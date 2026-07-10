@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -41,6 +42,16 @@ async def _token(client: httpx.AsyncClient) -> str:
     )
 
 
+def _range_path(cells: str) -> str:
+    """A1 notation with URL-encoded sheet tab name (한글 콘티)."""
+    return quote(f"{CONTI_TAB}!{cells}", safe="")
+
+
+def _values_url(spreadsheet_id: str, cells: str, action: str = "") -> str:
+    suffix = f":{action}" if action else ""
+    return f"{SHEETS}/{spreadsheet_id}/values/{_range_path(cells)}{suffix}"
+
+
 async def _ensure_conti_tab(client: httpx.AsyncClient, spreadsheet_id: str) -> None:
     token = await _token(client)
     meta = await client.get(
@@ -68,7 +79,7 @@ async def _ensure_conti_tab(client: httpx.AsyncClient, spreadsheet_id: str) -> N
     ).raise_for_status()
 
     await client.put(
-        f"{SHEETS}/{spreadsheet_id}/values/{CONTI_TAB}!A1:E1",
+        _values_url(spreadsheet_id, "A1:E1"),
         headers={"Authorization": f"Bearer {token}"},
         params={"valueInputOption": "USER_ENTERED"},
         json={"values": [list(HEADERS)]},
@@ -92,7 +103,9 @@ async def _create_spreadsheet(client: httpx.AsyncClient, project: str) -> dict[s
         params={"fields": "id,webViewLink"},
         json=body,
     )
-    res.raise_for_status()
+    if res.status_code >= 400:
+        detail = res.text[:500]
+        raise RuntimeError(f"Drive create failed ({res.status_code}): {detail}")
     payload = res.json()
     spreadsheet_id = payload["id"]
     await _ensure_conti_tab(client, spreadsheet_id)
@@ -123,7 +136,7 @@ async def ensure_project_sheet(client: httpx.AsyncClient, project: str) -> tuple
 async def read_project_rows(client: httpx.AsyncClient, spreadsheet_id: str) -> list[dict[str, str]]:
     token = await _token(client)
     res = await client.get(
-        f"{SHEETS}/{spreadsheet_id}/values/{CONTI_TAB}!A2:E",
+        _values_url(spreadsheet_id, "A2:E"),
         headers={"Authorization": f"Bearer {token}"},
     )
     if res.status_code == 400:
@@ -147,13 +160,14 @@ async def write_project_rows(
     values = [list(HEADERS)] + [[row[h] for h in HEADERS] for row in data]
 
     await client.post(
-        f"{SHEETS}/{spreadsheet_id}/values/{CONTI_TAB}!A:E:clear",
+        _values_url(spreadsheet_id, "A:E", "clear"),
         headers={"Authorization": f"Bearer {token}"},
-    )
+        json={},
+    ).raise_for_status()
 
     if values:
         await client.put(
-            f"{SHEETS}/{spreadsheet_id}/values/{CONTI_TAB}!A1:E{len(values)}",
+            _values_url(spreadsheet_id, f"A1:E{len(values)}"),
             headers={"Authorization": f"Bearer {token}"},
             params={"valueInputOption": "USER_ENTERED"},
             json={"values": values},
@@ -172,7 +186,7 @@ async def append_project_rows(
         return 0
     values = [[row[h] for h in HEADERS] for row in data]
     await client.post(
-        f"{SHEETS}/{spreadsheet_id}/values/{CONTI_TAB}!A:E:append",
+        _values_url(spreadsheet_id, "A:E", "append"),
         headers={"Authorization": f"Bearer {token}"},
         params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},
         json={"values": values},

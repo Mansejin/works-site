@@ -57,9 +57,12 @@ async def sheet_meta() -> dict[str, Any]:
 
 @router.get("/sheet/ensure")
 async def sheet_ensure(project: str = "default") -> dict[str, Any]:
-    if sheets_native_configured():
-        return await native_sheet_ensure(project)
-    return await _apps_script_request("GET", {"action": "ensure", "project": project})
+    try:
+        if sheets_native_configured():
+            return await native_sheet_ensure(project)
+        return await _apps_script_request("GET", {"action": "ensure", "project": project})
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.get("/sheet/get")
@@ -71,13 +74,16 @@ async def sheet_get(project: str = "default") -> dict[str, Any]:
 
 @router.post("/sheet/replace")
 async def sheet_replace(body: SheetRowsBody) -> dict[str, Any]:
-    if sheets_native_configured():
-        return await native_sheet_replace(body.project, body.rows)
-    return await _apps_script_request(
-        "POST",
-        {"action": "replace"},
-        {"project": body.project, "rows": body.rows},
-    )
+    try:
+        if sheets_native_configured():
+            return await native_sheet_replace(body.project, body.rows)
+        return await _apps_script_request(
+            "POST",
+            {"action": "replace"},
+            {"project": body.project, "rows": body.rows},
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/sheet/append")
