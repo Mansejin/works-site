@@ -1,0 +1,99 @@
+# Push api/ changes -> Tailscale -> SSH -> NAS git pull + docker rebuild
+#
+# Setup: api/docs/deploy-nas-auto.md
+# Secrets: NAS_SSH_HOST, NAS_SSH_USER, NAS_SSH_KEY, TAILSCALE_AUTHKEY
+# Optional: NAS_REPO_PATH=/volume1/docker/works-site
+
+name: Deploy works-api to NAS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - ".github/workflows/deploy-nas.yml"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to deploy (empty = triggering branch)"
+        required: false
+        default: ""
+
+concurrency:
+  group: deploy-works-api-nas
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check deploy secrets
+        run: |
+          skip=false
+          if [ -z "${{ secrets.NAS_SSH_HOST }}" ] || [ -z "${{ secrets.NAS_SSH_USER }}" ] || [ -z "${{ secrets.NAS_SSH_KEY }}" ]; then
+            echo "::warning::NAS_SSH_* secrets missing — skip (api/docs/deploy-nas-auto.md)"
+            skip=true
+          fi
+          if [ -z "${{ secrets.TAILSCALE_AUTHKEY }}" ]; then
+            echo "::error::TAILSCALE_AUTHKEY missing — use DSM Task Scheduler (section A) instead."
+            skip=true
+          fi
+          if [ "$skip" = "true" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        id: check
+
+      - name: Connect Tailscale
+        if: steps.check.outputs.skip != 'true'
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Wait for NAS SSH port
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          host="${{ secrets.NAS_SSH_HOST }}"
+          port="${{ secrets.NAS_SSH_PORT }}"
+          port="${port:-22}"
+          for i in $(seq 1 30); do
+            if timeout 2 bash -c "cat < /dev/null > /dev/tcp/${host}/${port}" 2>/dev/null; then
+              echo "NAS SSH port open"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Cannot reach NAS at ${host}:${port}"
+          exit 1
+
+      - name: Deploy via SSH
+        if: steps.check.outputs.skip != 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.NAS_SSH_HOST }}
+          username: ${{ secrets.NAS_SSH_USER }}
+          key: ${{ secrets.NAS_SSH_KEY }}
+          passphrase: ${{ secrets.NAS_SSH_PASSPHRASE }}
+          port: ${{ secrets.NAS_SSH_PORT || 22 }}
+          command_timeout: 15m
+          envs: WORKS_BRANCH,NAS_REPO_PATH,WORKS_DOCKER_SUDO
+          script: |
+            set -e
+            REPO="${NAS_REPO_PATH:-/volume1/docker/works-site}"
+            export PATH="/usr/local/bin:/var/packages/ContainerManager/target/usr/bin:/var/packages/Docker/target/usr/bin:/var/packages/Git/target/usr/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+            export WORKS_BRANCH
+            export WORKS_DOCKER_SUDO="${WORKS_DOCKER_SUDO:-1}"
+            curl -fsSL "https://raw.githubusercontent.com/Mansejin/works-site/${WORKS_BRANCH}/api/scripts/nas-docker-update.sh" -o /tmp/works-api-deploy.sh
+            sed -i 's/\r$//' /tmp/works-api-deploy.sh 2>/dev/null || true
+            cd "$REPO"
+            sh /tmp/works-api-deploy.sh
+        env:
+          WORKS_BRANCH: ${{ github.event.inputs.branch || github.ref_name }}
+          NAS_REPO_PATH: ${{ secrets.NAS_REPO_PATH }}
+          WORKS_DOCKER_SUDO: "1"
+
+      - name: Summary
+        if: steps.check.outputs.skip != 'true'
+        run: echo "works-api NAS deploy finished for branch ${{ github.event.inputs.branch || github.ref_name }}"

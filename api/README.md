@@ -61,6 +61,18 @@ curl https://works-api.mansejin.com/api/dddit/config
 
 브라우저에서 시나리오 머신 열면 API 설정 없이 서치·콘티·시트 버튼 사용 가능.
 
+## 자동 배포 (push만 하면 NAS 반영)
+
+sgb(`auto_script`)와 같은 방식입니다. **한 번만** DSM 작업 스케줄러를 켜 두면 `sudo docker compose up -d --build`를 직접 칠 필요가 없습니다.
+
+→ **[api/docs/deploy-nas-auto.md](docs/deploy-nas-auto.md)** (스케줄러 10분 / GitHub Actions+Tailscale)
+
+요약:
+
+1. NAS에 `git clone` → `/volume1/docker/works-site`
+2. DSM 작업: `sh /volume1/docker/works-site/api/scripts/nas-dsm-task.sh` (10분마다, **root**)
+3. `api/` push → 자동 pull + rebuild (`dddit/`만 바뀐 push는 docker 스킵)
+
 ## API
 
 | Method | Path | 설명 |
