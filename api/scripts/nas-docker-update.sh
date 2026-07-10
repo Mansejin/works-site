@@ -141,7 +141,16 @@ api_changed() {
   fi
   GIT=$(resolve_git)
   if [ -z "$GIT" ]; then
-    return 0
+    ensure_docker_access
+    if $DOCKER run --rm \
+      --entrypoint sh \
+      -v "$REPO_DIR:/git" \
+      -w /git \
+      "$GIT_IMAGE" \
+      -ec "git diff --name-only '$old_rev' '$new_rev' 2>/dev/null | grep -q '^api/'"; then
+      return 0
+    fi
+    return 1
   fi
   if "$GIT" -C "$REPO_DIR" diff --name-only "$old_rev" "$new_rev" 2>/dev/null | grep -q '^api/'; then
     return 0
@@ -207,7 +216,10 @@ if [ ! -d .git ]; then
   exit 1
 fi
 
-OLD_REV=$(git_current_rev)
+if [ -z "$WORKS_PRE_SYNC_REV" ]; then
+  WORKS_PRE_SYNC_REV=$(git_current_rev)
+fi
+OLD_REV="$WORKS_PRE_SYNC_REV"
 git_sync_deploy
 
 REPO_SCRIPT="$REPO_DIR/api/scripts/nas-docker-update.sh"
@@ -216,6 +228,7 @@ case "$0" in
   *)
     if [ -f "$REPO_SCRIPT" ]; then
       log "==> re-exec deploy script from repo (post git sync)"
+      export WORKS_PRE_SYNC_REV="$OLD_REV"
       exec sh "$REPO_SCRIPT" "$@"
     fi
     ;;
