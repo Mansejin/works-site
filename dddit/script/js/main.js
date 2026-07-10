@@ -2542,7 +2542,7 @@ let RESEARCH = null;
 const REQUIRED_PART_KEYWORDS = ['디자인', '실사용', '가격', '총평'];
 
 const STORAGE_KEY = 'dididit-script-machine-v1';
-const PROJECT_STORAGE_KEY = 'dididit-project-v1';
+const PROJECT_STORAGE_PREFIX = 'dididit-project-v1';
 const SHEET_SETTINGS_KEY = 'dididit-sheet-settings-v1';
 
 const state = {
@@ -2586,6 +2586,14 @@ const state = {
 };
 
 const $ = (sel) => document.querySelector(sel);
+
+function getSheetSlug() {
+  return window.DdditSheetSync?.projectSlug?.() || 'default';
+}
+
+function projectStorageKey() {
+  return `${PROJECT_STORAGE_PREFIX}-${getSheetSlug()}`;
+}
 
 function isApiReady() {
   const api = window.DdditWorksApi;
@@ -2704,7 +2712,7 @@ function saveProject() {
     syncBriefFromDOM();
     syncSpecsFromDOM();
     localStorage.setItem(
-      PROJECT_STORAGE_KEY,
+      projectStorageKey(),
       JSON.stringify({
         productName: state.productName,
         contentDirection: state.contentDirection,
@@ -2724,8 +2732,6 @@ function saveProject() {
         draftReason: state.draftReason,
         lineupConfirmed: state.lineupConfirmed,
         currentPartIndex: state.currentPartIndex,
-        allRows: state.allRows,
-        partSegments: state.partSegments,
         teamBriefNotes: state.teamBriefNotes,
         briefSource: state.briefSource,
         searchResults: state.searchResults,
@@ -2740,7 +2746,7 @@ function saveProject() {
 
 function loadProject() {
   try {
-    const saved = JSON.parse(localStorage.getItem(PROJECT_STORAGE_KEY) || '{}');
+    const saved = JSON.parse(localStorage.getItem(projectStorageKey()) || '{}');
     if (saved.productName) state.productName = saved.productName;
     if (saved.contentDirection) state.contentDirection = saved.contentDirection;
     if (saved.productNotes) state.productNotes = saved.productNotes;
@@ -2764,8 +2770,6 @@ function loadProject() {
       state.draftReason = saved.draftReason || '';
       state.lineupConfirmed = !!saved.lineupConfirmed;
       state.currentPartIndex = saved.currentPartIndex ?? -1;
-      state.allRows = saved.allRows || [];
-      state.partSegments = saved.partSegments || [];
     }
     if (saved.searchResults) state.searchResults = saved.searchResults;
     if (saved.searchDeviceId) state.searchDeviceId = saved.searchDeviceId;
@@ -2773,6 +2777,119 @@ function loadProject() {
     if (saved.briefSource) state.briefSource = saved.briefSource;
   } catch {
     /* ignore */
+  }
+}
+
+function applyProjectSeed(seed) {
+  if (!seed || typeof seed !== 'object') return false;
+  let applied = false;
+  const setIfEmpty = (key, value) => {
+    if (value == null || value === '') return;
+    if (typeof state[key] === 'string' && !state[key].trim()) {
+      state[key] = value;
+      applied = true;
+    }
+  };
+  setIfEmpty('productName', seed.productName);
+  setIfEmpty('contentDirection', seed.contentDirection);
+  setIfEmpty('briefSource', seed.briefSource);
+  if (seed.teamBriefNotes && !String(state.teamBriefNotes || '').trim()) {
+    state.teamBriefNotes = seed.teamBriefNotes;
+    applied = true;
+  }
+  if (seed.reviewBrief && typeof seed.reviewBrief === 'object') {
+    state.reviewBrief = { ...state.reviewBrief, ...seed.reviewBrief };
+    applied = true;
+  }
+  if (typeof seed.adMode === 'boolean' && !state.adMode) {
+    state.adMode = seed.adMode;
+    applied = true;
+  }
+  setIfEmpty('adBrand', seed.adBrand);
+  if (Array.isArray(seed.adGuides) && !state.adGuides.length) {
+    state.adGuides = seed.adGuides;
+    applied = true;
+  }
+  if (seed.categoryId) {
+    state.categoryId = seed.categoryId;
+    applied = true;
+  }
+  return applied;
+}
+
+function importBrandPlanFromStorage(project) {
+  if (!project || project === 'default') return false;
+  try {
+    const raw = localStorage.getItem(`works/dddit/${project}/plan`);
+    if (!raw) return false;
+    const data = JSON.parse(raw)?.data;
+    if (!data || typeof data !== 'object') return false;
+    return applyProjectSeed({
+      productName: data.title,
+      contentDirection: data.summary || data.keyMessage,
+      teamBriefNotes: [data.reviewGuide, data.brandMust, data.notes].filter(Boolean).join('\n\n'),
+      briefSource: 'team',
+      adMode: true,
+      adBrand: project === 'vendict' ? '벤딕트' : '',
+      reviewBrief: {
+        thesis: data.keyMessage || '',
+        targetScenario: data.targetAudience || '',
+        mustHighlight: data.brandMust || '',
+        carefulPoints: data.brandAvoid || '',
+        compareWith: '',
+      },
+    });
+  } catch {
+    return false;
+  }
+}
+
+async function importProjectSeed(project) {
+  if (!project || project === 'default') return false;
+  try {
+    const res = await fetch(`data/project-seeds/${encodeURIComponent(project)}.json`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return false;
+    const seed = await res.json();
+    return applyProjectSeed(seed);
+  } catch {
+    return false;
+  }
+}
+
+function applyRowsFromSheet(data, { silent = false } = {}) {
+  const rows = (data?.rows || []).map((r) => ({
+    대본: r.대본 || '',
+    장면: r.장면 || '',
+    사이즈: r.사이즈 || '',
+    자막: r.자막 || '',
+    코멘트: r.코멘트 || '',
+  }));
+  state.allRows = rows;
+  state.partSegments = [];
+  state.selectedPartIndex = null;
+  state._lastPartRows = [];
+  const project = getSheetSlug();
+  if (data?.spreadsheetUrl) rememberSheetUrl(project, data.spreadsheetUrl);
+  renderTable();
+  updateSheetStatus(`시트 ${rows.length}행 · 원본(SSOT)`);
+  if (!silent) showToast(`시트에서 ${rows.length}행을 불러왔습니다.`);
+  return rows.length;
+}
+
+async function maybePullSheetOnBoot() {
+  if (state.allRows.length) return;
+  const sync = window.DdditSheetSync;
+  if (!sync) return;
+  const project = getSheetSlug();
+  try {
+    const info = await sync.lookup(getSheetConfig(), project);
+    if (!info.exists) return;
+    const data = await sync.pull(getSheetConfig(), project);
+    applyRowsFromSheet(data, { silent: true });
+  } catch {
+    /* sheet optional on boot */
   }
 }
 
@@ -4347,7 +4464,7 @@ function renderTable() {
 
   if (!state.allRows.length) {
     tbody.innerHTML =
-      '<tr><td colspan="5" class="empty">AI 생성 후 여기에 미리보기가 표시됩니다</td></tr>';
+      '<tr><td colspan="2" class="empty">AI 생성 또는 시트 불러오기 후 미리보기가 표시됩니다</td></tr>';
     updateStats();
     return;
   }
@@ -4366,9 +4483,6 @@ function renderTable() {
     <tr data-idx="${i}" class="${rowClasses.join(' ')}">
       <td>${renderPreviewCell(r.대본)}</td>
       <td>${renderPreviewCell(r.장면)}</td>
-      <td>${renderPreviewCell(r.사이즈)}</td>
-      <td>${renderPreviewCell(r.자막)}</td>
-      <td>${renderPreviewCell(r.코멘트)}</td>
     </tr>`;
     })
     .join('');
@@ -5036,10 +5150,6 @@ function reindexPartSegments() {
 
 /* ── Google 시트 연동 ── */
 
-function getSheetSlug() {
-  return window.DdditSheetSync?.projectSlug?.() || 'default';
-}
-
 function loadSheetSettingsStore() {
   try {
     return JSON.parse(localStorage.getItem(SHEET_SETTINGS_KEY) || '{}');
@@ -5199,30 +5309,22 @@ async function pullFromSheet() {
   const sync = window.DdditSheetSync;
   if (!sync) return showToast('시트 모듈을 불러오지 못했습니다.', true);
 
-  if (state.allRows.length && !confirm('시트 내용으로 미리보기를 덮어쓸까요?\n(파트 구분 정보는 초기화됩니다. AI 파트 수정은 시트 불러오기 후 제한될 수 있습니다.)')) return;
+  if (
+    state.allRows.length &&
+    !confirm('시트 내용으로 미리보기를 덮어쓸까요?\n(파트 구분은 초기화됩니다. 시트가 최신 원본입니다.)')
+  ) {
+    return;
+  }
 
   const project = getSheetSlug();
   setLoading(true, '시트에서 불러오는 중…');
   try {
     const data = await sync.pull(getSheetConfig(), project);
-    state.allRows = (data.rows || []).map((r) => ({
-      대본: r.대본 || '',
-      장면: r.장면 || '',
-      사이즈: r.사이즈 || '',
-      자막: r.자막 || '',
-      코멘트: r.코멘트 || '',
-    }));
-    state.partSegments = [];
-    state.selectedPartIndex = null;
-    state._lastPartRows = [];
-    if (data.spreadsheetUrl) rememberSheetUrl(project, data.spreadsheetUrl);
-    saveProject();
-    renderTable();
-    updateSheetStatus(`시트에서 ${state.allRows.length}행 불러옴`);
-    showToast(`시트에서 ${state.allRows.length}행을 불러왔습니다.`);
+    applyRowsFromSheet(data);
   } catch (err) {
     reportError('pullFromSheet', err);
     showToast(err.message || '시트 불러오기 실패', true);
+    updateSheetStatus(err.message || '시트 불러오기 실패', true);
   } finally {
     setLoading(false);
   }
@@ -5557,6 +5659,12 @@ async function boot() {
     RESEARCH_LOG?.updateBadge();
     loadState();
     loadProject();
+    const project = getSheetSlug();
+    if (importBrandPlanFromStorage(project)) {
+      showToast('브랜드 기획안을 불러왔습니다.', false);
+    }
+    await importProjectSeed(project);
+    saveProject();
     renderModelOptions();
     renderCategoryOptions();
     applyBriefToDOM();
@@ -5570,6 +5678,7 @@ async function boot() {
       await window.DdditWorksApi.loadConfig().catch(() => null);
     }
     await initSheetIntegration();
+    await maybePullSheetOnBoot();
     bindErrorLogUI();
     bindErrorLogging();
     bindBeforeUnload();

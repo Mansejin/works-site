@@ -8,8 +8,14 @@ window.DdditWorksApi = (function () {
   let configCache = null;
   let configPromise = null;
 
+  function isLocalDevBackend() {
+    const host = location.hostname;
+    if (!/^localhost$|^127\.0\.0\.1$/i.test(host)) return false;
+    return new URLSearchParams(location.search).get("api") !== "direct";
+  }
+
   function isBackendMode() {
-    return HOSTED;
+    return HOSTED || isLocalDevBackend();
   }
 
   function baseUrl() {

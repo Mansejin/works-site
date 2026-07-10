@@ -8,7 +8,15 @@
 
 ## 로컬 실행
 
-디디딧 유튜브 채널용 리뷰 **콘티(엑셀 5열)** 를 **브리프 → 파트 → 대본 → TSV** 흐름으로 작성하는 HTML 도구입니다.
+```bash
+./dddit/script/start-local.sh
+# http://localhost:8080/dddit/script/?project=vendict
+```
+
+- **works-api 자동 연동** (API 키 불필요). 직접 Gemini만 쓰려면 URL에 `?api=direct` 추가.
+- 시트·생성 rows는 **세션 버퍼** — Google 시트가 원본(SSOT). 프로젝트별 브리프만 localStorage.
+
+레거시: `열기.bat` / `index.html` 더블클릭 (`file://`는 시드 JSON·시트 연동 제한)
 
 ## 최종 목표
 
