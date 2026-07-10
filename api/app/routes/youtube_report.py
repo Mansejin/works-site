@@ -274,6 +274,9 @@ def _promo_matches_video(title: str, video_id: str, promo: dict[str, Any]) -> bo
         return False
     if video_title in title_norm or title_norm in video_title:
         return True
+    promo_core = re.sub(r"\s*\([^)]*\)", "", _normalize_match_text(promo.get("title")))
+    if len(promo_core) >= 4 and promo_core in title_norm:
+        return True
     return len(video_title) >= 8 and video_title[:24] in title_norm
 
 
@@ -292,14 +295,18 @@ def _short_video_label(title: str, video_id: str, promotions: list[dict[str, Any
             if short:
                 return short[:18]
     if "?" in title:
-        tail = title.split("?", 1)[1].strip()
+        head, tail = title.split("?", 1)
         tail = re.sub(
             r"\s*(리뷰|사용기|직접 써봤습니다|써봤습니다|개봉기).*$",
             "",
-            tail,
+            tail.strip(),
         ).strip()
-        if tail:
+        generic_tails = ("직접", "써보니", "개봉", "사용해", "현실", "이게", "진짜")
+        if tail and not any(tail.startswith(word) for word in generic_tails):
             return tail[:18]
+        head_short = head.strip()
+        if head_short:
+            return head_short[:18]
     compact = title.strip()
     return compact[:14] + "…" if len(compact) > 14 else compact
 
