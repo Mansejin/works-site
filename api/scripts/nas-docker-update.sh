@@ -221,20 +221,24 @@ if [ -z "$WORKS_PRE_SYNC_REV" ]; then
 fi
 OLD_REV="$WORKS_PRE_SYNC_REV"
 git_sync_deploy
+SYNCED_REV=$(git_current_rev)
 
 REPO_SCRIPT="$REPO_DIR/api/scripts/nas-docker-update.sh"
 case "$0" in
   "$REPO_SCRIPT"|*/api/scripts/nas-docker-update.sh) ;;
   *)
     if [ -f "$REPO_SCRIPT" ]; then
+      if [ "$OLD_REV" != "$SYNCED_REV" ]; then
+        log "==> re-exec deploy script from repo (post git sync, rebuild)"
+        exec sh "$REPO_SCRIPT" --full-build "$@"
+      fi
       log "==> re-exec deploy script from repo (post git sync)"
-      export WORKS_PRE_SYNC_REV="$OLD_REV"
       exec sh "$REPO_SCRIPT" "$@"
     fi
     ;;
 esac
 
-NEW_REV=$(git_current_rev)
+NEW_REV="$SYNCED_REV"
 
 if [ "$PULL_ONLY" = "1" ]; then
   log "==> pull only (--pull-only)"
