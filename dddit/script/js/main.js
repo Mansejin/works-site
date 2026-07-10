@@ -1016,13 +1016,20 @@ ${blocks.join('\n\n')}`.trim();
     const specsBlock = formatSpecsBlock(state.productSpecs, state.categoryId);
     const briefBlock = formatReviewBriefBlock(state.reviewBrief);
     const extraNotes = String(state.productNotes || '').trim();
+    const teamNotes = String(state.teamBriefNotes || '').trim();
+    const teamBlock = teamNotes ? `\n## 팀 제공 자료 (최우선 반영)\n${teamNotes}` : '';
+    const sourceNote =
+      state.briefSource === 'team'
+        ? '\n- 브리프 출처: 팀 제공 (자동 서치 생략). 팀 자료·구조화 제원·리뷰 방향을 함께 반영.'
+        : '';
 
     return `
 # 제품 브리프
 제품명: ${state.productName}
 카테고리: ${cat.name || '기타'} — ${cat.focusHints || ''}
 콘텐츠 방향: ${state.contentDirection || '(미입력)'}
-가격·라인업: ${state.priceInfo || '(미입력)'}
+가격·라인업: ${state.priceInfo || '(미입력)'}${sourceNote}
+${teamBlock}
 
 ## 구조화 제원
 ${specsBlock}
@@ -1031,8 +1038,9 @@ ${extraNotes ? `\n## 추가 메모\n${extraNotes}` : ''}
 ## 리뷰 방향 (콘티·대본에 반영)
 ${briefBlock}
 
-## 콘티 출력 규칙
-- 최종 산출물은 스프레드시트 5열: 대본 | 장면 | 사이즈 | 자막 | 코멘트
+## 작성 파이프라인
+- 1단계: 파트별 내레이션 원문(prose) — 행·글자 수 제한 없이 자연스러운 호흡으로
+- 2단계: 원문을 스프레드시트 5열로 변환 — 대본 | 장면 | 사이즈 | 자막 | 코멘트
 - 제원·수치는 대본에 자연스럽게 녹이고, 스펙 나열형 낭독은 지양
 - 리뷰 방향의 mustHighlight는 빠뜨리지 말 것, carefulPoints는 디디딧 톤으로 솔직히
 ${adBlock ? `\n${adBlock}\n` : ''}${refBlock ? `\n${refBlock}` : ''}`.trim();
@@ -1967,6 +1975,7 @@ JSON만 출력: {"queries":["..."],"rationale":"계획 한 줄"}`;
 
   async function callGeminiGrounded(apiKey, prompt, options = {}) {
     const model = options.model || RESEARCH_GEMINI_MODEL;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     const generationConfig = { temperature: options.temperature ?? 0.25 };
     if (options.jsonMime !== false) {
@@ -1983,9 +1992,22 @@ JSON만 출력: {"queries":["..."],"rationale":"계획 한 줄"}`;
     if (options.useSearch !== false) {
       body.tools = [{ google_search: {} }];
     }
-    const res = await window.DdditWorksApi.postGemini(model, body, apiKey);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
-    const data = res;
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      const msg = errBody?.error?.message || `API 오류 (${res.status})`;
+      const e = new Error(msg);
+      e.apiStatus = res.status;
+      e.apiModel = model;
+      throw e;
+    }
+
+    const data = await res.json();
     const candidate = data?.candidates?.[0];
     let text = candidate?.content?.parts?.[0]?.text;
     if (!text && candidate?.content?.parts) {
@@ -2513,17 +2535,7 @@ let RESEARCH = null;
 const REQUIRED_PART_KEYWORDS = ['디자인', '실사용', '가격', '총평'];
 
 const STORAGE_KEY = 'dididit-script-machine-v1';
-const PROJECT_SLUG = new URLSearchParams(location.search).get('project') || 'default';
-const PROJECT_STORAGE_KEY = `dididit-project-v1:${PROJECT_SLUG}`;
-
-const WORKSPACE_PROJECTS = {
-  xenics: {
-    label: 'Xenics 데스크테리어',
-    contentDirection: '제닉스 제품 데스크 세팅 완성',
-    adMode: true,
-    adBrand: '제닉스',
-  },
-};
+const PROJECT_STORAGE_KEY = 'dididit-project-v1';
 
 const state = {
   apiKey: '',
@@ -2558,52 +2570,11 @@ const state = {
   selectedPartIndex: null,
   searchResults: null,
   searchDeviceId: 'dehumidifier',
-  briefSource: 'search',
-  teamBriefNotes: '',
-  useProsePipeline: true,
-  flexibleLineup: false,
-  autoPushConti: true,
-  geminiContents: [],
-  partProse: {},
   workflowStep: 1,
   currentPage: 1,
-  sheetApiUrl: '',
-  sheetToken: '',
-  sheetOpenUrl: '',
 };
 
 const $ = (sel) => document.querySelector(sel);
-
-function apiReady() {
-  if (window.DdditWorksApi?.isBackendMode?.()) {
-    return window.DdditWorksApi.isApiReady(state.apiKey);
-  }
-  return Boolean(state.apiKey?.trim());
-}
-
-function applyBackendUI() {
-  if (!window.DdditWorksApi?.isBackendMode?.()) return;
-  document.querySelectorAll('[data-local-only]').forEach((el) => {
-    el.hidden = true;
-  });
-  const note = $('#backend-settings-note');
-  if (note) note.hidden = false;
-  const status = $('#sheet-sync-status');
-  if (status) status.hidden = false;
-}
-
-async function initBackend() {
-  if (!window.DdditWorksApi?.isBackendMode?.()) return true;
-  try {
-    await window.DdditWorksApi.loadConfig();
-    applyBackendUI();
-    updateSheetSyncStatus();
-    return true;
-  } catch (err) {
-    showToast(`NAS API 연결 실패: ${err.message}`, true);
-    return false;
-  }
-}
 
 function bindModules() {
   const cfg = window.DIDIDIT_CONFIG;
@@ -2647,9 +2618,6 @@ function loadState() {
     } else if (saved.model && isSupportedGeminiModel(saved.model)) {
       /* legacy: single model was lite default */
     }
-    if (saved.sheetApiUrl) state.sheetApiUrl = saved.sheetApiUrl;
-    if (saved.sheetToken) state.sheetToken = saved.sheetToken;
-    if (saved.sheetOpenUrl) state.sheetOpenUrl = saved.sheetOpenUrl;
   } catch {
     /* ignore */
   }
@@ -2689,223 +2657,14 @@ function getModelLabel(modelId) {
 }
 
 function saveSettings() {
-  syncSheetSettingsFromDOM();
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
       apiKey: state.apiKey,
       modelLite: state.modelLite,
       modelPro: state.modelPro,
-      sheetApiUrl: state.sheetApiUrl,
-      sheetToken: state.sheetToken,
-      sheetOpenUrl: state.sheetOpenUrl,
     })
   );
-}
-
-function syncSheetSettingsFromDOM() {
-  state.sheetApiUrl = $('#sheet-api-url')?.value.trim() || '';
-  state.sheetToken = $('#sheet-api-token')?.value.trim() || '';
-  state.sheetOpenUrl = $('#sheet-open-url')?.value.trim() || '';
-}
-
-function applySheetSettingsToDOM() {
-  if ($('#sheet-api-url')) $('#sheet-api-url').value = state.sheetApiUrl || '';
-  if ($('#sheet-api-token')) $('#sheet-api-token').value = state.sheetToken || '';
-  if ($('#sheet-open-url')) $('#sheet-open-url').value = state.sheetOpenUrl || '';
-  updateSheetSyncStatus();
-}
-
-function sheetConfig() {
-  return {
-    apiUrl: state.sheetApiUrl,
-    token: state.sheetToken,
-    openUrl: state.sheetOpenUrl,
-  };
-}
-
-function updateSheetSyncStatus() {
-  const el = $('#sheet-sync-status');
-  if (!el) return;
-  const project = window.DdditSheetSync?.projectSlug() || 'default';
-  const tab = window.DdditSheetSync?.tabLabel(project) || project;
-
-  if (window.DdditSheetSync?.useBackend?.()) {
-    const open = window.DdditWorksApi?.sheetOpenUrl?.();
-    el.textContent = open
-      ? `NAS 연동 · 프로젝트 탭: ${tab} · 시트 연결됨`
-      : `NAS 연동 · 프로젝트 탭: ${tab}`;
-    return;
-  }
-
-  const cfg = sheetConfig();
-  const parts = [`프로젝트 탭: ${tab}`];
-  if (!cfg.apiUrl) parts.push('시트 API URL 미설정');
-  else parts.push('API URL 설정됨');
-  if (!cfg.token) parts.push('API 토큰 미설정');
-  else parts.push(`API 토큰 설정됨 (${cfg.token.length}자)`);
-  if (!cfg.openUrl) parts.push('시트 열기 URL 미설정');
-  else parts.push('시트 링크 설정됨');
-  el.textContent = parts.join(' · ');
-}
-
-function toggleSheetTokenVisibility() {
-  const input = $('#sheet-api-token');
-  const btn = $('#btn-toggle-sheet-token');
-  if (!input || !btn) return;
-  const show = input.type === 'password';
-  input.type = show ? 'text' : 'password';
-  btn.textContent = show ? '숨기기' : '표시';
-  btn.setAttribute('aria-pressed', show ? 'true' : 'false');
-}
-
-function contiProjectSlug() {
-  return PROJECT_SLUG;
-}
-
-function contiEditorUrl(project = contiProjectSlug()) {
-  const params = new URLSearchParams();
-  params.set('project', project);
-  const title = state.productName.trim() || WORKSPACE_PROJECTS[project]?.label;
-  if (title) params.set('title', title);
-  return `${location.origin}/dddit/conti/?${params}`;
-}
-
-function usesFlexibleLineup() {
-  return state.flexibleLineup || state.briefSource === 'team';
-}
-
-function getLineupRulesPromptBlock() {
-  if (usesFlexibleLineup()) {
-    return `구성 규칙 (유동):
-- 프롤로그 + 총평은 반드시 포함
-- 본문은 제품·팀 브리프에 맞게 1~3개 파트로 유동 구성 (디자인/실사용/가격을 무조건 분리할 필요 없음)
-- 팀 제공 자료·콘텐츠 방향을 최우선 반영`;
-  }
-  return `필수 포함: 디자인, 실사용, 가격, 총평 (파트 제목에 반영)`;
-}
-
-async function pushContiToNas(options = {}) {
-  const api = window.DdditContiApi;
-  if (!api) return showToast('콘티 API를 불러오지 못했습니다.', true);
-  if (!state.allRows.length) return showToast('보낼 콘티가 없습니다.', true);
-
-  const project = contiProjectSlug();
-  const silent = !!options.silent;
-  if (
-    !silent &&
-    !confirm(
-      `콘티 에디터 「${project}」에 ${state.allRows.length}행을 덮어씁니다.\nNAS에 저장되며 팀 실시간 편집에 반영됩니다. 계속할까요?`
-    )
-  ) {
-    return false;
-  }
-
-  try {
-    if (!silent) showToast('콘티 에디터로 보내는 중…');
-    const title = state.productName.trim() || WORKSPACE_PROJECTS[project]?.label || project;
-    const result = await api.save(project, {
-      title,
-      rows: state.allRows,
-      updatedAt: Date.now(),
-    });
-    const count = result.rows?.length || state.allRows.length;
-    showToast(
-      silent
-        ? `전체 파트 완료 · 콘티 ${count}행 NAS 저장됨`
-        : `콘티 에디터에 ${count}행 저장됨`
-    );
-    if (options.open) window.open(contiEditorUrl(project), '_blank', 'noopener,noreferrer');
-    return true;
-  } catch (err) {
-    reportError('pushContiToNas', err);
-    if (!silent) showToast(err.message || 'NAS 콘티 저장 실패', true);
-    return false;
-  }
-}
-
-function openContiEditor() {
-  window.open(contiEditorUrl(), '_blank', 'noopener,noreferrer');
-}
-
-async function pushContiToSheet() {
-  if (!state.allRows.length) return showToast('보낼 콘티가 없습니다.', true);
-  if (!window.DdditSheetSync) return showToast('시트 연동 모듈을 불러오지 못했습니다.', true);
-  if (!window.DdditSheetSync.useBackend()) {
-    syncSheetSettingsFromDOM();
-    saveSettings();
-  }
-  const project = PROJECT_SLUG;
-  const tab = window.DdditSheetSync.tabLabel(project);
-  if (
-    !confirm(
-      `「${tab}」 탭에 콘티 ${state.allRows.length}행을 덮어씁니다.\n시트에서 수정한 내용이 사라질 수 있습니다. 계속할까요?`
-    )
-  ) {
-    return;
-  }
-  try {
-    showToast('시트로 보내는 중…');
-    const result = await window.DdditSheetSync.pushReplace(sheetConfig(), state.allRows, project);
-    showToast(`시트 「${result.tab || tab}」에 ${result.rowCount}행 저장됨`);
-    saveProject();
-  } catch (err) {
-    reportError('pushContiToSheet', err);
-    showToast(err.message || '시트 저장 실패', true);
-  }
-}
-
-async function pullContiFromSheet() {
-  if (!window.DdditSheetSync) return showToast('시트 연동 모듈을 불러오지 못했습니다.', true);
-  if (!window.DdditSheetSync.useBackend()) {
-    syncSheetSettingsFromDOM();
-    saveSettings();
-  }
-  const project = PROJECT_SLUG;
-  const tab = window.DdditSheetSync.tabLabel(project);
-  if (state.allRows.length) {
-    if (!confirm(`시트 「${tab}」에서 불러오면 현재 콘티(${state.allRows.length}행)를 덮어씁니다. 계속할까요?`)) {
-      return;
-    }
-  }
-  try {
-    showToast('시트에서 불러오는 중…');
-    const result = await window.DdditSheetSync.pull(sheetConfig(), project);
-    state.allRows = (result.rows || []).map((r) => ({
-      대본: r.대본 || '',
-      장면: r.장면 || '',
-      사이즈: r.사이즈 || '',
-      자막: r.자막 || '',
-      코멘트: r.코멘트 || '',
-    }));
-    state.partSegments =
-      state.allRows.length > 0
-        ? [{ partIndex: 0, partName: '시트', start: 0, end: state.allRows.length - 1 }]
-        : [];
-    state.selectedPartIndex = null;
-    renderTable();
-    saveProject();
-    updateWorkflowStep(4);
-    showToast(`시트 「${result.tab || tab}」에서 ${state.allRows.length}행 불러옴`);
-  } catch (err) {
-    reportError('pullContiFromSheet', err);
-    showToast(err.message || '시트 불러오기 실패', true);
-  }
-}
-
-function openContiSheet() {
-  const url =
-    window.DdditWorksApi?.sheetOpenUrl?.() ||
-    (() => {
-      syncSheetSettingsFromDOM();
-      saveSettings();
-      return state.sheetOpenUrl?.trim();
-    })();
-  if (url) {
-    window.open(url, '_blank', 'noopener,noreferrer');
-    return;
-  }
-  showToast('시트 주소가 설정되지 않았습니다. NAS .env의 DDDIT_SHEET_OPEN_URL을 확인하세요.', true);
 }
 
 function saveProject() {
@@ -2921,10 +2680,6 @@ function saveProject() {
         productSpecs: state.productSpecs,
         reviewBrief: state.reviewBrief,
         priceInfo: state.priceInfo,
-        briefSource: state.briefSource,
-        teamBriefNotes: state.teamBriefNotes,
-        flexibleLineup: state.flexibleLineup,
-        autoPushConti: state.autoPushConti,
         categoryId: state.categoryId,
         referenceScripts: state.referenceScripts,
         adMode: state.adMode,
@@ -2956,16 +2711,6 @@ function loadProject() {
     if (saved.contentDirection) state.contentDirection = saved.contentDirection;
     if (saved.productNotes) state.productNotes = saved.productNotes;
     if (saved.priceInfo) state.priceInfo = saved.priceInfo;
-    if (saved.briefSource === 'team' || saved.briefSource === 'search') {
-      state.briefSource = saved.briefSource;
-    }
-    if (typeof saved.teamBriefNotes === 'string') state.teamBriefNotes = saved.teamBriefNotes;
-    if (state.briefSource === 'team') {
-      state.flexibleLineup = true;
-    } else if (typeof saved.flexibleLineup === 'boolean') {
-      state.flexibleLineup = saved.flexibleLineup;
-    }
-    if (typeof saved.autoPushConti === 'boolean') state.autoPushConti = saved.autoPushConti;
     if (saved.categoryId) state.categoryId = saved.categoryId;
     if (saved.productSpecs && typeof saved.productSpecs === 'object') {
       state.productSpecs = saved.productSpecs;
@@ -3006,8 +2751,6 @@ function applyBriefToDOM() {
   $('#brief-must').value = state.reviewBrief.mustHighlight || '';
   $('#brief-careful').value = state.reviewBrief.carefulPoints || '';
   $('#brief-compare').value = state.reviewBrief.compareWith || '';
-  if ($('#team-brief-notes')) $('#team-brief-notes').value = state.teamBriefNotes || '';
-  updateBriefSourceUI();
   renderSpecFields();
 }
 
@@ -3019,29 +2762,6 @@ function syncBriefFromDOM() {
     carefulPoints: $('#brief-careful')?.value.trim() || '',
     compareWith: $('#brief-compare')?.value.trim() || '',
   };
-  state.teamBriefNotes = $('#team-brief-notes')?.value.trim() || '';
-}
-
-function updateBriefSourceUI() {
-  const isTeam = state.briefSource === 'team';
-  $('#brief-source-badge')?.classList.toggle('hidden', !isTeam);
-  $('#team-brief-callout')?.classList.toggle('hidden', isTeam);
-  const flex = $('#lineup-flexible');
-  if (flex) {
-    flex.checked = usesFlexibleLineup();
-    flex.disabled = isTeam;
-  }
-  const rail1 = document.querySelector('.step-rail-item[data-rail="1"]');
-  if (rail1) rail1.title = isTeam ? '서치 생략됨 (팀 제공)' : '';
-}
-
-function startTeamBriefMode() {
-  state.briefSource = 'team';
-  state.flexibleLineup = true;
-  updateBriefSourceUI();
-  updateWorkflowStep(2);
-  saveProject();
-  showToast('팀 제공 모드 — 브리프를 작성하세요.');
 }
 
 function syncSpecsFromDOM() {
@@ -3111,7 +2831,7 @@ function loadAirPurifierExample() {
   applyBriefToDOM();
   updateCategoryHint();
   saveProject();
-  if (state.productName.trim() && apiReady()) updateWorkflowStep(3);
+  if (state.apiKey && state.productName.trim()) updateWorkflowStep(3);
   showToast('공기청정기 예시 브리프를 불러왔습니다. 실제 제품 정보로 수정하세요.');
 }
 
@@ -3331,7 +3051,7 @@ function deleteSearchResult(index) {
 }
 
 async function runDeviceSearch() {
-  if (!apiReady()) return showToast('API를 사용할 수 없습니다. NAS 연결 또는 API 키를 확인하세요.', true);
+  if (!state.apiKey) return showToast('Google API 키를 입력하세요. (상단 API)', true);
   if (!RESEARCH) return showToast('리서치 모듈을 불러오지 못했습니다.', true);
 
   const criteria = getSearchCriteriaFromDOM();
@@ -3817,7 +3537,7 @@ function updateActionDock() {
 
   if (btnReviseLineup) {
     btnReviseLineup.disabled =
-      !apiReady() || !state.partLineup.length || state.lineupConfirmed;
+      !state.apiKey || !state.partLineup.length || state.lineupConfirmed;
   }
 
   if (!state.lineupConfirmed) {
@@ -3839,7 +3559,7 @@ function updateActionDock() {
       label.textContent = hasSeg ? `수정 대상: ${name}` : `작성 대상: ${name}`;
     }
     if (progress) progress.textContent = `${done}/${total} 파트 완료 · 미작성: ${getPendingPartsLabel()}`;
-    if (btnRevise) btnRevise.disabled = !apiReady() || !hasSeg;
+    if (btnRevise) btnRevise.disabled = !state.apiKey || !hasSeg;
   } else if (done < total) {
     const nextIdx = state.partLineup.findIndex((_, i) => !isPartGenerated(i));
     const next = nextIdx >= 0 ? state.partLineup[nextIdx] : '';
@@ -3851,13 +3571,14 @@ function updateActionDock() {
     if (progress) progress.textContent = `${total}/${total}`;
     if (btnRevise) {
       btnRevise.disabled =
-        state.selectedPartIndex === null || !isPartGenerated(state.selectedPartIndex) || !apiReady();
+        state.selectedPartIndex === null || !isPartGenerated(state.selectedPartIndex) || !state.apiKey;
     }
   }
 }
 
 async function callGemini(userPrompt, temperature = 0.7, modelId = null, options = {}) {
   const model = modelId || state.modelLite;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
 
   const generationConfig = {
     temperature,
@@ -3873,7 +3594,22 @@ async function callGemini(userPrompt, temperature = 0.7, modelId = null, options
     generationConfig,
   };
 
-  const data = await window.DdditWorksApi.postGemini(model, body, state.apiKey);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    const msg = errBody?.error?.message || `API 오류 (${res.status})`;
+    const e = new Error(msg);
+    e.apiStatus = res.status;
+    e.apiModel = model;
+    throw e;
+  }
+
+  const data = await res.json();
   const candidate = data?.candidates?.[0];
   const text = candidate?.content?.parts?.[0]?.text;
   if (!text) {
@@ -3890,127 +3626,6 @@ async function callGemini(userPrompt, temperature = 0.7, modelId = null, options
     throw e;
   }
   return text;
-}
-
-async function callGeminiSession(userPrompt, options = {}) {
-  const model = options.model || state.modelPro;
-  const temperature = options.temperature ?? 0.7;
-  const systemRules = options.systemRules || getSystemRules();
-
-  if (!Array.isArray(state.geminiContents)) state.geminiContents = [];
-
-  state.geminiContents.push({
-    role: 'user',
-    parts: [{ text: userPrompt }],
-  });
-
-  const generationConfig = {
-    temperature,
-    responseMimeType: options.responseMimeType || 'application/json',
-  };
-  if (options.responseSchema) {
-    generationConfig.responseSchema = options.responseSchema;
-  }
-
-  const body = {
-    systemInstruction: { parts: [{ text: systemRules }] },
-    contents: state.geminiContents,
-    generationConfig,
-  };
-
-  const data = await window.DdditWorksApi.postGemini(model, body, state.apiKey);
-  const candidate = data?.candidates?.[0];
-  const text = candidate?.content?.parts?.[0]?.text;
-  if (!text) {
-    const finishReason = candidate?.finishReason || '';
-    const blockReason = data?.promptFeedback?.blockReason || '';
-    const hint = finishReason || blockReason;
-    const msg =
-      finishReason === 'SAFETY' || blockReason
-        ? `응답 차단${hint ? `: ${hint}` : ''}`
-        : '응답이 비어 있습니다.';
-    const e = new Error(msg);
-    e.apiModel = model;
-    e.finishReason = finishReason;
-    throw e;
-  }
-
-  state.geminiContents.push({
-    role: 'model',
-    parts: [{ text }],
-  });
-
-  return text;
-}
-
-function resetGeminiSession() {
-  state.geminiContents = [];
-}
-
-const PROSE_RESPONSE_SCHEMA = {
-  type: 'OBJECT',
-  properties: {
-    prose: { type: 'STRING' },
-  },
-  required: ['prose'],
-};
-
-function getProseSystemRules() {
-  return `# System Context
-Role: IT 리뷰 채널 '디디딧' 메인 작가
-Target Audience: 퇴근 후 혼자만의 시간을 즐기는 1인 가구 직장인
-Tone: 솔직 담백, 과장 없는 팩트, 실생활 밀착형 공감 화법
-
-# 이번 단계: 내레이션 원문(prose)만
-- 스프레드시트 5열·행 분할·글자 수 제한은 **적용하지 마세요**.
-- 성우가 읽을 자연스러운 내레이션 문단으로 작성합니다.
-- 제품을 '이 녀석'이라 지칭하지 말 것.
-- 언박싱 연출·작위적 감정 연기·고가 비교 제품 세팅은 배제.
-- 프롤로그 파트: 오프닝 고정 멘트 포함.
-- 총평 파트: 클로징 고정 멘트 포함.
-
-# Response Format
-유효한 JSON만 출력. 마크다운 코드블록 없이:
-{"prose":"..."}`;
-}
-
-function getContiConvertSystemRules() {
-  return `# 역할: 디디딧 콘티 편집자
-# 입력: 완성된 내레이션 원문(prose)
-# 출력: 스프레드시트 5열 JSON
-
-${getNarrationRhythmBlock()}
-
-- 대본 열: 원문 의미·호흡 유지. 호흡 단위로 행 분할 (목표 25~45자).
-- 장면: 모델 행동·카메라 구도. 연속 컷은 '컷 유지'.
-- 사이즈: 미디엄샷, 클로즈업, 탑뷰 등.
-- 자막: 스펙·수치가 대본에 나올 때만 요약.
-- 코멘트: 준비물·앱 세팅 필요 시만.
-
-# Response Format
-{"rows":[{"대본":"...","장면":"...","사이즈":"...","자막":"","코멘트":""}]}`;
-}
-
-function parseProseJson(raw) {
-  const cleaned = stripJsonFences(raw);
-  let parsed;
-  try {
-    parsed = JSON.parse(findJsonObjectBounds(cleaned));
-  } catch (e) {
-    throw new Error(`prose JSON 파싱 실패: ${e.message}`);
-  }
-  const prose = parsed.prose || parsed.text || parsed.narration;
-  if (!prose || !String(prose).trim()) throw new Error('prose 필드가 비어 있습니다.');
-  return String(prose).trim();
-}
-
-function shouldAcceptPartRowsRelaxed(rows, validation, partName) {
-  if (!rows.length) return false;
-  if (rows.some((r) => !r.대본.trim())) return false;
-  if (isProloguePart(partName)) return rows.length >= 2 && rows.length <= 12;
-  const missingScene = rows.filter((r) => !r.장면).length;
-  if (missingScene > Math.ceil(rows.length * 0.35)) return false;
-  return validation.issues.filter((i) => i.includes('누락')).length <= 2;
 }
 
 const LINEUP_RESPONSE_SCHEMA = {
@@ -4600,16 +4215,6 @@ function unlockLineupEdit() {
 
 function validateLineupRequired() {
   const joined = state.partLineup.join(' ');
-  if (usesFlexibleLineup()) {
-    const missing = [];
-    if (!/프롤로그|오프닝/i.test(joined)) missing.push('프롤로그');
-    if (!/총평|클로징/i.test(joined)) missing.push('총평');
-    const bodyCount = state.partLineup.filter(
-      (part) => !isProloguePart(part) && !isClosingPart(part)
-    ).length;
-    if (bodyCount < 1) missing.push('본문 파트 1개 이상');
-    return missing;
-  }
   const missing = REQUIRED_PART_KEYWORDS.filter((kw) => !joined.includes(kw));
   return missing;
 }
@@ -4620,7 +4225,7 @@ function updateGenerateButtons() {
   const btnPart = $('#btn-generate-part');
   const btnUnlock = $('#btn-unlock-lineup');
 
-  if (btnDraft) btnDraft.disabled = !apiReady() || !state.productName.trim();
+  if (btnDraft) btnDraft.disabled = !state.apiKey || !state.productName.trim();
   if (btnConfirm) {
     btnConfirm.disabled = !state.partLineup.length || state.lineupConfirmed;
   }
@@ -4638,21 +4243,21 @@ function updateGenerateButtons() {
     } else if (countGeneratedParts() >= state.partLineup.length) {
       if (state.selectedPartIndex !== null && isPartGenerated(state.selectedPartIndex)) {
         const name = state.partLineup[state.selectedPartIndex];
-        btnPart.disabled = !apiReady();
+        btnPart.disabled = !state.apiKey;
         setGenBtn('③ 재생성', `다시 생성: ${name}`);
       } else {
         btnPart.disabled = true;
         setGenBtn('③ 완료', '전체 파트 완료');
       }
     } else if (state.selectedPartIndex !== null) {
-      btnPart.disabled = !apiReady();
+      btnPart.disabled = !state.apiKey;
       const name = state.partLineup[state.selectedPartIndex];
       setGenBtn(
         isPartGenerated(state.selectedPartIndex) ? '③ 재생성' : '③ 생성',
         isPartGenerated(state.selectedPartIndex) ? `다시 생성: ${name}` : `파트 생성: ${name}`
       );
     } else {
-      btnPart.disabled = !apiReady();
+      btnPart.disabled = !state.apiKey;
       const nextIdx = state.partLineup.findIndex((_, i) => !isPartGenerated(i));
       const next = nextIdx >= 0 ? state.partLineup[nextIdx] : '';
       setGenBtn('③ 생성', next ? `파트 생성: ${next}` : '파트 생성');
@@ -4661,8 +4266,63 @@ function updateGenerateButtons() {
   updateActionDock();
 }
 
-function renderTable() {
+const SHEET_HEADERS = ['대본', '장면', '사이즈', '자막', '코멘트'];
+
+function emptySheetRow() {
+  return { 대본: '', 장면: '', 사이즈: '', 자막: '', 코멘트: '' };
+}
+
+function commitCellFromElement(el) {
+  const tr = el?.closest('tr');
+  if (!tr) return;
+  const idx = Number(tr.dataset.idx);
+  const field = el.dataset.field;
+  if (!Number.isFinite(idx) || !field || !state.allRows[idx]) return;
+  state.allRows[idx][field] = el.value;
+}
+
+function applySpreadsheetPaste(startRow, startField, grid) {
+  const startCol = SHEET_HEADERS.indexOf(startField);
+  if (startCol < 0 || !grid.length) return 0;
+
+  grid.forEach((cells, rowOffset) => {
+    const rowIndex = startRow + rowOffset;
+    while (state.allRows.length <= rowIndex) {
+      state.allRows.push(emptySheetRow());
+    }
+    cells.forEach((cell, colOffset) => {
+      const headerIndex = startCol + colOffset;
+      if (headerIndex < 0 || headerIndex >= SHEET_HEADERS.length) return;
+      state.allRows[rowIndex][SHEET_HEADERS[headerIndex]] = String(cell ?? '').trim();
+    });
+  });
+
+  saveProject();
+  renderTable();
+  return grid.length;
+}
+
+function bindScriptTableSpreadsheet() {
+  const SS = window.DdditSpreadsheetCells;
   const tbody = $('#script-table tbody');
+  if (!SS || !tbody || tbody.dataset.spreadsheetBound === '1') return;
+  tbody.dataset.spreadsheetBound = '1';
+
+  SS.bindSpreadsheetTable(tbody, {
+    headers: SHEET_HEADERS,
+    rowAttr: 'data-idx',
+    rowCount: () => state.allRows.length,
+    onBeforeNav: commitCellFromElement,
+    onPaste: applySpreadsheetPaste,
+    onPasted: (count) => showToast(`${count}행 붙여넣음`),
+  });
+}
+
+function renderTable() {
+  const SS = window.DdditSpreadsheetCells;
+  const tbody = $('#script-table tbody');
+  const focusRef = SS?.captureFocus?.(tbody, 'data-idx');
+
   if (!state.allRows.length) {
     tbody.innerHTML =
       '<tr><td colspan="5" class="empty">대본이 여기에 쌓입니다</td></tr>';
@@ -4693,8 +4353,10 @@ function renderTable() {
 
   tbody.querySelectorAll('.cell-edit').forEach((el) => {
     el.addEventListener('change', onCellEdit);
+    el.addEventListener('blur', onCellEdit);
   });
 
+  SS?.restoreFocus?.(tbody, focusRef, 'data-idx');
   updateStats();
 }
 
@@ -5015,7 +4677,7 @@ function startEmptyLineup() {
 }
 
 async function generatePartDraft() {
-  if (!apiReady()) return showToast('API를 사용할 수 없습니다.', true);
+  if (!state.apiKey) return showToast('Google API 키를 입력하세요.', true);
   if (!state.productName.trim()) return showToast('제품명을 입력하세요.', true);
   if (state.adMode && !state.adGuides.length) {
     if (!confirm('광고 모드인데 본사 가이드가 없습니다. 가이드 없이 초안을 만들까요?')) return;
@@ -5038,7 +4700,7 @@ ${adModePromptExtra()}
 
 디디딧 리뷰의 **파트 구성 초안**만 작성하세요. (대본 본문 X)
 카테고리 후보 파트: ${cat.suggestedParts.join(', ')}
-${getLineupRulesPromptBlock()}
+필수 포함: 디자인, 실사용, 가격, 총평 (파트 제목에 반영)
 파트 이름 규칙: **1~3단어 짧은 라벨만** (예: 프롤로그, 디자인, 성능, 실사용, 편의성, 단점, 가격, 총평). "디자인 및 첫인상" 같은 긴 설명형 제목 금지.
 reason: 구성 이유 한 줄 (큰따옴표·줄바꿈 없이)
 
@@ -5076,16 +4738,12 @@ function confirmPartLineup() {
   syncLineupFromInputs();
   const missing = validateLineupRequired();
   if (missing.length) {
-    const hint = usesFlexibleLineup()
-      ? ' (유동 구성: 프롤로그·총평·본문 1개 이상)'
-      : ' (파트 이름에 포함되어야 함)';
-    return showToast(`필수 파트 누락: ${missing.join(', ')}${hint}`, true);
+    return showToast(`필수 파트 누락: ${missing.join(', ')} (파트 이름에 포함되어야 함)`, true);
   }
 
   state.lineupConfirmed = true;
   state.currentPartIndex = -1;
   state.selectedPartIndex = null;
-  resetGeminiSession();
   renderPartLineup();
   updateWorkflowStep(6);
   showToast('파트 구성이 확정됐습니다. 칩을 클릭해 원하는 파트만 [③ 파트 생성]하세요.');
@@ -5098,124 +4756,6 @@ function syncLineupFromInputs() {
     state.partLineup[idx] = inp.value.trim();
   });
   state.partLineup = state.partLineup.filter(Boolean);
-}
-
-async function convertProseToContiRows(prose, partName, scriptModel) {
-  const convertPrompt = `${buildProductContext()}
-
-파트 "${partName}" 내레이션 원문을 콘티 5열 JSON으로 변환하세요.
-${getPartVolumePrompt(partName)}
-
-[원문]
-${prose}
-
-대본 열은 원문 호흡·의미를 유지하며 호흡 단위로 행 분할하세요.
-JSON만 출력: {"rows":[...]}`;
-
-  let rows;
-  let validation;
-  let attempts = 0;
-  const maxAttempts = 2;
-
-  while (attempts < maxAttempts) {
-    attempts++;
-    const retryHint =
-      attempts > 1 ? '\n\n[재시도] 장면·사이즈 누락 없이, 빈 대본 행 없이 변환하세요.' : '';
-    const rowsRaw = await callGeminiSession(convertPrompt + retryHint, {
-      systemRules: getContiConvertSystemRules(),
-      model: scriptModel,
-      temperature: 0.35,
-    });
-    rows = parseRowsJson(rowsRaw);
-    validation = validatePartRows(rows, partName);
-    if (shouldAcceptPartRowsRelaxed(rows, validation, partName)) break;
-  }
-
-  return { rows, validation };
-}
-
-async function generatePartWithProsePipeline(partIndex, partName, scriptModel) {
-  if (isPartGenerated(partIndex)) resetGeminiSession();
-
-  const prevContext = getPreviousPartsContext(partIndex);
-  const writtenParts = state.partSegments
-    .filter((s) => s.partIndex !== partIndex)
-    .map((s) => state.partLineup[s.partIndex])
-    .join(', ');
-  const pendingParts = getPendingPartsLabel();
-  const directionHint = state.contentDirection
-    ? `\n콘텐츠 방향 우선 반영: ${state.contentDirection}`
-    : '';
-
-  const proseMandate = isProloguePart(partName)
-    ? '\n프롤로그 오프닝 고정 멘트를 반드시 포함하세요.'
-    : isClosingPart(partName)
-      ? '\n총평 클로징 고정 멘트를 반드시 포함하세요.'
-      : '';
-
-  const prosePrompt = `${buildProductContext()}
-${directionHint}
-${adPartPromptExtra(partName)}
-
-전체 파트 구성: ${state.partLineup.join(' → ')}
-현재 작성 파트: "${partName}" (${partIndex + 1}/${state.partLineup.length})
-이미 작성된 파트: ${writtenParts || '(없음)'}
-아직 미작성 파트: ${pendingParts}
-${prevContext}
-
-파트 "${partName}"의 **내레이션 원문(prose)**만 작성하세요.
-- 스프레드시트 행·글자 수 규칙은 적용하지 마세요.
-- 성우 호흡에 맞는 자연스러운 문단으로 작성합니다.${proseMandate}
-
-JSON만 출력: {"prose":"..."}`;
-
-  setLoading(true, `${partName} 프로즈 작성 중… (${getModelLabel(scriptModel)})`);
-  const proseRaw = await callGeminiSession(prosePrompt, {
-    systemRules: getProseSystemRules(),
-    model: scriptModel,
-    temperature: 0.75,
-    responseSchema: PROSE_RESPONSE_SCHEMA,
-  });
-  const prose = parseProseJson(proseRaw);
-  if (!state.partProse || typeof state.partProse !== 'object') state.partProse = {};
-  state.partProse[partIndex] = prose;
-
-  setLoading(true, `${partName} 콘티 변환 중… (${getModelLabel(scriptModel)})`);
-  return convertProseToContiRows(prose, partName, scriptModel);
-}
-
-async function revisePartWithProsePipeline(partIndex, partName, scriptModel, currentRows, notes) {
-  const proseFromRows = currentRows.map((r) => r.대본).filter(Boolean).join('\n');
-
-  const revisePrompt = `${buildProductContext()}
-${adPartPromptExtra(partName)}
-
-전체 파트 구성: ${state.partLineup.join(' → ')}
-수정 대상 파트: "${partName}" (${partIndex + 1}/${state.partLineup.length})
-
-현재 파트 내레이션 원문:
-${proseFromRows}
-
-사용자 수정 요청:
-${notes}
-
-위 요청을 반영해 **내레이션 원문(prose)**만 다시 작성하세요.
-- 스프레드시트 행·글자 수 규칙은 적용하지 마세요.
-JSON만 출력: {"prose":"..."}`;
-
-  setLoading(true, `${partName} 프로즈 수정 중… (${getModelLabel(scriptModel)})`);
-  const proseRaw = await callGeminiSession(revisePrompt, {
-    systemRules: getProseSystemRules(),
-    model: scriptModel,
-    temperature: 0.7,
-    responseSchema: PROSE_RESPONSE_SCHEMA,
-  });
-  const prose = parseProseJson(proseRaw);
-  if (!state.partProse || typeof state.partProse !== 'object') state.partProse = {};
-  state.partProse[partIndex] = prose;
-
-  setLoading(true, `${partName} 콘티 변환 중… (${getModelLabel(scriptModel)})`);
-  return convertProseToContiRows(prose, partName, scriptModel);
 }
 
 async function generatePartAtIndex(partIndex) {
@@ -5231,24 +4771,18 @@ async function generatePartAtIndex(partIndex) {
   setLoading(true, `${partName} 작성 중… (${getModelLabel(scriptModel)})`);
 
   try {
-    let rows;
-    let validation;
+    const prevContext = getPreviousPartsContext(partIndex);
+    const writtenParts = state.partSegments
+      .filter((s) => s.partIndex !== partIndex)
+      .map((s) => state.partLineup[s.partIndex])
+      .join(', ');
+    const pendingParts = getPendingPartsLabel();
 
-    if (state.useProsePipeline) {
-      ({ rows, validation } = await generatePartWithProsePipeline(partIndex, partName, scriptModel));
-    } else {
-      const prevContext = getPreviousPartsContext(partIndex);
-      const writtenParts = state.partSegments
-        .filter((s) => s.partIndex !== partIndex)
-        .map((s) => state.partLineup[s.partIndex])
-        .join(', ');
-      const pendingParts = getPendingPartsLabel();
+    const directionHint = state.contentDirection
+      ? `\n콘텐츠 방향 우선 반영: ${state.contentDirection}`
+      : '';
 
-      const directionHint = state.contentDirection
-        ? `\n콘텐츠 방향 우선 반영: ${state.contentDirection}`
-        : '';
-
-      const prompt = `${buildProductContext()}
+    const prompt = `${buildProductContext()}
 ${directionHint}
 ${adPartPromptExtra(partName)}
 
@@ -5260,23 +4794,22 @@ ${prevContext}
 
 ${getPartVolumePrompt(partName)}`;
 
-      let attempts = 0;
-      const maxAttempts = 4;
+    let rows;
+    let validation;
+    let attempts = 0;
+    const maxAttempts = 4;
 
-      while (attempts < maxAttempts) {
-        attempts++;
-        const raw = await callGemini(
-          attempts > 1 ? prompt + getPartRetryHint(partName) : prompt,
-          0.7,
-          scriptModel
-        );
-        rows = parseRowsJson(raw);
-        validation = validatePartRows(rows, partName);
-        if (shouldAcceptPartRows(rows, validation, partName)) break;
-      }
+    while (attempts < maxAttempts) {
+      attempts++;
+      const raw = await callGemini(
+        attempts > 1 ? prompt + getPartRetryHint(partName) : prompt,
+        0.7,
+        scriptModel
+      );
+      rows = parseRowsJson(raw);
+      validation = validatePartRows(rows, partName);
+      if (shouldAcceptPartRows(rows, validation, partName)) break;
     }
-
-    if (!rows?.length) throw new Error('파트 대본 생성에 실패했습니다.');
 
     insertPartRows(partIndex, partName, rows);
     state._lastPartRows = rows;
@@ -5286,20 +4819,15 @@ ${getPartVolumePrompt(partName)}`;
     renderTable();
     updateGenerateButtons();
 
-    const issues = validation?.issues || [];
     const msg =
-      issues.length === 0
-        ? `${partName} 완료 (${validation?.rowCount ?? rows.length}행 / ${validation?.totalBytes ?? 0}B)`
-        : `${partName} 완료 — 검증 참고: ${issues[0]}`;
+      validation.issues.length === 0
+        ? `${partName} 완료 (${validation.rowCount}행 / ${validation.totalBytes}B)`
+        : `${partName} 완료 — 검증 참고: ${validation.issues[0]}`;
     showToast(msg);
     saveProject();
 
-    const allDone = countGeneratedParts() >= state.partLineup.length;
-    if (allDone) {
+    if (countGeneratedParts() >= state.partLineup.length) {
       updateWorkflowStep(8);
-      if (state.autoPushConti && window.DdditContiApi) {
-        await pushContiToNas({ silent: true });
-      }
     } else {
       updateWorkflowStep(7);
     }
@@ -5333,7 +4861,7 @@ async function generateNextPart() {
 }
 
 async function reviseLineupWithAI() {
-  if (!apiReady()) return showToast('API를 사용할 수 없습니다.', true);
+  if (!state.apiKey) return showToast('Google API 키를 입력하세요.', true);
   if (!state.partLineup.length) return showToast('먼저 파트 초안을 만드세요.', true);
   if (state.lineupConfirmed) return showToast('확정된 구성입니다. [구성 다시 편집]을 누르세요.', true);
 
@@ -5354,7 +4882,7 @@ ${notes}
 
 위 요청을 반영해 파트 구성만 다시 작성하세요. (대본 본문 X)
 파트 이름은 1~3단어 짧은 라벨만 (긴 설명형 제목 금지).
-${getLineupRulesPromptBlock()}
+필수 포함: 디자인, 실사용, 가격, 총평 (파트 제목에 반영)
 reason: 수정 반영 이유 한 줄 (큰따옴표·줄바꿈 없이)
 
 JSON만 출력:
@@ -5377,7 +4905,7 @@ JSON만 출력:
 }
 
 async function revisePartWithAI() {
-  if (!apiReady()) return showToast('API를 사용할 수 없습니다.', true);
+  if (!state.apiKey) return showToast('Google API 키를 입력하세요.', true);
   if (!state.lineupConfirmed) return showToast('먼저 파트 구성을 확정하세요.', true);
 
   const partIndex =
@@ -5403,35 +4931,23 @@ async function revisePartWithAI() {
 
   setLoading(true, `${partName} AI 수정 중… (${getModelLabel(scriptModel)})`);
   try {
-    let rows;
-    let validation;
+    const prevContext =
+      seg.start > 0
+        ? `\n이전 파트 마지막 대사:\n${state.allRows
+            .slice(Math.max(0, seg.start - 3), seg.start)
+            .map((r) => r.대본)
+            .join('\n')}`
+        : '';
 
-    if (state.useProsePipeline) {
-      ({ rows, validation } = await revisePartWithProsePipeline(
-        partIndex,
-        partName,
-        scriptModel,
-        currentRows,
-        notes
-      ));
-    } else {
-      const prevContext =
-        seg.start > 0
-          ? `\n이전 파트 마지막 대사:\n${state.allRows
-              .slice(Math.max(0, seg.start - 3), seg.start)
-              .map((r) => r.대본)
-              .join('\n')}`
-          : '';
+    const nextContext =
+      seg.end < state.allRows.length - 1
+        ? `\n다음 파트 시작 대사:\n${state.allRows
+            .slice(seg.end + 1, seg.end + 4)
+            .map((r) => r.대본)
+            .join('\n')}`
+        : '';
 
-      const nextContext =
-        seg.end < state.allRows.length - 1
-          ? `\n다음 파트 시작 대사:\n${state.allRows
-              .slice(seg.end + 1, seg.end + 4)
-              .map((r) => r.대본)
-              .join('\n')}`
-          : '';
-
-      const prompt = `${buildProductContext()}
+    const prompt = `${buildProductContext()}
 ${adPartPromptExtra(partName)}
 
 전체 파트 구성: ${state.partLineup.join(' → ')}
@@ -5450,20 +4966,21 @@ ${getPartVolumePrompt(partName)}
 
 JSON만 출력: {"rows":[...]}`;
 
-      let attempts = 0;
-      const maxAttempts = 4;
+    let rows;
+    let validation;
+    let attempts = 0;
+    const maxAttempts = 4;
 
-      while (attempts < maxAttempts) {
-        attempts++;
-        const raw = await callGemini(
-          attempts > 1 ? prompt + getPartRetryHint(partName) : prompt,
-          0.65,
-          scriptModel
-        );
-        rows = parseRowsJson(raw);
-        validation = validatePartRows(rows, partName);
-        if (shouldAcceptPartRows(rows, validation, partName)) break;
-      }
+    while (attempts < maxAttempts) {
+      attempts++;
+      const raw = await callGemini(
+        attempts > 1 ? prompt + getPartRetryHint(partName) : prompt,
+        0.65,
+        scriptModel
+      );
+      rows = parseRowsJson(raw);
+      validation = validatePartRows(rows, partName);
+      if (shouldAcceptPartRows(rows, validation, partName)) break;
     }
 
     state.allRows.splice(seg.start, seg.end - seg.start + 1, ...rows);
@@ -5484,11 +5001,10 @@ JSON만 출력: {"rows":[...]}`;
     renderTable();
     updateGenerateButtons();
 
-    const issues = validation?.issues || [];
     const msg =
-      issues.length === 0
-        ? `"${partName}" AI 수정 완료 (${validation?.rowCount ?? rows.length}행 / ${validation?.totalBytes ?? 0}B)`
-        : `"${partName}" 수정 완료 — ${issues[0]}`;
+      validation.issues.length === 0
+        ? `"${partName}" AI 수정 완료 (${validation.rowCount}행 / ${validation.totalBytes}B)`
+        : `"${partName}" 수정 완료 — ${validation.issues[0]}`;
     showToast(msg);
   } catch (e) {
     reportError('revisePartWithAI', e, { model: scriptModel, part: partName });
@@ -5561,18 +5077,12 @@ function resetProject() {
   state.adBrand = '';
   state.adToneLevel = 'balanced';
   state.adDisclosure = true;
-  state.briefSource = 'search';
-  state.teamBriefNotes = '';
-  state.flexibleLineup = false;
-  state.autoPushConti = true;
-  state.partProse = {};
-  resetGeminiSession();
   $('#structure-reason').textContent = '';
   updateAdModeUI();
   renderAdGuideList();
   renderPartLineup();
   renderTable();
-  updateWorkflowStep(apiReady() ? 2 : 1);
+  updateWorkflowStep(state.apiKey ? 2 : 1);
   showToast('프로젝트를 초기화했습니다.');
 }
 
@@ -5718,15 +5228,6 @@ function bindEvents() {
   $('#btn-load-air-example')?.addEventListener('click', loadAirPurifierExample);
   $('#btn-search-device')?.addEventListener('click', runDeviceSearch);
   $('#btn-search-clear')?.addEventListener('click', clearSearchResults);
-  $('#btn-skip-to-brief')?.addEventListener('click', startTeamBriefMode);
-  $('#lineup-flexible')?.addEventListener('change', (e) => {
-    state.flexibleLineup = e.target.checked;
-    saveProject();
-  });
-  $('#team-brief-notes')?.addEventListener('input', () => {
-    syncBriefFromDOM();
-    saveProject();
-  });
 
   document.querySelectorAll('.step-rail-item').forEach((btn) => {
     btn.addEventListener('click', () => navigateToPage(Number(btn.dataset.rail)));
@@ -5747,25 +5248,7 @@ function bindEvents() {
   $('#btn-revise-part').addEventListener('click', revisePartWithAI);
   $('#btn-export').addEventListener('click', exportTsv);
   $('#btn-copy').addEventListener('click', copyTable);
-  $('#btn-sheet-push').addEventListener('click', pushContiToSheet);
-  $('#btn-conti-push')?.addEventListener('click', () => pushContiToNas({ open: false }));
-  $('#btn-conti-open')?.addEventListener('click', openContiEditor);
-  $('#btn-sheet-pull').addEventListener('click', pullContiFromSheet);
-  $('#btn-sheet-open').addEventListener('click', openContiSheet);
-  $('#btn-toggle-sheet-token').addEventListener('click', toggleSheetTokenVisibility);
   $('#btn-reset').addEventListener('click', resetProject);
-  ['sheet-api-url', 'sheet-api-token', 'sheet-open-url'].forEach((id) => {
-    $('#' + id)?.addEventListener('input', () => {
-      syncSheetSettingsFromDOM();
-      saveSettings();
-      updateSheetSyncStatus();
-    });
-    $('#' + id)?.addEventListener('change', () => {
-      syncSheetSettingsFromDOM();
-      saveSettings();
-      updateSheetSyncStatus();
-    });
-  });
   $('#toggle-settings').addEventListener('click', () => {
     togglePanel('#settings-panel', '#toggle-settings');
   });
@@ -5810,27 +5293,8 @@ function renderPartPoolSelect() {
     PART_NAME_POOL.map((p) => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
 }
 
-function applyWorkspaceProject() {
-  const badge = $('#workspace-project-badge');
-  const preset = WORKSPACE_PROJECTS[PROJECT_SLUG];
-  if (!preset) {
-    badge?.classList.add('hidden');
-    return;
-  }
-  if (badge) {
-    badge.textContent = preset.label;
-    badge.classList.remove('hidden');
-  }
-  const hasSaved = !!localStorage.getItem(PROJECT_STORAGE_KEY);
-  if (hasSaved) return;
-  if (preset.contentDirection) state.contentDirection = preset.contentDirection;
-  if (preset.adMode) state.adMode = true;
-  if (preset.adBrand) state.adBrand = preset.adBrand;
-}
-
 async function boot() {
   try {
-    const backendOk = await initBackend();
     bindModules();
     hideToast();
     bindToastDismiss();
@@ -5839,7 +5303,6 @@ async function boot() {
     RESEARCH_LOG?.load();
     RESEARCH_LOG?.updateBadge();
     loadState();
-    applyWorkspaceProject();
     loadProject();
     renderModelOptions();
     renderCategoryOptions();
@@ -5849,8 +5312,8 @@ async function boot() {
     renderAdGuideList();
     updateAdModeUI();
     $('#api-key').value = state.apiKey;
-    applySheetSettingsToDOM();
     bindEvents();
+    bindScriptTableSpreadsheet();
     bindErrorLogUI();
     bindErrorLogging();
     bindBeforeUnload();
@@ -5864,14 +5327,10 @@ async function boot() {
     updateSearchProfileUI(state.searchDeviceId);
     if (state.searchResults) renderSearchResults(state.searchResults);
 
-    if (!apiReady()) {
+    if (!state.apiKey) {
       updateWorkflowStep(1);
-      if (!window.DdditWorksApi?.isBackendMode?.()) {
-        $('#settings-panel')?.classList.remove('collapsed');
-        $('#toggle-settings')?.classList.add('btn-active');
-      }
-    } else if (state.briefSource === 'team') {
-      updateWorkflowStep(2);
+      $('#settings-panel')?.classList.remove('collapsed');
+      $('#toggle-settings')?.classList.add('btn-active');
     } else {
       updateWorkflowStep(state.searchResults ? 2 : 1);
     }

@@ -1752,8 +1752,63 @@ function updateGenerateButtons() {
   updateActionDock();
 }
 
-function renderTable() {
+const SHEET_HEADERS = ['대본', '장면', '사이즈', '자막', '코멘트'];
+
+function emptySheetRow() {
+  return { 대본: '', 장면: '', 사이즈: '', 자막: '', 코멘트: '' };
+}
+
+function commitCellFromElement(el) {
+  const tr = el?.closest('tr');
+  if (!tr) return;
+  const idx = Number(tr.dataset.idx);
+  const field = el.dataset.field;
+  if (!Number.isFinite(idx) || !field || !state.allRows[idx]) return;
+  state.allRows[idx][field] = el.value;
+}
+
+function applySpreadsheetPaste(startRow, startField, grid) {
+  const startCol = SHEET_HEADERS.indexOf(startField);
+  if (startCol < 0 || !grid.length) return 0;
+
+  grid.forEach((cells, rowOffset) => {
+    const rowIndex = startRow + rowOffset;
+    while (state.allRows.length <= rowIndex) {
+      state.allRows.push(emptySheetRow());
+    }
+    cells.forEach((cell, colOffset) => {
+      const headerIndex = startCol + colOffset;
+      if (headerIndex < 0 || headerIndex >= SHEET_HEADERS.length) return;
+      state.allRows[rowIndex][SHEET_HEADERS[headerIndex]] = String(cell ?? '').trim();
+    });
+  });
+
+  saveProject();
+  renderTable();
+  return grid.length;
+}
+
+function bindScriptTableSpreadsheet() {
+  const SS = window.DdditSpreadsheetCells;
   const tbody = $('#script-table tbody');
+  if (!SS || !tbody || tbody.dataset.spreadsheetBound === '1') return;
+  tbody.dataset.spreadsheetBound = '1';
+
+  SS.bindSpreadsheetTable(tbody, {
+    headers: SHEET_HEADERS,
+    rowAttr: 'data-idx',
+    rowCount: () => state.allRows.length,
+    onBeforeNav: commitCellFromElement,
+    onPaste: applySpreadsheetPaste,
+    onPasted: (count) => showToast(`${count}행 붙여넣음`),
+  });
+}
+
+function renderTable() {
+  const SS = window.DdditSpreadsheetCells;
+  const tbody = $('#script-table tbody');
+  const focusRef = SS?.captureFocus?.(tbody, 'data-idx');
+
   if (!state.allRows.length) {
     tbody.innerHTML =
       '<tr><td colspan="5" class="empty">대본이 여기에 쌓입니다</td></tr>';
@@ -1784,8 +1839,10 @@ function renderTable() {
 
   tbody.querySelectorAll('.cell-edit').forEach((el) => {
     el.addEventListener('change', onCellEdit);
+    el.addEventListener('blur', onCellEdit);
   });
 
+  SS?.restoreFocus?.(tbody, focusRef, 'data-idx');
   updateStats();
 }
 
@@ -2742,6 +2799,7 @@ async function boot() {
     updateAdModeUI();
     $('#api-key').value = state.apiKey;
     bindEvents();
+    bindScriptTableSpreadsheet();
     bindErrorLogUI();
     bindErrorLogging();
     bindBeforeUnload();

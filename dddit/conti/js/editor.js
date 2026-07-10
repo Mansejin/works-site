@@ -1,6 +1,7 @@
 import { Y, WebsocketProvider } from "../vendor/collab-lib.js";
 
 const api = window.DdditContiApi;
+const SS = window.DdditSpreadsheetCells;
 const HEADERS = api.HEADERS;
 
 const params = new URLSearchParams(location.search);
@@ -171,27 +172,11 @@ function setupColumnResize() {
 }
 
 function captureFocus() {
-  const active = document.activeElement;
-  if (!active?.classList?.contains("cell-edit")) return null;
-  const tr = active.closest("tr");
-  if (!tr) return null;
-  return {
-    index: Number(tr.dataset.index),
-    field: active.dataset.field,
-    start: active.selectionStart,
-    end: active.selectionEnd,
-  };
+  return SS?.captureFocus(tbody, "data-index") || null;
 }
 
 function restoreFocus(ref) {
-  if (!ref || !Number.isFinite(ref.index)) return;
-  const tr = tbody.querySelector(`tr[data-index="${ref.index}"]`);
-  const el = tr?.querySelector(`[data-field="${ref.field}"]`);
-  if (!el) return;
-  el.focus();
-  if (typeof ref.start === "number" && typeof el.setSelectionRange === "function") {
-    el.setSelectionRange(ref.start, ref.end);
-  }
+  SS?.restoreFocus(tbody, ref, "data-index");
 }
 
 function plainRows() {
@@ -231,48 +216,7 @@ function scheduleRender() {
 }
 
 function cellCoords(el) {
-  const tr = el?.closest("tr");
-  if (!tr) return null;
-  const index = Number(tr.dataset.index);
-  const field = el.dataset.field;
-  if (!Number.isFinite(index) || !field) return null;
-  return { index, field };
-}
-
-function isHeaderRow(cells) {
-  const trimmed = cells.map((cell) => cell.trim());
-  if (!trimmed.length) return false;
-  if (trimmed[0] === "대본" && (trimmed.length === 1 || trimmed[1] === "장면")) return true;
-  if (trimmed.join("\t") === HEADERS.join("\t")) return true;
-  return false;
-}
-
-function parsePasteGrid(text) {
-  const normalized = String(text || "")
-    .replace(/\uFEFF/g, "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n");
-  const lines = normalized.split("\n");
-  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
-
-  const grid = lines
-    .map((line) => line.split("\t"))
-    .filter((cells) => cells.some((cell) => cell.trim()));
-
-  if (grid.length && isHeaderRow(grid[0])) grid.shift();
-  return grid;
-}
-
-function isSpreadsheetPaste(text) {
-  const raw = String(text || "");
-  if (!raw.trim()) return false;
-  if (raw.includes("\t")) return true;
-  const lines = raw
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .split("\n")
-    .filter((line) => line.trim());
-  return lines.length > 1;
+  return SS?.cellCoords(el, "data-index") || null;
 }
 
 function ensureRowAt(index) {
@@ -311,31 +255,22 @@ function applySpreadsheetPaste(startRow, startField, grid) {
   return grid.length;
 }
 
-function bindTablePaste() {
-  if (!tbody || tbody.dataset.pasteBound === "1") return;
-  tbody.dataset.pasteBound = "1";
+function bindTableSpreadsheet() {
+  if (!tbody || !SS || tbody.dataset.spreadsheetBound === "1") return;
+  tbody.dataset.spreadsheetBound = "1";
 
-  tbody.addEventListener("paste", (event) => {
-    if (!ydoc || !yRows) return;
-    const target = event.target;
-    if (!target?.classList?.contains("cell-edit")) return;
-
-    const text = event.clipboardData?.getData("text/plain");
-    if (!isSpreadsheetPaste(text)) return;
-
-    const coords = cellCoords(target);
-    if (!coords) return;
-
-    event.preventDefault();
-    composing = false;
-
-    const grid = parsePasteGrid(text);
-    if (!grid.length) return;
-
-    const count = applySpreadsheetPaste(coords.index, coords.field, grid);
-    if (count > 0) {
-      setStatus(`${count}행 붙여넣음 · 실시간 동기화`, "ok");
-    }
+  SS.bindSpreadsheetTable(tbody, {
+    headers: HEADERS,
+    rowAttr: "data-index",
+    rowCount: () => plainRows().length,
+    onBeforeNav: (el) => commitCellFromElement(el),
+    onPaste: (startRow, startField, grid) => {
+      if (!ydoc || !yRows) return 0;
+      composing = false;
+      const count = applySpreadsheetPaste(startRow, startField, grid);
+      if (count > 0) setStatus(`${count}행 붙여넣음 · 실시간 동기화`, "ok");
+      return count;
+    },
   });
 }
 
@@ -558,7 +493,7 @@ function loadEditor() {
   shareUrlInput.value = api.shareUrl(project);
   setStatus("동기화 연결 중…");
   setupColumnResize();
-  bindTablePaste();
+  bindTableSpreadsheet();
   connectCollab();
 }
 
