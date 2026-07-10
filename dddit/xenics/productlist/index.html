@@ -22,8 +22,6 @@
       --row-hover: #f8fafc;
       --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
       --radius: 12px;
-      --success: #16a34a;
-      --warn: #d97706;
     }
 
     * {
@@ -63,80 +61,6 @@
 
     .hub-nav a:hover {
       color: var(--accent);
-    }
-
-    .hub-nav-sep {
-      color: var(--border-strong);
-      font-size: 0.85rem;
-    }
-
-    .save-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 12px;
-      padding: 10px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      font-size: 13px;
-      color: var(--text-muted);
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-    }
-
-    .save-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .save-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #94a3b8;
-      flex-shrink: 0;
-    }
-
-    .save-dot.saved { background: var(--success); }
-    .save-dot.pending { background: var(--warn); }
-
-    .save-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      appearance: none;
-      border: 1px solid var(--border-strong);
-      background: #fff;
-      color: var(--text);
-      font: inherit;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 6px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.15s ease, border-color 0.15s ease;
-    }
-
-    .btn:hover {
-      background: var(--row-hover);
-      border-color: #94a3b8;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
-
-    .btn-primary:hover {
-      background: #1d4ed8;
-      border-color: #1d4ed8;
     }
 
     .card {
@@ -486,20 +410,8 @@
 <body>
   <div class="page">
     <nav class="hub-nav">
-      <a href="../../">← 디디딧 워크스페이스</a>
-      <span class="hub-nav-sep">/</span>
-      <a href="../">Xenics 프로젝트</a>
+      <a href="../">← Xenics 프로젝트</a>
     </nav>
-    <div class="save-bar">
-      <div class="save-status">
-        <span class="save-dot" id="save-dot"></span>
-        <span id="save-message">불러오는 중...</span>
-      </div>
-      <div class="save-actions">
-        <button type="button" class="btn" id="btn-connect" hidden>HTML 파일 연결</button>
-        <button type="button" class="btn btn-primary" id="btn-download" hidden>HTML 다운로드</button>
-      </div>
-    </div>
 
     <div class="card">
       <div class="card-header">
@@ -602,16 +514,8 @@
       "works/dddit/productlist/xenics",
       "works/dddit/productlist",
     ];
-    const IS_WEB_HOSTED = location.protocol === "https:" && /^works\.mansejin\.com$/i.test(location.hostname);
-    const HANDLE_DB = "works-dddit-xenics-files";
-    const HANDLE_STORE = "handles";
-    const HANDLE_KEY = "main";
 
     const tbody = document.getElementById("product-tbody");
-    const saveDot = document.getElementById("save-dot");
-    const saveMessage = document.getElementById("save-message");
-    const btnConnect = document.getElementById("btn-connect");
-    const btnDownload = document.getElementById("btn-download");
     const btnAddRow = document.getElementById("btn-add-row");
 
     const PLACEHOLDERS = {
@@ -623,9 +527,7 @@
     const EMPTY_ROW = { name: "", color: "", qty: "1", link: "" };
     const SWIPE = { openAt: 44 };
 
-    let fileHandle = null;
     let saveTimer = null;
-    let isSaving = false;
     let linkClickTimer = null;
     let swipeState = null;
 
@@ -802,72 +704,6 @@
       });
     }
 
-    function setStatus(state, message) {
-      saveDot.className = "save-dot";
-      if (state === "saved") saveDot.classList.add("saved");
-      if (state === "pending") saveDot.classList.add("pending");
-      saveMessage.textContent = message;
-    }
-
-    function buildHtmlDocument(rows) {
-      const clone = document.documentElement.cloneNode(true);
-      clone.querySelector("#product-data").textContent = "\n" + JSON.stringify(rows, null, 2) + "\n  ";
-      clone.querySelector("#product-tbody").innerHTML = rows.map((row) => createRowHtml(row)).join("");
-      return "<!DOCTYPE html>\n" + clone.outerHTML + "\n";
-    }
-
-    async function openHandleDb() {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open(HANDLE_DB, 1);
-        request.onupgradeneeded = () => request.result.createObjectStore(HANDLE_STORE);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    }
-
-    async function storeFileHandle(handle) {
-      const db = await openHandleDb();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction(HANDLE_STORE, "readwrite");
-        tx.objectStore(HANDLE_STORE).put(handle, HANDLE_KEY);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-      db.close();
-    }
-
-    async function loadStoredFileHandle() {
-      const db = await openHandleDb();
-      const handle = await new Promise((resolve, reject) => {
-        const tx = db.transaction(HANDLE_STORE, "readonly");
-        const req = tx.objectStore(HANDLE_STORE).get(HANDLE_KEY);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => reject(req.error);
-      });
-      db.close();
-      return handle || null;
-    }
-
-    async function ensureFilePermission(handle) {
-      if (!handle) return false;
-      if ((await handle.queryPermission({ mode: "readwrite" })) === "granted") return true;
-      if ((await handle.requestPermission({ mode: "readwrite" })) === "granted") return true;
-      return false;
-    }
-
-    async function saveToFile(rows) {
-      if (!fileHandle) return false;
-      if (!(await ensureFilePermission(fileHandle))) {
-        fileHandle = null;
-        btnConnect.hidden = false;
-        return false;
-      }
-      const writable = await fileHandle.createWritable();
-      await writable.write(buildHtmlDocument(rows));
-      await writable.close();
-      return true;
-    }
-
     function saveToLocalStorage(rows) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ updatedAt: Date.now(), rows }));
     }
@@ -891,67 +727,13 @@
       }
     }
 
-    async function persistRows() {
-      if (isSaving) return;
-      isSaving = true;
-      setStatus("pending", "저장 중...");
-      const rows = collectRows();
-      saveToLocalStorage(rows);
-      let fileSaved = false;
-      try {
-        fileSaved = await saveToFile(rows);
-      } catch {
-        fileHandle = null;
-        btnConnect.hidden = false;
-      }
-      isSaving = false;
-      if (fileSaved) {
-        setStatus("saved", "HTML 파일에 자동 저장됨");
-      } else if (IS_WEB_HOSTED) {
-        setStatus("saved", "저장됨");
-        btnConnect.hidden = true;
-        btnDownload.hidden = false;
-      } else {
-        setStatus("saved", "브라우저에 저장됨 · HTML 파일 연결 시 파일에도 저장");
-        btnConnect.hidden = !("showOpenFilePicker" in window);
-        btnDownload.hidden = false;
-      }
+    function persistRows() {
+      saveToLocalStorage(collectRows());
     }
 
     function scheduleSave() {
-      setStatus("pending", "변경 사항 저장 예정...");
       clearTimeout(saveTimer);
       saveTimer = setTimeout(persistRows, 400);
-    }
-
-    async function connectFile() {
-      if (!("showOpenFilePicker" in window)) {
-        alert("이 브라우저는 HTML 파일 직접 저장을 지원하지 않습니다. Chrome 또는 Edge를 사용해 주세요.");
-        return;
-      }
-      try {
-        const [handle] = await window.showOpenFilePicker({
-          types: [{ description: "HTML", accept: { "text/html": [".html"] } }],
-          multiple: false,
-        });
-        fileHandle = handle;
-        await storeFileHandle(handle);
-        await persistRows();
-        btnConnect.hidden = true;
-      } catch (error) {
-        if (error.name !== "AbortError") alert("파일 연결에 실패했습니다. 다시 시도해 주세요.");
-      }
-    }
-
-    function downloadHtml() {
-      const blob = new Blob([buildHtmlDocument(collectRows())], { type: "text/html;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "dddit-xenics-productlist.html";
-      a.click();
-      URL.revokeObjectURL(url);
-      setStatus("saved", "HTML 파일 다운로드 완료");
     }
 
     function isTouchUi() {
@@ -1109,43 +891,18 @@
       });
     }
 
-    async function init() {
+    function init() {
       const embeddedRows = readEmbeddedRows().map(normalizeRow);
       const storedRows = loadFromLocalStorage();
       renderRows((storedRows || embeddedRows).map(normalizeRow));
       bindEditEvents();
       bindRowActions();
 
-      btnConnect.addEventListener("click", connectFile);
-      btnDownload.addEventListener("click", downloadHtml);
       btnAddRow.addEventListener("click", addRow);
       window.addEventListener("beforeunload", () => {
         clearTimeout(saveTimer);
         saveToLocalStorage(collectRows());
       });
-
-      if (IS_WEB_HOSTED) {
-        btnConnect.hidden = true;
-        btnDownload.hidden = false;
-        setStatus("saved", storedRows ? "저장됨" : "편집 후 자동 저장됩니다");
-      } else if ("showOpenFilePicker" in window) {
-        try {
-          const storedHandle = await loadStoredFileHandle();
-          if (storedHandle && (await ensureFilePermission(storedHandle))) {
-            fileHandle = storedHandle;
-            setStatus("saved", "HTML 파일 연결됨 · 자동 저장 중");
-          } else {
-            btnConnect.hidden = false;
-            setStatus("saved", storedRows ? "브라우저에 저장됨 · HTML 파일 연결 권장" : "편집 후 자동 저장됩니다");
-          }
-        } catch {
-          btnConnect.hidden = false;
-          setStatus("saved", "HTML 파일 연결을 눌러 주세요");
-        }
-      } else {
-        btnDownload.hidden = false;
-        setStatus("saved", storedRows ? "브라우저에 저장됨" : "편집 후 브라우저에 자동 저장됩니다");
-      }
     }
 
     init();

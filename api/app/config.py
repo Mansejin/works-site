@@ -34,3 +34,11 @@ def sheet_api_token() -> str:
 
 def sheet_open_url() -> str:
     return os.getenv("DDDIT_SHEET_OPEN_URL", "").strip()
+
+
+def youtube_api_key() -> str:
+    return os.getenv("YOUTUBE_API_KEY", "").strip()
+
+
+def youtube_channel_handle() -> str:
+    return os.getenv("YOUTUBE_CHANNEL_HANDLE", "DD-DIT").strip().lstrip("@")

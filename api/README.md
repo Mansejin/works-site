@@ -30,6 +30,8 @@ nano .env
 | `DDDIT_SHEET_API_URL` | Apps Script 웹 앱 URL (`.../exec`) |
 | `DDDIT_SHEET_API_TOKEN` | Apps Script 스크립트 속성 `API_TOKEN`과 동일 |
 | `DDDIT_SHEET_OPEN_URL` | 팀 공유 스프레드시트 URL |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 키 (구독자·조회수) |
+| `YOUTUBE_CHANNEL_HANDLE` | 채널 핸들 (기본 `DD-DIT`) |
 
 ### 3. Docker 실행
 
@@ -68,6 +70,7 @@ curl https://works-api.mansejin.com/api/dddit/config
 | GET | `/api/dddit/sheet/get?project=xenics` | 콘티 불러오기 |
 | POST | `/api/dddit/sheet/replace` | 콘티 덮어쓰기 |
 | POST | `/api/dddit/gemini/v1beta/models/{model}:generateContent` | Gemini 프록시 |
+| GET | `/api/dddit/youtube/channel` | 채널 통계 + 최근 영상 4개 (15분 캐시) |
 
 CORS: `WORKS_ALLOWED_ORIGINS`에 `https://works.mansejin.com` 포함.
 

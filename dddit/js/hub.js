@@ -2,6 +2,7 @@
   const STORAGE_KEY = "works/dddit/hub";
   const IS_WEB_HOSTED =
     location.protocol === "https:" && /^works\.mansejin\.com$/i.test(location.hostname);
+  const API_BASE = IS_WEB_HOSTED ? "https://works-api.mansejin.com" : "http://localhost:8788";
 
   const PROJECTS = [
     {
@@ -82,6 +83,13 @@
     btnExport: document.getElementById("btn-export"),
     btnImport: document.getElementById("btn-import"),
     importFile: document.getElementById("import-file"),
+    ytSubs: document.getElementById("yt-subs"),
+    ytViews: document.getElementById("yt-views"),
+    ytVideosCount: document.getElementById("yt-videos-count"),
+    ytVideos: document.getElementById("yt-videos"),
+    ytChannelTitle: document.getElementById("yt-channel-title"),
+    ytChannelLink: document.getElementById("yt-channel-link"),
+    ytError: document.getElementById("yt-error"),
   };
 
   function uid() {
@@ -161,20 +169,13 @@
       const sponsorCount = state.sponsorships.filter((s) => s.project === project.id).length;
       const scriptHref = project.scriptPath || `script/?project=${project.id}`;
       return `
-        <div class="project-card-wrap">
-          <a class="project-card" href="${escapeHtml(project.path)}">
-            <div class="project-card-top">
-              <span class="project-status">${escapeHtml(project.status)}</span>
-              <span class="project-brand">${escapeHtml(project.brand)}</span>
-            </div>
+        <div>
+          <a class="mini-card" href="${escapeHtml(project.path)}">
             <h3>${escapeHtml(project.name)}</h3>
             <p>${escapeHtml(project.summary)}</p>
-            <div class="project-meta">
-              <span>일정 ${scheduleCount}</span>
-              <span>협업 ${sponsorCount}</span>
-            </div>
+            <span class="tag">${escapeHtml(project.status)} · 일정 ${scheduleCount} · 협업 ${sponsorCount}</span>
           </a>
-          <a class="project-link-pill" href="${escapeHtml(scriptHref)}">콘티 · 시나리오 머신 →</a>
+          <a class="project-pill" href="${escapeHtml(scriptHref)}">콘티 · 시나리오 →</a>
         </div>
       `;
     }).join("");
@@ -183,10 +184,10 @@
   function renderTools() {
     if (!els.toolGrid) return;
     els.toolGrid.innerHTML = CHANNEL_TOOLS.map((tool) => `
-      <a class="link-card ${tool.ready ? "is-ready" : "is-soon"}" href="${escapeHtml(tool.path)}">
-        <h2>${escapeHtml(tool.name)}</h2>
+      <a class="mini-card ${tool.ready ? "is-ready" : ""}" href="${escapeHtml(tool.path)}">
+        <h3>${escapeHtml(tool.name)}</h3>
         <p>${escapeHtml(tool.summary)}</p>
-        <span class="status">${tool.ready ? `${escapeHtml(tool.status)} →` : "준비 중"}</span>
+        <span class="tag">${tool.ready ? `${escapeHtml(tool.status)} →` : "준비 중"}</span>
       </a>
     `).join("");
   }
@@ -215,7 +216,7 @@
         if (!db) return -1;
         return da - db;
       })
-      .slice(0, 6);
+      .slice(0, 4);
 
     if (!items.length) {
       els.timeline.innerHTML = `<div class="empty-hint">등록된 일정이 없습니다.</div>`;
@@ -476,12 +477,104 @@
     reader.readAsText(file);
   }
 
+  function setYtStat(el, value) {
+    if (!el) return;
+    el.textContent = value ?? "—";
+    el.classList.remove("loading");
+  }
+
+  function renderYoutubeVideos(videos) {
+    if (!els.ytVideos) return;
+    const list = (videos || []).slice(0, 4);
+    while (list.length < 4) list.push(null);
+
+    els.ytVideos.innerHTML = list
+      .map((video) => {
+        if (!video?.id) {
+          return `<div class="yt-video"><div class="yt-video-placeholder">영상 없음</div></div>`;
+        }
+        const title = escapeHtml(video.title || "YouTube");
+        return `
+          <div class="yt-video" title="${title}">
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/${escapeHtml(video.id)}"
+              title="${title}"
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+            ></iframe>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  function showYtError(message) {
+    if (!els.ytError) return;
+    if (!message) {
+      els.ytError.hidden = true;
+      els.ytError.textContent = "";
+      return;
+    }
+    els.ytError.hidden = false;
+    els.ytError.textContent = message;
+  }
+
+  async function loadYoutube() {
+    if (!els.ytSubs) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/dddit/youtube/channel`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (els.ytChannelTitle && data.title) els.ytChannelTitle.textContent = data.title;
+      if (els.ytChannelLink && data.channelUrl) {
+        els.ytChannelLink.href = data.channelUrl;
+        els.ytChannelLink.textContent = `@${data.handle || "DD-DIT"} 열기 →`;
+      }
+
+      setYtStat(els.ytSubs, data.subscriberCountText);
+      setYtStat(els.ytViews, data.viewCountText);
+      setYtStat(els.ytVideosCount, data.videoCountText);
+      renderYoutubeVideos(data.videos);
+
+      if (data.source === "scrape" && data.subscriberCountText === "—") {
+        showYtError("구독자·총 조회수는 NAS .env에 YOUTUBE_API_KEY를 넣으면 표시됩니다. 최근 영상은 채널 페이지에서 불러왔습니다.");
+      } else {
+        showYtError("");
+      }
+    } catch {
+      setYtStat(els.ytSubs, "—");
+      setYtStat(els.ytViews, "—");
+      setYtStat(els.ytVideosCount, "—");
+      renderYoutubeVideos([]);
+      showYtError("YouTube 정보를 불러오지 못했습니다. NAS API(works-api)가 실행 중인지 확인하세요.");
+    }
+  }
+
+  function initTabs() {
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll(".tab-btn").forEach((b) => {
+          b.classList.toggle("active", b.dataset.tab === tab);
+        });
+        document.querySelectorAll(".tab-pane").forEach((pane) => {
+          pane.classList.toggle("active", pane.dataset.tab === tab);
+        });
+      });
+    });
+  }
+
   function init() {
     load();
     bindOverview();
     bindTables();
+    initTabs();
     renderAll();
     persist();
+    loadYoutube();
 
     els.btnExport.addEventListener("click", exportData);
     els.btnImport.addEventListener("click", () => els.importFile.click());

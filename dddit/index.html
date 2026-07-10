@@ -23,6 +23,7 @@
       --radius: 12px;
       --success: #16a34a;
       --warn: #d97706;
+      --yt-red: #ff0000;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,19 +32,38 @@
       font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
       background: linear-gradient(160deg, #eef2ff 0%, var(--bg) 45%, #f8fafc 100%);
       color: var(--text);
-      line-height: 1.6;
+      line-height: 1.5;
       min-height: 100vh;
-      padding: 32px 20px 64px;
+      padding: 20px 20px 48px;
     }
 
-    .page { max-width: 1080px; margin: 0 auto; }
+    .page { max-width: 1200px; margin: 0 auto; }
 
-    .top-bar {
+    .app-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .app-brand h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .app-brand p {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
       gap: 12px;
-      margin-bottom: 20px;
       flex-wrap: wrap;
     }
 
@@ -51,7 +71,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       color: var(--text-muted);
     }
 
@@ -65,62 +85,38 @@
     .save-dot.saved { background: var(--success); }
     .save-dot.pending { background: var(--warn); }
 
-    .top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .top-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
     .btn {
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
       border-radius: 8px;
-      padding: 8px 12px;
+      padding: 7px 11px;
       font: inherit;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       cursor: pointer;
     }
 
     .btn:hover { border-color: var(--border-strong); }
 
-    .hero {
-      background: var(--header-bg);
-      color: #f8fafc;
-      border-radius: var(--radius);
-      padding: 28px 28px 24px;
-      box-shadow: var(--shadow);
-      margin-bottom: 24px;
+    .dashboard {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 14px;
     }
 
-    .badge {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: rgba(37, 99, 235, 0.15);
-      border: 1px solid rgba(147, 197, 253, 0.35);
-      color: #bfdbfe;
-      font-size: 0.75rem;
-      font-weight: 700;
-      margin-bottom: 12px;
+    .dash-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
     }
-
-    .hero h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 6px; }
-    .hero p { color: #cbd5e1; font-size: 0.95rem; }
-
-    .zone-label {
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin: 28px 0 12px;
-    }
-
-    .zone-label:first-of-type { margin-top: 0; }
 
     .block {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      margin-bottom: 16px;
       overflow: hidden;
     }
 
@@ -128,32 +124,124 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 16px 20px;
+      gap: 10px;
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border);
       background: #fafbfc;
     }
 
     .block-head h2 {
-      font-size: 1rem;
+      font-size: 0.92rem;
       font-weight: 700;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
 
-    .block-icon { font-size: 1.1rem; }
+    .block-icon { font-size: 1rem; }
 
-    .block-body { padding: 20px; }
+    .block-body { padding: 14px 16px; }
+    .block-body.compact { padding: 12px 14px; }
 
-    .overview-text {
-      min-height: 72px;
-      padding: 14px 16px;
+    .block-link {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .block-link:hover { text-decoration: underline; }
+
+    /* YouTube panel */
+    .yt-panel .block-body { padding: 14px 16px 16px; }
+
+    .yt-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .yt-stat {
+      padding: 10px 12px;
       border: 1px solid var(--border);
       border-radius: 10px;
+      background: #fafbfc;
+    }
+
+    .yt-stat-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .yt-stat-value {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .yt-stat-value.loading {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .yt-videos {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .yt-video {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .yt-video iframe {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: none;
+    }
+
+    .yt-video-placeholder {
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f1f5f9;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+    }
+
+    .yt-error {
+      padding: 12px;
+      border-radius: 8px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      font-size: 0.82rem;
+      margin-bottom: 12px;
+    }
+
+    /* Overview */
+    .overview-text {
+      min-height: 56px;
+      max-height: 120px;
+      overflow-y: auto;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
       outline: none;
-      font-size: 0.95rem;
-      line-height: 1.7;
+      font-size: 0.88rem;
+      line-height: 1.6;
     }
 
     .overview-text:focus {
@@ -166,171 +254,104 @@
       color: var(--text-muted);
     }
 
-    .project-grid {
+    /* Projects & tools inline */
+    .mini-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 14px;
-      margin-top: 18px;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
     }
 
-    .project-card-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .project-link-pill {
-      display: inline-block;
-      align-self: flex-start;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      border: 1px solid #bfdbfe;
-      color: var(--accent);
-      font-size: 0.78rem;
-      font-weight: 700;
-      text-decoration: none;
-    }
-
-    .project-link-pill:hover {
-      background: #dbeafe;
-    }
-
-    .link-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 14px;
-    }
-
-    .link-card {
+    .mini-card {
       display: block;
-      padding: 18px 18px 16px;
+      padding: 12px;
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
       text-decoration: none;
       color: inherit;
       background: #fafbfc;
-      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
 
-    .link-card:hover {
+    .mini-card:hover {
       border-color: #93c5fd;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.08);
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08);
     }
 
-    .link-card h2 {
-      font-size: 1rem;
+    .mini-card h3 {
+      font-size: 0.88rem;
       font-weight: 700;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
-    .link-card p {
-      font-size: 0.85rem;
+    .mini-card p {
+      font-size: 0.78rem;
       color: var(--text-muted);
-      line-height: 1.5;
+      line-height: 1.4;
     }
 
-    .link-card.is-ready {
+    .mini-card .tag {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .mini-card.is-ready {
       background: var(--accent-soft);
       border-color: #bfdbfe;
     }
 
-    .link-card .status {
+    .project-pill {
       display: inline-block;
-      margin-top: 10px;
-      font-size: 0.75rem;
-      font-weight: 600;
+      margin-top: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid #bfdbfe;
       color: var(--accent);
-    }
-
-    .link-card.is-soon .status {
-      color: var(--text-muted);
-    }
-
-    .project-card {
-      display: block;
-      padding: 16px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      text-decoration: none;
-      color: inherit;
-      background: #fafbfc;
-      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-    }
-
-    .project-card:hover {
-      border-color: #93c5fd;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.08);
-    }
-
-    .project-card-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 10px;
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-
-    .project-status { color: var(--accent); }
-    .project-brand { color: var(--text-muted); }
-
-    .project-card h3 {
-      font-size: 0.98rem;
+      font-size: 0.72rem;
       font-weight: 700;
-      margin-bottom: 6px;
+      text-decoration: none;
     }
 
-    .project-card p {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
+    .project-pill:hover { background: #dbeafe; }
 
-    .project-meta {
-      display: flex;
-      gap: 12px;
-      margin-top: 12px;
-      font-size: 0.78rem;
-      color: var(--text-muted);
-    }
-
-    .timeline { display: grid; gap: 10px; }
+    /* Timeline compact */
+    .timeline { display: grid; gap: 6px; }
 
     .timeline-item {
       display: grid;
-      grid-template-columns: 64px 1fr auto;
-      gap: 12px;
+      grid-template-columns: 48px 1fr auto;
+      gap: 8px;
       align-items: center;
-      padding: 12px 14px;
+      padding: 8px 10px;
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
       background: #fafbfc;
+      font-size: 0.82rem;
     }
 
     .timeline-date {
-      font-size: 0.85rem;
+      font-size: 0.78rem;
       font-weight: 700;
       color: var(--accent);
     }
 
     .timeline-type {
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.04em;
     }
 
-    .timeline-title { font-size: 0.92rem; font-weight: 600; }
-    .timeline-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+    .timeline-title { font-weight: 600; }
+    .timeline-sub { font-size: 0.75rem; color: var(--text-muted); }
 
     .pill {
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       font-weight: 700;
-      padding: 4px 8px;
+      padding: 3px 7px;
       border-radius: 999px;
       white-space: nowrap;
     }
@@ -341,31 +362,67 @@
     .pill-hold { background: #ffedd5; color: #c2410c; }
 
     .empty-hint {
-      padding: 20px;
+      padding: 14px;
       text-align: center;
       color: var(--text-muted);
-      font-size: 0.9rem;
+      font-size: 0.82rem;
       border: 1px dashed var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
     }
+
+    /* Work tabs */
+    .work-panel .block-body { padding: 0; }
+
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      background: #fafbfc;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      border: none;
+      background: transparent;
+      padding: 12px 18px;
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover { color: var(--text); }
+
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: var(--surface);
+    }
+
+    .tab-pane { display: none; padding: 14px 16px; }
+    .tab-pane.active { display: block; }
 
     .table-wrap { overflow-x: auto; }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
     }
 
     th, td {
       border-bottom: 1px solid var(--border);
-      padding: 10px 8px;
+      padding: 8px 6px;
       text-align: left;
       vertical-align: middle;
     }
 
     th {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 700;
       color: var(--text-muted);
       white-space: nowrap;
@@ -381,9 +438,9 @@
       width: 100%;
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 7px 8px;
+      padding: 6px 7px;
       font: inherit;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       background: #fff;
     }
 
@@ -393,16 +450,16 @@
       box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
     }
 
-    .row-actions { width: 36px; text-align: center; }
+    .row-actions { width: 32px; text-align: center; }
 
     .btn-icon {
-      width: 28px;
-      height: 28px;
+      width: 26px;
+      height: 26px;
       border: none;
       border-radius: 6px;
       background: transparent;
       color: var(--text-muted);
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       line-height: 1;
       cursor: pointer;
     }
@@ -410,153 +467,186 @@
     .btn-icon:hover { background: #fee2e2; color: #b91c1c; }
 
     .btn-add {
-      margin-top: 12px;
+      margin-top: 10px;
       border: 1px dashed var(--border-strong);
       background: #fafbfc;
       color: var(--text-muted);
       border-radius: 8px;
-      padding: 8px 12px;
+      padding: 7px 10px;
       font: inherit;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       cursor: pointer;
       width: 100%;
     }
 
     .btn-add:hover { border-color: var(--accent); color: var(--accent); }
 
-    .notice-list { display: grid; gap: 12px; }
+    .notice-list { display: grid; gap: 10px; }
 
     .notice-card {
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
+      border-radius: 8px;
+      padding: 12px;
       background: #fafbfc;
     }
 
     .notice-head {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 10px;
+      gap: 8px;
+      margin-bottom: 8px;
     }
 
     .pin-check {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 0.8rem;
+      gap: 5px;
+      font-size: 0.78rem;
       color: var(--text-muted);
       white-space: nowrap;
     }
 
-    .notice-date { max-width: 150px; margin-left: auto; }
+    .notice-date { max-width: 140px; margin-left: auto; }
 
     .notice-title {
       width: 100%;
       font-weight: 700;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       border: none;
       border-bottom: 1px solid var(--border);
       border-radius: 0;
-      padding: 6px 0;
+      padding: 5px 0;
       background: transparent;
     }
 
     .notice-title:focus { box-shadow: none; border-color: var(--accent); }
 
-    .notice-card textarea { resize: vertical; min-height: 72px; }
+    .notice-card textarea { resize: vertical; min-height: 60px; }
 
     .help-note {
-      margin-top: 20px;
-      padding: 12px 14px;
-      border-radius: 10px;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 8px;
       background: var(--accent-soft);
       border: 1px solid #bfdbfe;
-      font-size: 0.82rem;
+      font-size: 0.78rem;
       color: #1e40af;
-      line-height: 1.6;
+      line-height: 1.5;
     }
 
-    @media (max-width: 760px) {
-      body { padding: 20px 14px 48px; }
-      .hero { padding: 22px 18px; }
-      .hero h1 { font-size: 1.45rem; }
-      .block-body { padding: 14px; }
-      .timeline-item { grid-template-columns: 1fr; gap: 6px; }
-      .pill { justify-self: start; }
+    @media (max-width: 960px) {
+      .dash-row { grid-template-columns: 1fr; }
+      .yt-videos { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 560px) {
+      body { padding: 14px 12px 36px; }
+      .yt-stats { grid-template-columns: 1fr; }
+      .yt-videos { grid-template-columns: 1fr; }
+      .timeline-item { grid-template-columns: 1fr; gap: 4px; }
     }
   </style>
 </head>
 <body>
   <div class="page">
-    <div class="top-bar">
-      <div class="save-status">
-        <span class="save-dot" id="save-dot"></span>
-        <span id="save-message">불러오는 중...</span>
+    <header class="app-header">
+      <div class="app-brand">
+        <h1>디디딧 워크스페이스</h1>
+        <p>채널 현황 · 프로젝트 · 팀 업무</p>
       </div>
-      <div class="top-actions">
-        <button type="button" class="btn" id="btn-import">데이터 가져오기</button>
-        <button type="button" class="btn" id="btn-export">데이터보내기</button>
-        <input type="file" id="import-file" accept="application/json,.json" hidden>
+      <div class="header-right">
+        <div class="save-status">
+          <span class="save-dot" id="save-dot"></span>
+          <span id="save-message">불러오는 중...</span>
+        </div>
+        <div class="top-actions">
+          <button type="button" class="btn" id="btn-import">가져오기</button>
+          <button type="button" class="btn" id="btn-export">보내기</button>
+          <input type="file" id="import-file" accept="application/json,.json" hidden>
+        </div>
+      </div>
+    </header>
+
+    <div class="dashboard">
+      <section class="block yt-panel" id="yt-panel">
+        <div class="block-head">
+          <h2><span class="block-icon">▶</span> <span id="yt-channel-title">디디딧 YouTube</span></h2>
+          <a class="block-link" id="yt-channel-link" href="https://www.youtube.com/@DD-DIT" target="_blank" rel="noopener">@DD-DIT 열기 →</a>
+        </div>
+        <div class="block-body">
+          <div id="yt-error" class="yt-error" hidden></div>
+          <div class="yt-stats">
+            <div class="yt-stat">
+              <div class="yt-stat-label">구독자</div>
+              <div class="yt-stat-value loading" id="yt-subs">불러오는 중…</div>
+            </div>
+            <div class="yt-stat">
+              <div class="yt-stat-label">총 조회수</div>
+              <div class="yt-stat-value loading" id="yt-views">불러오는 중…</div>
+            </div>
+            <div class="yt-stat">
+              <div class="yt-stat-label">영상 수</div>
+              <div class="yt-stat-value loading" id="yt-videos-count">불러오는 중…</div>
+            </div>
+          </div>
+          <div class="yt-videos" id="yt-videos"></div>
+        </div>
+      </section>
+
+      <div class="dash-row">
+        <section class="block">
+          <div class="block-head">
+            <h2><span class="block-icon">📡</span> 채널 소개</h2>
+          </div>
+          <div class="block-body compact">
+            <div
+              id="overview-text"
+              class="overview-text"
+              contenteditable="true"
+              data-placeholder="채널 방향, 운영 원칙 등을 입력하세요."
+            ></div>
+          </div>
+        </section>
+
+        <section class="block">
+          <div class="block-head">
+            <h2><span class="block-icon">🗓</span> 다가오는 일정</h2>
+          </div>
+          <div class="block-body compact">
+            <div id="timeline" class="timeline"></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="dash-row">
+        <section class="block">
+          <div class="block-head">
+            <h2><span class="block-icon">📂</span> 프로젝트</h2>
+          </div>
+          <div class="block-body compact">
+            <div id="project-grid" class="mini-grid"></div>
+          </div>
+        </section>
+
+        <section class="block">
+          <div class="block-head">
+            <h2><span class="block-icon">🛠</span> 채널 도구</h2>
+          </div>
+          <div class="block-body compact">
+            <div id="tool-grid" class="mini-grid"></div>
+          </div>
+        </section>
       </div>
     </div>
 
-    <header class="hero">
-      <span class="badge">디디딧</span>
-      <h1>채널 워크스페이스</h1>
-      <p>프로젝트 현황 · 일정 · 협찬 · 노티스를 한곳에서 관리합니다.</p>
-    </header>
+    <section class="block work-panel">
+      <div class="tab-bar" role="tablist">
+        <button type="button" class="tab-btn active" data-tab="schedule" role="tab">일정</button>
+        <button type="button" class="tab-btn" data-tab="sponsorships" role="tab">협찬 · 광고</button>
+        <button type="button" class="tab-btn" data-tab="notices" role="tab">노티스</button>
+      </div>
 
-    <div class="zone-label">채널 개요</div>
-
-    <section class="block">
-      <div class="block-head">
-        <h2><span class="block-icon">📡</span> 채널 소개</h2>
-      </div>
-      <div class="block-body">
-        <div
-          id="overview-text"
-          class="overview-text"
-          contenteditable="true"
-          data-placeholder="채널 방향, 운영 원칙, 팀 공지 사항 등을 입력하세요."
-        ></div>
-      </div>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <h2><span class="block-icon">🛠</span> 채널 도구</h2>
-      </div>
-      <div class="block-body">
-        <div id="tool-grid" class="link-grid"></div>
-      </div>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <h2><span class="block-icon">📂</span> 프로젝트</h2>
-      </div>
-      <div class="block-body">
-        <div id="project-grid" class="project-grid"></div>
-      </div>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <h2><span class="block-icon">🗓</span> 다가오는 일정</h2>
-      </div>
-      <div class="block-body">
-        <div id="timeline" class="timeline"></div>
-      </div>
-    </section>
-
-    <div class="zone-label">팀 업무</div>
-
-    <section class="block">
-      <div class="block-head">
-        <h2><span class="block-icon">📅</span> 기획 · 촬영 · 편집 · 업로드 일정</h2>
-      </div>
-      <div class="block-body">
+      <div class="tab-pane active" data-tab="schedule" role="tabpanel">
         <div class="table-wrap">
           <table>
             <thead>
@@ -576,13 +666,8 @@
         </div>
         <button type="button" class="btn-add" data-action="add" data-block="schedule">+ 일정 추가</button>
       </div>
-    </section>
 
-    <section class="block">
-      <div class="block-head">
-        <h2><span class="block-icon">🤝</span> 광고 · 협찬 협업</h2>
-      </div>
-      <div class="block-body">
+      <div class="tab-pane" data-tab="sponsorships" role="tabpanel">
         <div class="table-wrap">
           <table>
             <thead>
@@ -602,22 +687,16 @@
         </div>
         <button type="button" class="btn-add" data-action="add" data-block="sponsorships">+ 협업 추가</button>
       </div>
-    </section>
 
-    <section class="block">
-      <div class="block-head">
-        <h2><span class="block-icon">📢</span> 노티스</h2>
-      </div>
-      <div class="block-body">
+      <div class="tab-pane" data-tab="notices" role="tabpanel">
         <div id="notice-list" class="notice-list"></div>
         <button type="button" class="btn-add" data-action="add" data-block="notices">+ 노티스 추가</button>
       </div>
     </section>
 
     <p class="help-note">
-      변경 사항은 브라우저에 자동 저장됩니다. 팀원과 공유할 때는 <strong>데이터보내기</strong>로 JSON을 보내고,
-      받은 사람이 <strong>데이터 가져오기</strong>로 불러오면 됩니다.
-      <strong>콘티</strong>는 Google 시트에서 팀 편집 → 시나리오 머신 <strong>시트로 보내기 / 불러오기</strong>로 동기화합니다.
+      변경 사항은 브라우저에 자동 저장됩니다. 팀 공유는 <strong>보내기/가져오기</strong> JSON.
+      콘티는 Google 시트 ↔ 시나리오 머신 <strong>시트 동기화</strong>로 맞춥니다.
     </p>
   </div>
 
