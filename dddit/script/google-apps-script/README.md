@@ -22,6 +22,9 @@
    - 액세스: **모든 사용자**
 5. 배포 URL 복사 (`.../exec`)
 
+팀 내부 설정값(API_TOKEN, DRIVE_FOLDER_ID 등)은 git에 넣지 말고  
+`google-apps-script/SETUP.local.md`에 메모하세요 (`.gitignore` 처리됨).
+
 선택: `setupDdditProjects` 함수를 한 번 실행하면 `default`, `xenics` 시트를 미리 만들 수 있습니다.
 
 ## 2. NAS works-api (.env)
