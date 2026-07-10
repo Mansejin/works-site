@@ -515,10 +515,18 @@ textarea.prose-draft {
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.chapter-item-head:active {
+  cursor: grabbing;
 }
 
 .chapter-item-head .btn-chapter-remove {
   margin-left: auto;
+  cursor: pointer;
 }
 
 .chapter-drag-handle {
@@ -530,13 +538,7 @@ textarea.prose-draft {
   padding: 4px 8px;
   font-size: 0.85rem;
   line-height: 1;
-  cursor: grab;
-  user-select: none;
-  touch-action: none;
-}
-
-.chapter-drag-handle:active {
-  cursor: grabbing;
+  pointer-events: none;
 }
 
 .chapter-item.is-dragging {

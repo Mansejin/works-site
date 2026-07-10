@@ -1349,21 +1349,29 @@ function reorderChapters(fromId, toId) {
 function bindChapterDragDrop(list) {
   let dragId = null;
 
-  list.querySelectorAll('.chapter-drag-handle').forEach((handle) => {
-    handle.addEventListener('dragstart', (e) => {
-      const item = handle.closest('.chapter-item');
-      dragId = item?.dataset.id || '';
-      if (!dragId) return;
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', dragId);
-      item.classList.add('is-dragging');
+  function startChapterDrag(e) {
+    if (e.target.closest('.btn-chapter-remove')) {
+      e.preventDefault();
+      return;
+    }
+    const item = e.currentTarget.closest('.chapter-item');
+    dragId = item?.dataset.id || '';
+    if (!dragId) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragId);
+    item.classList.add('is-dragging');
+  }
+
+  function endChapterDrag() {
+    dragId = null;
+    list.querySelectorAll('.chapter-item').forEach((el) => {
+      el.classList.remove('is-dragging', 'is-drag-over');
     });
-    handle.addEventListener('dragend', () => {
-      dragId = null;
-      list.querySelectorAll('.chapter-item').forEach((el) => {
-        el.classList.remove('is-dragging', 'is-drag-over');
-      });
-    });
+  }
+
+  list.querySelectorAll('.chapter-item-head').forEach((head) => {
+    head.addEventListener('dragstart', startChapterDrag);
+    head.addEventListener('dragend', endChapterDrag);
   });
 
   list.querySelectorAll('.chapter-item').forEach((item) => {
@@ -1393,8 +1401,8 @@ function renderChapters() {
   }
   list.innerHTML = state.chapters.map((ch, i) => `
     <div class="chapter-item" data-id="${esc(ch.id)}">
-      <div class="chapter-item-head">
-        <button type="button" class="chapter-drag-handle" draggable="true" title="드래그하여 순서 변경" aria-label="챕터 순서 변경">⋮⋮</button>
+      <div class="chapter-item-head" draggable="true" title="드래그하여 순서 변경">
+        <span class="chapter-drag-handle" aria-hidden="true">⋮⋮</span>
         <span class="chapter-item-num">챕터 ${i + 1}</span>
         <button type="button" class="btn btn-ghost btn-sm btn-chapter-remove">삭제</button>
       </div>
