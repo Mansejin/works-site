@@ -220,8 +220,24 @@ async def _fetch_video_details(
     return videos
 
 
+def _analytics_status_note(analytics: dict[str, Any] | None) -> str:
+    if analytics and analytics.get("ok"):
+        return (
+            "YouTube Analytics OAuth 연동됨 — 상단에서 유입·시청 유지·인구통계를 표시합니다. "
+            "썸네일 노출/CTR은 Reporting API 전용이라 Studio에서 확인하세요."
+        )
+    if analytics and analytics.get("configured"):
+        return "YouTube Analytics OAuth 설정됨 — 데이터 조회 오류 시 새로고침하세요."
+    return (
+        "YouTube Analytics OAuth 미연동 — NAS .env에 YOUTUBE_OAUTH_* 및 YOUTUBE_CHANNEL_ID 설정 필요."
+    )
+
+
 def _build_subscriber_trend(
-    snapshots_data: dict[str, Any], live_subscribers: int | None
+    snapshots_data: dict[str, Any],
+    live_subscribers: int | None,
+    *,
+    analytics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     snapshots = list(snapshots_data.get("snapshots") or [])
     if live_subscribers and snapshots:
@@ -252,10 +268,15 @@ def _build_subscriber_trend(
             }
         )
 
+    if analytics and analytics.get("ok"):
+        note = "회색=자연 증가(추정), 빨강=총 구독자. Analytics 연동됨 — 주간 스냅샷은 하단 JSON에서 편집."
+    else:
+        note = "회색=자연 증가(수동 입력·추정), 빨강=총 구독자. OAuth 연동 시 상단 Analytics와 함께 활용."
+
     return {
         "points": points,
         "adSubsTotal": ad_subs_total,
-        "note": "회색=자연 증가(수동 입력·추정), 빨강=총 구독자. YouTube Analytics OAuth 연동 시 주간 구독 출처 자동화 가능.",
+        "note": note,
     }
 
 
@@ -354,6 +375,19 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
         else:
             limitations.append("Google Ads API: 프로모션 비용·노출 실시간 동기화 (미설정)")
 
+        if analytics_overview.get("ok"):
+            for video in videos:
+                video["retentionNote"] = ""
+            views_trend_note = (
+                "7일 조회 추이는 snapshots JSON 수동 입력. "
+                "유입·시청 지표는 상단 Analytics(OAuth 연동됨) 참고."
+            )
+        else:
+            views_trend_note = (
+                "7일 조회 추이는 subscriber-snapshots.json의 viewsTrend7d 또는 "
+                "YouTube Analytics OAuth 필요"
+            )
+
         payload = {
             "ok": True,
             "generatedAt": datetime.now(timezone.utc).isoformat(),
@@ -372,12 +406,15 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
                 {"title": (v.get("title") or "")[:18], "views": v.get("views", 0)} for v in recent_six
             ],
             "viewsTrend7d": snapshots_data.get("viewsTrend7d") or [],
-            "viewsTrendNote": "7일 조회 추이는 subscriber-snapshots.json의 viewsTrend7d 또는 YouTube Analytics OAuth 필요",
-            "subscriberTrend": _build_subscriber_trend(snapshots_data, live_subs),
+            "viewsTrendNote": views_trend_note,
+            "subscriberTrend": _build_subscriber_trend(
+                snapshots_data, live_subs, analytics=analytics_overview
+            ),
             "promotions": enriched_promos,
             "issues": promotions_data.get("issues") or [],
             "insights": _overview_insights(videos, promotions_data.get("issues") or []),
             "analytics": analytics_overview,
+            "analyticsStatusNote": _analytics_status_note(analytics_overview),
             "adsSync": ads_status,
             "limitations": limitations,
         }

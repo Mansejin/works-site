@@ -25,7 +25,7 @@
     issuesEditor: document.getElementById("issues-editor"),
     promotionsEditor: document.getElementById("promotions-editor"),
     snapshotsEditor: document.getElementById("snapshots-editor"),
-    saveStatus: document.getElementById("save-status"),
+    videoSectionNote: document.getElementById("video-section-note"),
   };
 
   let charts = {
@@ -313,7 +313,11 @@
     }
 
     if (banner) {
-      if (analytics.message && !analytics.ok) {
+      if (analytics.impressionsNote && analytics.ok) {
+        banner.classList.remove("hidden");
+        banner.classList.remove("warn");
+        banner.textContent = analytics.impressionsNote;
+      } else if (analytics.message && !analytics.ok) {
         banner.classList.remove("hidden");
         banner.classList.add("warn");
         banner.textContent = analytics.message;
@@ -550,7 +554,7 @@
               <a href="${esc(v.url)}" target="_blank" rel="noopener">YouTube</a>
               ${v.studioUrl ? `<a href="${esc(v.studioUrl)}" target="_blank" rel="noopener">Studio 분석</a>` : ""}
             </div>
-            <div class="video-note">${esc(v.retentionNote || "")}</div>
+            ${v.retentionNote ? `<div class="video-note">${esc(v.retentionNote)}</div>` : ""}
           </div>
         </article>`;
       })
@@ -630,6 +634,10 @@
       renderInsights(overview.insights || []);
       renderPromotions(overview.promotions || []);
       renderVideos(videosData.videos || []);
+
+      if (els.videoSectionNote && overview.analyticsStatusNote) {
+        els.videoSectionNote.textContent = overview.analyticsStatusNote;
+      }
 
       els.limitations.innerHTML = (overview.limitations || [])
         .map((line) => `<li>${esc(line)}</li>`)
