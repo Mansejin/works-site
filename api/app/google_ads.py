@@ -11,7 +11,7 @@ from app.config import google_ads_config
 from app.google_oauth import get_access_token
 from app.youtube_report_store import merge_ads_into_promotions, read_ads_sync, write_ads_sync
 
-_ADS_API_VERSION = "v20"
+_ADS_API_VERSION = "v24"
 _CACHE_TTL = 3600
 _SYNC_CACHE: dict[str, Any] = {}
 
