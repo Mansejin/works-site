@@ -1967,7 +1967,6 @@ JSON만 출력: {"queries":["..."],"rationale":"계획 한 줄"}`;
 
   async function callGeminiGrounded(apiKey, prompt, options = {}) {
     const model = options.model || RESEARCH_GEMINI_MODEL;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     const generationConfig = { temperature: options.temperature ?? 0.25 };
     if (options.jsonMime !== false) {
@@ -1984,22 +1983,9 @@ JSON만 출력: {"queries":["..."],"rationale":"계획 한 줄"}`;
     if (options.useSearch !== false) {
       body.tools = [{ google_search: {} }];
     }
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const res = await window.DdditWorksApi.postGemini(model, body, apiKey);
 
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      const msg = errBody?.error?.message || `API 오류 (${res.status})`;
-      const e = new Error(msg);
-      e.apiStatus = res.status;
-      e.apiModel = model;
-      throw e;
-    }
-
-    const data = await res.json();
+    const data = res;
     const candidate = data?.candidates?.[0];
     let text = candidate?.content?.parts?.[0]?.text;
     if (!text && candidate?.content?.parts) {
@@ -2581,6 +2567,37 @@ const state = {
 
 const $ = (sel) => document.querySelector(sel);
 
+function apiReady() {
+  if (window.DdditWorksApi?.isBackendMode?.()) {
+    return window.DdditWorksApi.isApiReady(state.apiKey);
+  }
+  return Boolean(state.apiKey?.trim());
+}
+
+function applyBackendUI() {
+  if (!window.DdditWorksApi?.isBackendMode?.()) return;
+  document.querySelectorAll('[data-local-only]').forEach((el) => {
+    el.hidden = true;
+  });
+  const note = $('#backend-settings-note');
+  if (note) note.hidden = false;
+  const status = $('#sheet-sync-status');
+  if (status) status.hidden = false;
+}
+
+async function initBackend() {
+  if (!window.DdditWorksApi?.isBackendMode?.()) return true;
+  try {
+    await window.DdditWorksApi.loadConfig();
+    applyBackendUI();
+    updateSheetSyncStatus();
+    return true;
+  } catch (err) {
+    showToast(`NAS API 연결 실패: ${err.message}`, true);
+    return false;
+  }
+}
+
 function bindModules() {
   const cfg = window.DIDIDIT_CONFIG;
   PM = window.DIDIDIT_PROMPT;
@@ -2703,20 +2720,25 @@ function sheetConfig() {
 function updateSheetSyncStatus() {
   const el = $('#sheet-sync-status');
   if (!el) return;
-  const cfg = sheetConfig();
   const project = window.DdditSheetSync?.projectSlug() || 'default';
   const tab = window.DdditSheetSync?.tabLabel(project) || project;
-  const parts = [`프로젝트 탭: ${tab}`];
 
+  if (window.DdditSheetSync?.useBackend?.()) {
+    const open = window.DdditWorksApi?.sheetOpenUrl?.();
+    el.textContent = open
+      ? `NAS 연동 · 프로젝트 탭: ${tab} · 시트 연결됨`
+      : `NAS 연동 · 프로젝트 탭: ${tab}`;
+    return;
+  }
+
+  const cfg = sheetConfig();
+  const parts = [`프로젝트 탭: ${tab}`];
   if (!cfg.apiUrl) parts.push('시트 API URL 미설정');
   else parts.push('API URL 설정됨');
-
   if (!cfg.token) parts.push('API 토큰 미설정');
   else parts.push(`API 토큰 설정됨 (${cfg.token.length}자)`);
-
   if (!cfg.openUrl) parts.push('시트 열기 URL 미설정');
   else parts.push('시트 링크 설정됨');
-
   el.textContent = parts.join(' · ');
 }
 
@@ -2733,8 +2755,10 @@ function toggleSheetTokenVisibility() {
 async function pushContiToSheet() {
   if (!state.allRows.length) return showToast('보낼 콘티가 없습니다.', true);
   if (!window.DdditSheetSync) return showToast('시트 연동 모듈을 불러오지 못했습니다.', true);
-  syncSheetSettingsFromDOM();
-  saveSettings();
+  if (!window.DdditSheetSync.useBackend()) {
+    syncSheetSettingsFromDOM();
+    saveSettings();
+  }
   const project = PROJECT_SLUG;
   const tab = window.DdditSheetSync.tabLabel(project);
   if (
@@ -2757,8 +2781,10 @@ async function pushContiToSheet() {
 
 async function pullContiFromSheet() {
   if (!window.DdditSheetSync) return showToast('시트 연동 모듈을 불러오지 못했습니다.', true);
-  syncSheetSettingsFromDOM();
-  saveSettings();
+  if (!window.DdditSheetSync.useBackend()) {
+    syncSheetSettingsFromDOM();
+    saveSettings();
+  }
   const project = PROJECT_SLUG;
   const tab = window.DdditSheetSync.tabLabel(project);
   if (state.allRows.length) {
@@ -2792,14 +2818,18 @@ async function pullContiFromSheet() {
 }
 
 function openContiSheet() {
-  syncSheetSettingsFromDOM();
-  saveSettings();
-  const url = state.sheetOpenUrl?.trim();
+  const url =
+    window.DdditWorksApi?.sheetOpenUrl?.() ||
+    (() => {
+      syncSheetSettingsFromDOM();
+      saveSettings();
+      return state.sheetOpenUrl?.trim();
+    })();
   if (url) {
     window.open(url, '_blank', 'noopener,noreferrer');
     return;
   }
-  showToast('시트 열기 URL을 API 설정에 입력해 주세요.', true);
+  showToast('시트 주소가 설정되지 않았습니다. NAS .env의 DDDIT_SHEET_OPEN_URL을 확인하세요.', true);
 }
 
 function saveProject() {
@@ -2966,7 +2996,7 @@ function loadAirPurifierExample() {
   applyBriefToDOM();
   updateCategoryHint();
   saveProject();
-  if (state.apiKey && state.productName.trim()) updateWorkflowStep(3);
+  if (state.productName.trim() && apiReady()) updateWorkflowStep(3);
   showToast('공기청정기 예시 브리프를 불러왔습니다. 실제 제품 정보로 수정하세요.');
 }
 
@@ -3186,7 +3216,7 @@ function deleteSearchResult(index) {
 }
 
 async function runDeviceSearch() {
-  if (!state.apiKey) return showToast('Google API 키를 입력하세요. (상단 API)', true);
+  if (!apiReady()) return showToast('API를 사용할 수 없습니다. NAS 연결 또는 API 키를 확인하세요.', true);
   if (!RESEARCH) return showToast('리서치 모듈을 불러오지 못했습니다.', true);
 
   const criteria = getSearchCriteriaFromDOM();
@@ -3672,7 +3702,7 @@ function updateActionDock() {
 
   if (btnReviseLineup) {
     btnReviseLineup.disabled =
-      !state.apiKey || !state.partLineup.length || state.lineupConfirmed;
+      !apiReady() || !state.partLineup.length || state.lineupConfirmed;
   }
 
   if (!state.lineupConfirmed) {
@@ -3694,7 +3724,7 @@ function updateActionDock() {
       label.textContent = hasSeg ? `수정 대상: ${name}` : `작성 대상: ${name}`;
     }
     if (progress) progress.textContent = `${done}/${total} 파트 완료 · 미작성: ${getPendingPartsLabel()}`;
-    if (btnRevise) btnRevise.disabled = !state.apiKey || !hasSeg;
+    if (btnRevise) btnRevise.disabled = !apiReady() || !hasSeg;
   } else if (done < total) {
     const nextIdx = state.partLineup.findIndex((_, i) => !isPartGenerated(i));
     const next = nextIdx >= 0 ? state.partLineup[nextIdx] : '';
@@ -3706,14 +3736,13 @@ function updateActionDock() {
     if (progress) progress.textContent = `${total}/${total}`;
     if (btnRevise) {
       btnRevise.disabled =
-        state.selectedPartIndex === null || !isPartGenerated(state.selectedPartIndex) || !state.apiKey;
+        state.selectedPartIndex === null || !isPartGenerated(state.selectedPartIndex) || !apiReady();
     }
   }
 }
 
 async function callGemini(userPrompt, temperature = 0.7, modelId = null, options = {}) {
   const model = modelId || state.modelLite;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
 
   const generationConfig = {
     temperature,
@@ -3729,22 +3758,7 @@ async function callGemini(userPrompt, temperature = 0.7, modelId = null, options
     generationConfig,
   };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    const msg = errBody?.error?.message || `API 오류 (${res.status})`;
-    const e = new Error(msg);
-    e.apiStatus = res.status;
-    e.apiModel = model;
-    throw e;
-  }
-
-  const data = await res.json();
+  const data = await window.DdditWorksApi.postGemini(model, body, state.apiKey);
   const candidate = data?.candidates?.[0];
   const text = candidate?.content?.parts?.[0]?.text;
   if (!text) {
@@ -4360,7 +4374,7 @@ function updateGenerateButtons() {
   const btnPart = $('#btn-generate-part');
   const btnUnlock = $('#btn-unlock-lineup');
 
-  if (btnDraft) btnDraft.disabled = !state.apiKey || !state.productName.trim();
+  if (btnDraft) btnDraft.disabled = !apiReady() || !state.productName.trim();
   if (btnConfirm) {
     btnConfirm.disabled = !state.partLineup.length || state.lineupConfirmed;
   }
@@ -4378,21 +4392,21 @@ function updateGenerateButtons() {
     } else if (countGeneratedParts() >= state.partLineup.length) {
       if (state.selectedPartIndex !== null && isPartGenerated(state.selectedPartIndex)) {
         const name = state.partLineup[state.selectedPartIndex];
-        btnPart.disabled = !state.apiKey;
+        btnPart.disabled = !apiReady();
         setGenBtn('③ 재생성', `다시 생성: ${name}`);
       } else {
         btnPart.disabled = true;
         setGenBtn('③ 완료', '전체 파트 완료');
       }
     } else if (state.selectedPartIndex !== null) {
-      btnPart.disabled = !state.apiKey;
+      btnPart.disabled = !apiReady();
       const name = state.partLineup[state.selectedPartIndex];
       setGenBtn(
         isPartGenerated(state.selectedPartIndex) ? '③ 재생성' : '③ 생성',
         isPartGenerated(state.selectedPartIndex) ? `다시 생성: ${name}` : `파트 생성: ${name}`
       );
     } else {
-      btnPart.disabled = !state.apiKey;
+      btnPart.disabled = !apiReady();
       const nextIdx = state.partLineup.findIndex((_, i) => !isPartGenerated(i));
       const next = nextIdx >= 0 ? state.partLineup[nextIdx] : '';
       setGenBtn('③ 생성', next ? `파트 생성: ${next}` : '파트 생성');
@@ -4755,7 +4769,7 @@ function startEmptyLineup() {
 }
 
 async function generatePartDraft() {
-  if (!state.apiKey) return showToast('Google API 키를 입력하세요.', true);
+  if (!apiReady()) return showToast('API를 사용할 수 없습니다.', true);
   if (!state.productName.trim()) return showToast('제품명을 입력하세요.', true);
   if (state.adMode && !state.adGuides.length) {
     if (!confirm('광고 모드인데 본사 가이드가 없습니다. 가이드 없이 초안을 만들까요?')) return;
@@ -4939,7 +4953,7 @@ async function generateNextPart() {
 }
 
 async function reviseLineupWithAI() {
-  if (!state.apiKey) return showToast('Google API 키를 입력하세요.', true);
+  if (!apiReady()) return showToast('API를 사용할 수 없습니다.', true);
   if (!state.partLineup.length) return showToast('먼저 파트 초안을 만드세요.', true);
   if (state.lineupConfirmed) return showToast('확정된 구성입니다. [구성 다시 편집]을 누르세요.', true);
 
@@ -4983,7 +4997,7 @@ JSON만 출력:
 }
 
 async function revisePartWithAI() {
-  if (!state.apiKey) return showToast('Google API 키를 입력하세요.', true);
+  if (!apiReady()) return showToast('API를 사용할 수 없습니다.', true);
   if (!state.lineupConfirmed) return showToast('먼저 파트 구성을 확정하세요.', true);
 
   const partIndex =
@@ -5160,7 +5174,7 @@ function resetProject() {
   renderAdGuideList();
   renderPartLineup();
   renderTable();
-  updateWorkflowStep(state.apiKey ? 2 : 1);
+  updateWorkflowStep(apiReady() ? 2 : 1);
   showToast('프로젝트를 초기화했습니다.');
 }
 
@@ -5407,6 +5421,7 @@ function applyWorkspaceProject() {
 
 async function boot() {
   try {
+    const backendOk = await initBackend();
     bindModules();
     hideToast();
     bindToastDismiss();
@@ -5440,10 +5455,12 @@ async function boot() {
     updateSearchProfileUI(state.searchDeviceId);
     if (state.searchResults) renderSearchResults(state.searchResults);
 
-    if (!state.apiKey) {
+    if (!apiReady()) {
       updateWorkflowStep(1);
-      $('#settings-panel')?.classList.remove('collapsed');
-      $('#toggle-settings')?.classList.add('btn-active');
+      if (!window.DdditWorksApi?.isBackendMode?.()) {
+        $('#settings-panel')?.classList.remove('collapsed');
+        $('#toggle-settings')?.classList.add('btn-active');
+      }
     } else {
       updateWorkflowStep(state.searchResults ? 2 : 1);
     }
