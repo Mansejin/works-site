@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>DD-DIT Channel Report — Google Ads API Design</title>
+  <style>
+    @page { size: A4; margin: 22mm 20mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      font-size: 11pt;
+      line-height: 1.55;
+      color: #1e293b;
+      max-width: 170mm;
+      margin: 0 auto;
+      padding: 16mm 0;
+    }
+    h1 { font-size: 18pt; margin-bottom: 4px; color: #0f172a; }
+    .meta { font-size: 9.5pt; color: #64748b; margin-bottom: 18px; }
+    h2 {
+      font-size: 12pt;
+      margin: 16px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #2563eb;
+      color: #1e40af;
+    }
+    p, li { margin-bottom: 6px; }
+    ul { margin-left: 18px; }
+    .diagram {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin: 10px 0;
+      background: #f8fafc;
+      font-family: Consolas, monospace;
+      font-size: 9.5pt;
+      line-height: 1.7;
+      white-space: pre;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 10pt;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 10px;
+      text-align: left;
+    }
+    th { background: #eff6ff; font-weight: 700; }
+    .mock {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+      margin: 10px 0;
+    }
+    .mock-title { font-weight: 700; font-size: 10pt; margin-bottom: 8px; }
+    .mock-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 6px;
+      font-size: 9pt;
+      padding: 4px 0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .mock-head { font-weight: 700; background: #f1f5f9; padding: 6px; border-radius: 4px; }
+    .footer { margin-top: 20px; font-size: 9pt; color: #64748b; }
+  </style>
+</head>
+<body>
+  <h1>DD-DIT Channel Report</h1>
+  <p class="meta">Google Ads API Integration — Design Document (Internal Tool)<br />
+  Project: works-site / dddit &nbsp;|&nbsp; Date: July 2026 &nbsp;|&nbsp; Contact: ddditchannel@gmail.com</p>
+
+  <h2>1. Purpose</h2>
+  <p>
+    디디딧(DD-DIT) YouTube 채널 팀이 사용하는 <strong>비공개 내부 워크스페이스</strong>입니다.
+    Google Ads API를 통해 <strong>본인 Google Ads 계정의 프로모션 캠페인</strong> 비용·노출·조회·클릭 데이터만
+    읽어와 채널 보고 대시보드에 표시합니다. CPV·CPM 등 효율 지표를 YouTube Analytics 데이터와 함께 검토합니다.
+  </p>
+  <ul>
+    <li>대상 URL: https://works.mansejin.com/dddit/report/ (noindex, team-only)</li>
+    <li>API access: <strong>read-only</strong> — no campaign create/edit/delete</li>
+    <li>Audience: internal team members only (not public SaaS)</li>
+  </ul>
+
+  <h2>2. Architecture</h2>
+  <div class="diagram">[ Google Ads Account 144-794-4603 ]
+            |
+            |  Google Ads API (search / metrics read)
+            v
+[ NAS Docker: works-api ]  ← OAuth refresh token, developer token (server-side .env)
+            |
+            |  HTTPS REST (private)
+            v
+[ works.mansejin.com/dddit/report/ ]  ← team browser (no API keys in frontend)</div>
+
+  <h2>3. Data Flow</h2>
+  <ol>
+    <li>Team opens channel report page or clicks Refresh.</li>
+    <li>Backend calls <code>POST /api/dddit/youtube/report/ads/sync</code> (on-demand).</li>
+    <li>works-api queries Google Ads API for campaign metrics (last 30 days).</li>
+    <li>Results cached in NAS <code>data/youtube/ads-sync.json</code> and merged with manual notes.</li>
+    <li>Report UI shows promotion table: cost, impressions, views, CPV, efficiency text.</li>
+  </ol>
+
+  <h2>4. UI Mock — Promotion Efficiency Table</h2>
+  <div class="mock">
+    <div class="mock-title">프로모션 효율 요약 · Ads sync status badge</div>
+    <div class="mock-row mock-head">
+      <span>Campaign</span><span>Cost</span><span>Impressions</span><span>CPV</span>
+    </div>
+    <div class="mock-row">
+      <span>Shokz OpenFit promo</span><span>₩84,266</span><span>29,672</span><span>₩25</span>
+    </div>
+    <div class="mock-row">
+      <span>Ikko MindOne pro (subs)</span><span>₩156,800</span><span>56,295</span><span>₩134</span>
+    </div>
+  </div>
+
+  <h2>5. API Usage Scope</h2>
+  <table>
+    <tr><th>Item</th><th>Detail</th></tr>
+    <tr><td>Google Ads API operations</td><td>campaign search, metrics: cost_micros, impressions, video_views, clicks</td></tr>
+    <tr><td>Accounts accessed</td><td>Own account only (customer ID 1447944603)</td></tr>
+    <tr><td>Write operations</td><td>None</td></tr>
+    <tr><td>Third-party accounts</td><td>None</td></tr>
+    <tr><td>Refresh frequency</td><td>On page load / manual refresh (~hourly cache)</td></tr>
+  </table>
+
+  <h2>6. Security</h2>
+  <ul>
+    <li>Developer token, OAuth client secret, and refresh token stored only in NAS server <code>.env</code>.</li>
+    <li>Frontend static site has no Google credentials.</li>
+    <li>Report page: <code>noindex, nofollow</code>; workspace is private.</li>
+    <li>CORS restricted to works.mansejin.com.</li>
+  </ul>
+
+  <p class="footer">
+    This document describes an internal reporting tool for DD-DIT YouTube channel operations.
+    Google Cloud project: nth-victory-502004-m1
+  </p>
+</body>
+</html>
