@@ -276,27 +276,7 @@ function connectCollab() {
     renderPresence();
     updateStatusLine();
   });
-
-btnCopyShare.addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(shareUrlInput.value);
-    setStatus("공유 링크 복사됨", "ok");
-  } catch {
-    shareUrlInput.select();
-    document.execCommand("copy");
-    setStatus("공유 링크 복사됨", "ok");
-  }
-});
-
-titleInput.addEventListener("input", () => {
-  if (!yTitle || !ydoc) return;
-  const value = titleInput.value;
-  if (yTitle.toString() === value) return;
-  ydoc.transact(() => {
-    yTitle.delete(0, yTitle.length);
-    yTitle.insert(0, value);
-  });
-});
+}
 
 async function renderPicker(projects) {
   if (!projects.length) {
@@ -392,6 +372,16 @@ btnCopyShare.addEventListener("click", async () => {
     document.execCommand("copy");
     setStatus("공유 링크 복사됨", "ok");
   }
+});
+
+titleInput.addEventListener("input", () => {
+  if (!yTitle || !ydoc) return;
+  const value = titleInput.value;
+  if (yTitle.toString() === value) return;
+  ydoc.transact(() => {
+    yTitle.delete(0, yTitle.length);
+    yTitle.insert(0, value);
+  });
 });
 
 async function init() {
