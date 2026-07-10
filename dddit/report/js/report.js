@@ -27,7 +27,6 @@
     issuesEditor: document.getElementById("issues-editor"),
     promotionsEditor: document.getElementById("promotions-editor"),
     snapshotsEditor: document.getElementById("snapshots-editor"),
-    videoSectionNote: document.getElementById("video-section-note"),
   };
 
   let charts = {
@@ -381,7 +380,7 @@
           analytics.impressionsSource === "reporting-api" ? "썸네일 노출 (28일)" : "노출수",
         value: analytics.impressions != null ? formatNum(analytics.impressions) : "—",
       },
-      { label: "CTR", value: analytics.ctr != null ? `${analytics.ctr}%` : "—" },
+      { label: "CTR", value: analytics.impressions != null && analytics.ctr != null ? `${analytics.ctr}%` : "—" },
       {
         label: "평균 시청률",
         value:
@@ -717,7 +716,6 @@
               <a href="${esc(v.url)}" target="_blank" rel="noopener">YouTube</a>
               ${v.studioUrl ? `<a href="${esc(v.studioUrl)}" target="_blank" rel="noopener">Studio 분석</a>` : ""}
             </div>
-            ${v.retentionNote ? `<div class="video-note">${esc(v.retentionNote)}</div>` : ""}
           </div>
         </article>`;
       })
@@ -797,10 +795,6 @@
       renderInsights(overview.insights || []);
       renderPromotions(overview.promotions || []);
       renderVideos(videosData.videos || []);
-
-      if (els.videoSectionNote && overview.analyticsStatusNote) {
-        els.videoSectionNote.textContent = overview.analyticsStatusNote;
-      }
 
       els.limitations.innerHTML = (overview.limitations || [])
         .map((line) => `<li>${esc(line)}</li>`)

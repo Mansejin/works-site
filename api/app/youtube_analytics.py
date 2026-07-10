@@ -174,7 +174,7 @@ async def fetch_analytics_overview(refresh: bool = False) -> dict[str, Any]:
 
             reach = await fetch_reporting_reach(refresh=refresh)
             payload["reporting"] = reach
-            if reach.get("impressions") is not None:
+            if reach.get("impressions") is not None and reach.get("impressions") > 0:
                 payload["impressions"] = reach["impressions"]
                 payload["ctr"] = reach.get("ctr")
                 payload["impressionsSource"] = "reporting-api"

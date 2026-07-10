@@ -39,7 +39,7 @@
       padding: 20px 20px 48px;
     }
 
-    .page { max-width: 1200px; margin: 0 auto; }
+    .page { max-width: 1280px; margin: 0 auto; }
 
     .hub-nav { margin-bottom: 14px; }
     .hub-nav a {
@@ -96,6 +96,18 @@
     .grid { display: grid; gap: 14px; }
     .grid-4 { grid-template-columns: repeat(4, 1fr); }
     .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-promo-insights {
+      grid-template-columns: minmax(200px, 24%) minmax(0, 1fr);
+      align-items: start;
+    }
+    .insights-card .card-body {
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .insights-card .insights {
+      font-size: 0.8rem;
+      gap: 6px;
+    }
 
     .card {
       background: var(--surface);
@@ -170,6 +182,11 @@
       vertical-align: top;
     }
     th { background: #f8fafc; font-size: 0.74rem; color: var(--text-muted); white-space: nowrap; }
+    .promo-table-wrap table th:not(:first-child),
+    .promo-table-wrap table td:not(:first-child) {
+      text-align: right;
+      white-space: nowrap;
+    }
     .metric-good { color: var(--success); font-weight: 600; }
     .badge {
       display: inline-block;
@@ -184,8 +201,8 @@
 
     .video-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
     }
     .video-card {
       border: 1px solid var(--border);
@@ -200,11 +217,11 @@
       width: 100%;
       object-fit: cover;
     }
-    .video-body { padding: 10px 12px 12px; }
+    .video-body { padding: 8px 10px 10px; }
     .video-title {
-      font-size: 0.86rem;
+      font-size: 0.8rem;
       font-weight: 700;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
@@ -309,10 +326,12 @@
 
     @media (max-width: 960px) {
       .kpi-grid, .grid-4 { grid-template-columns: repeat(2, 1fr); }
-      .grid-2 { grid-template-columns: 1fr; }
+      .grid-2, .grid-promo-insights { grid-template-columns: 1fr; }
+      .video-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
     @media (max-width: 560px) {
       .kpi-grid { grid-template-columns: 1fr; }
+      .video-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
   </style>
 </head>
@@ -395,8 +414,8 @@
         </div>
       </section>
 
-      <div class="grid grid-2" style="margin-bottom:14px;">
-        <section class="card">
+      <div class="grid grid-promo-insights" style="margin-bottom:14px;">
+        <section class="card insights-card">
           <div class="card-head"><h2>주요 이슈 · 진단</h2></div>
           <div class="card-body"><ul class="insights" id="insights-list"></ul></div>
         </section>
@@ -434,9 +453,6 @@
           <a id="channel-link" class="btn btn-ghost" href="https://www.youtube.com/@DD-DIT" target="_blank" rel="noopener" style="text-decoration:none;">채널 열기</a>
         </div>
         <div class="card-body">
-          <p class="video-note" id="video-section-note" style="margin-bottom:12px;">
-            API 기준 조회수·길이·게시일. 유입·시청 유지·인구통계는 상단 YouTube Analytics 섹션을 참고하세요.
-          </p>
           <div id="video-grid" class="video-grid"></div>
         </div>
       </section>
@@ -466,6 +482,6 @@
     <div id="loading" class="card loading-block">보고 데이터를 불러오는 중…</div>
   </div>
 
-  <script src="js/report.js?v=7"></script>
+  <script src="js/report.js?v=9"></script>
 </body>
 </html>

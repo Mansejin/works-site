@@ -88,7 +88,7 @@ jobs:
             curl -fsSL "https://raw.githubusercontent.com/Mansejin/works-site/${WORKS_BRANCH}/api/scripts/nas-docker-update.sh" -o /tmp/works-api-deploy.sh
             sed -i 's/\r$//' /tmp/works-api-deploy.sh 2>/dev/null || true
             cd "$REPO"
-            sh /tmp/works-api-deploy.sh
+            sh /tmp/works-api-deploy.sh --full-build
         env:
           WORKS_BRANCH: ${{ github.event.inputs.branch || github.ref_name }}
           NAS_REPO_PATH: ${{ secrets.NAS_REPO_PATH }}

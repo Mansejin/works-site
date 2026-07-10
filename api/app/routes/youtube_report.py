@@ -220,6 +220,25 @@ async def _fetch_video_details(
     return videos
 
 
+def _reporting_limitation_line(analytics: dict[str, Any] | None) -> str:
+    reporting = (analytics or {}).get("reporting") or {}
+    impressions = (analytics or {}).get("impressions")
+    ctr = (analytics or {}).get("ctr")
+    if (analytics or {}).get("impressionsSource") == "reporting-api" and impressions:
+        ctr_part = f", CTR {ctr}%" if ctr is not None else ""
+        return (
+            f"YouTube Reporting API (OAuth): 썸네일 노출·CTR (연동됨 — "
+            f"28일 {impressions:,} 노출{ctr_part})"
+        )
+    if reporting.get("ok") is False and reporting.get("message"):
+        return f"YouTube Reporting API (OAuth): {reporting['message']}"
+    if reporting.get("jobId"):
+        count = reporting.get("reportCount") or 0
+        note = reporting.get("message") or "첫 일별 CSV 대기 중 (보통 24~48시간)"
+        return f"YouTube Reporting API (OAuth): job 연결됨 (CSV {count}건) — {note}"
+    return "YouTube Reporting API (OAuth): 썸네일 노출·CTR (GCP API 활성화 + OAuth)"
+
+
 def _analytics_status_note(analytics: dict[str, Any] | None) -> str:
     if analytics and analytics.get("ok"):
         reporting = analytics.get("reporting") or {}
@@ -375,13 +394,7 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
         ]
         if youtube_analytics_oauth_config():
             limitations.append("YouTube Analytics API (OAuth): 유입·시청 유지·인구통계 (연동됨)")
-            reporting = (analytics_overview.get("reporting") or {}) if analytics_overview.get("ok") else {}
-            if analytics_overview.get("impressionsSource") == "reporting-api":
-                limitations.append("YouTube Reporting API (OAuth): 썸네일 노출·CTR (연동됨)")
-            elif reporting.get("jobId"):
-                limitations.append("YouTube Reporting API (OAuth): job 생성됨 — 첫 CSV 대기 중")
-            else:
-                limitations.append("YouTube Reporting API (OAuth): 썸네일 노출·CTR (GCP API 활성화 필요)")
+            limitations.append(_reporting_limitation_line(analytics_overview))
         else:
             limitations.append("YouTube Analytics API (OAuth): NAS .env에 OAuth 토큰 설정 필요")
         if google_ads_config():

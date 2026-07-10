@@ -51,8 +51,16 @@ def _parse_report_date(value: str) -> date | None:
         return None
 
 
+def _normalize_ctr_percent(value: float) -> float:
+    if value <= 1:
+        return round(value * 100, 2)
+    return round(value, 2)
+
+
 def _aggregate_csv(text: str, start: date, end: date) -> tuple[int, float | None]:
     reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames:
+        return 0, None
     total_impressions = 0
     weighted_ctr = 0.0
     for row in reader:
@@ -63,14 +71,12 @@ def _aggregate_csv(text: str, start: date, end: date) -> tuple[int, float | None
         if impressions <= 0:
             continue
         ctr_raw = float(row.get("video_thumbnail_impressions_ctr") or 0)
+        ctr_percent = _normalize_ctr_percent(ctr_raw)
         total_impressions += impressions
-        weighted_ctr += impressions * ctr_raw
+        weighted_ctr += impressions * ctr_percent
     if total_impressions <= 0:
         return 0, None
-    ctr = weighted_ctr / total_impressions
-    if ctr <= 1:
-        ctr *= 100
-    return total_impressions, round(ctr, 2)
+    return total_impressions, round(weighted_ctr / total_impressions, 2)
 
 
 async def _ensure_job(client: httpx.AsyncClient, token: str) -> str:
@@ -211,6 +217,7 @@ async def fetch_reporting_reach(refresh: bool = False) -> dict[str, Any]:
             payload = {
                 "ok": True,
                 "configured": True,
+                "status": "pending",
                 "jobId": job_id,
                 "impressions": None,
                 "ctr": None,
@@ -226,6 +233,7 @@ async def fetch_reporting_reach(refresh: bool = False) -> dict[str, Any]:
         payload = {
             "ok": True,
             "configured": True,
+            "status": "ready",
             "jobId": job_id,
             "impressions": impressions,
             "ctr": ctr,
