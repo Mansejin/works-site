@@ -60,46 +60,6 @@
       margin-top: 2px;
     }
 
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .save-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.82rem;
-      color: var(--text-muted);
-    }
-
-    .save-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--border-strong);
-    }
-
-    .save-dot.saved { background: var(--success); }
-    .save-dot.pending { background: var(--warn); }
-
-    .top-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-
-    .btn {
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--text);
-      border-radius: 8px;
-      padding: 7px 11px;
-      font: inherit;
-      font-size: 0.82rem;
-      cursor: pointer;
-    }
-
-    .btn:hover { border-color: var(--border-strong); }
-
     .dashboard {
       display: grid;
       gap: 14px;
@@ -254,58 +214,68 @@
       color: var(--text-muted);
     }
 
-    /* Projects & tools inline */
-    .mini-grid {
+    /* Projects & tools */
+    .link-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
     }
 
-    .mini-card {
+    .link-card {
       display: block;
-      padding: 12px;
+      padding: 14px 14px 12px;
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       text-decoration: none;
       color: inherit;
       background: #fafbfc;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
     }
 
-    .mini-card:hover {
+    .link-card:hover {
       border-color: #93c5fd;
       box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08);
+      transform: translateY(-1px);
     }
 
-    .mini-card h3 {
-      font-size: 0.88rem;
+    .link-card h3 {
+      font-size: 0.92rem;
       font-weight: 700;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+      line-height: 1.35;
     }
 
-    .mini-card p {
-      font-size: 0.78rem;
+    .link-card p {
+      font-size: 0.8rem;
       color: var(--text-muted);
-      line-height: 1.4;
+      line-height: 1.45;
     }
 
-    .mini-card .tag {
-      display: inline-block;
-      margin-top: 8px;
-      font-size: 0.7rem;
-      font-weight: 700;
+    .link-card .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      margin-top: 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
       color: var(--accent);
     }
 
-    .mini-card.is-ready {
+    .link-card.is-ready {
       background: var(--accent-soft);
       border-color: #bfdbfe;
     }
 
+    .project-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
     .project-pill {
       display: inline-block;
-      margin-top: 6px;
-      padding: 4px 8px;
+      align-self: flex-start;
+      padding: 5px 10px;
       border-radius: 999px;
       background: #fff;
       border: 1px solid #bfdbfe;
@@ -316,6 +286,13 @@
     }
 
     .project-pill:hover { background: #dbeafe; }
+
+    .card-status {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-top: 8px;
+    }
 
     /* Timeline compact */
     .timeline { display: grid; gap: 6px; }
@@ -554,17 +531,6 @@
         <h1>디디딧 워크스페이스</h1>
         <p>채널 현황 · 프로젝트 · 팀 업무</p>
       </div>
-      <div class="header-right">
-        <div class="save-status">
-          <span class="save-dot" id="save-dot"></span>
-          <span id="save-message">불러오는 중...</span>
-        </div>
-        <div class="top-actions">
-          <button type="button" class="btn" id="btn-import">가져오기</button>
-          <button type="button" class="btn" id="btn-export">보내기</button>
-          <input type="file" id="import-file" accept="application/json,.json" hidden>
-        </div>
-      </div>
     </header>
 
     <div class="dashboard">
@@ -624,7 +590,7 @@
             <h2><span class="block-icon">📂</span> 프로젝트</h2>
           </div>
           <div class="block-body compact">
-            <div id="project-grid" class="mini-grid"></div>
+            <div id="project-grid" class="link-grid"></div>
           </div>
         </section>
 
@@ -633,7 +599,7 @@
             <h2><span class="block-icon">🛠</span> 채널 도구</h2>
           </div>
           <div class="block-body compact">
-            <div id="tool-grid" class="mini-grid"></div>
+            <div id="tool-grid" class="link-grid"></div>
           </div>
         </section>
       </div>
@@ -694,9 +660,8 @@
       </div>
     </section>
 
-    <p class="help-note">
-      변경 사항은 브라우저에 자동 저장됩니다. 팀 공유는 <strong>보내기/가져오기</strong> JSON.
-      콘티는 Google 시트 ↔ 시나리오 머신 <strong>시트 동기화</strong>로 맞춥니다.
+    <p class="help-note" id="help-note">
+      팀 공유 데이터는 works-api 서버에 자동 저장됩니다.
     </p>
   </div>
 

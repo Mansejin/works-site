@@ -69,10 +69,9 @@
 
   let state = structuredClone(DEFAULT_STATE);
   let saveTimer = null;
+  let useServer = IS_WEB_HOSTED;
 
   const els = {
-    saveDot: document.getElementById("save-dot"),
-    saveMessage: document.getElementById("save-message"),
     overviewText: document.getElementById("overview-text"),
     projectGrid: document.getElementById("project-grid"),
     toolGrid: document.getElementById("tool-grid"),
@@ -80,9 +79,7 @@
     scheduleBody: document.getElementById("schedule-body"),
     sponsorshipBody: document.getElementById("sponsorship-body"),
     noticeList: document.getElementById("notice-list"),
-    btnExport: document.getElementById("btn-export"),
-    btnImport: document.getElementById("btn-import"),
-    importFile: document.getElementById("import-file"),
+    helpNote: document.getElementById("help-note"),
     ytSubs: document.getElementById("yt-subs"),
     ytViews: document.getElementById("yt-views"),
     ytVideosCount: document.getElementById("yt-videos-count"),
@@ -114,37 +111,6 @@
     return PROJECTS.find((p) => p.id === id);
   }
 
-  function setStatus(kind, message) {
-    els.saveDot.className = "save-dot" + (kind === "saved" ? " saved" : kind === "pending" ? " pending" : "");
-    els.saveMessage.textContent = message;
-  }
-
-  function scheduleSave() {
-    setStatus("pending", "저장 예정...");
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(persist, 400);
-  }
-
-  function persist() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ updatedAt: Date.now(), data: state }));
-      setStatus("saved", IS_WEB_HOSTED ? "저장됨" : "브라우저에 저장됨");
-    } catch {
-      setStatus("pending", "저장 실패");
-    }
-  }
-
-  function load() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (parsed?.data) state = mergeState(DEFAULT_STATE, parsed.data);
-    } catch {
-      /* keep defaults */
-    }
-  }
-
   function mergeState(base, saved) {
     return {
       overview: saved.overview ?? base.overview,
@@ -152,6 +118,87 @@
       sponsorships: Array.isArray(saved.sponsorships) ? saved.sponsorships : base.sponsorships,
       notices: Array.isArray(saved.notices) ? saved.notices : base.notices,
     };
+  }
+
+  function loadFromLocalStorage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.data ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveToLocalStorage() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ updatedAt: Date.now(), data: state }));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function loadFromServer() {
+    const res = await fetch(`${API_BASE}/api/dddit/hub`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    return payload?.data ?? null;
+  }
+
+  async function saveToServer() {
+    const res = await fetch(`${API_BASE}/api/dddit/hub`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updatedAt: Date.now(), data: state }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  }
+
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(persist, 400);
+  }
+
+  async function persist() {
+    if (useServer) {
+      try {
+        await saveToServer();
+        return;
+      } catch {
+        useServer = false;
+        if (els.helpNote) {
+          els.helpNote.textContent = "서버 저장 실패 — 브라우저에 임시 저장 중입니다.";
+        }
+      }
+    }
+    saveToLocalStorage();
+  }
+
+  async function load() {
+    if (IS_WEB_HOSTED) {
+      try {
+        const serverData = await loadFromServer();
+        if (serverData) {
+          state = mergeState(DEFAULT_STATE, serverData);
+          return;
+        }
+        const localData = loadFromLocalStorage();
+        if (localData) {
+          state = mergeState(DEFAULT_STATE, localData);
+          await persist();
+          return;
+        }
+        return;
+      } catch {
+        useServer = false;
+        if (els.helpNote) {
+          els.helpNote.textContent = "서버 연결 실패 — 브라우저에 임시 저장됩니다.";
+        }
+      }
+    }
+    const localData = loadFromLocalStorage();
+    if (localData) state = mergeState(DEFAULT_STATE, localData);
   }
 
   function bindOverview() {
@@ -169,11 +216,18 @@
       const sponsorCount = state.sponsorships.filter((s) => s.project === project.id).length;
       const scriptHref = project.scriptPath || `script/?project=${project.id}`;
       return `
-        <div>
-          <a class="mini-card" href="${escapeHtml(project.path)}">
+        <div class="project-wrap">
+          <a class="link-card is-ready" href="${escapeHtml(project.path)}">
+            <div class="card-meta">
+              <span>${escapeHtml(project.status)}</span>
+              <span>${escapeHtml(project.brand)}</span>
+            </div>
             <h3>${escapeHtml(project.name)}</h3>
             <p>${escapeHtml(project.summary)}</p>
-            <span class="tag">${escapeHtml(project.status)} · 일정 ${scheduleCount} · 협업 ${sponsorCount}</span>
+            <div class="card-meta">
+              <span>일정 ${scheduleCount}</span>
+              <span>협업 ${sponsorCount}</span>
+            </div>
           </a>
           <a class="project-pill" href="${escapeHtml(scriptHref)}">콘티 · 시나리오 →</a>
         </div>
@@ -183,13 +237,15 @@
 
   function renderTools() {
     if (!els.toolGrid) return;
-    els.toolGrid.innerHTML = CHANNEL_TOOLS.map((tool) => `
-      <a class="mini-card ${tool.ready ? "is-ready" : ""}" href="${escapeHtml(tool.path)}">
+    els.toolGrid.innerHTML = CHANNEL_TOOLS.map(
+      (tool) => `
+      <a class="link-card ${tool.ready ? "is-ready" : ""}" href="${escapeHtml(tool.path)}">
         <h3>${escapeHtml(tool.name)}</h3>
         <p>${escapeHtml(tool.summary)}</p>
-        <span class="tag">${tool.ready ? `${escapeHtml(tool.status)} →` : "준비 중"}</span>
+        <span class="card-status">${tool.ready ? `${escapeHtml(tool.status)} →` : "준비 중"}</span>
       </a>
-    `).join("");
+    `
+    ).join("");
   }
 
   function parseDate(value) {
@@ -446,37 +502,6 @@
     });
   }
 
-  function exportData() {
-    const blob = new Blob([JSON.stringify({ exportedAt: Date.now(), data: state }, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `dddit-workspace-${todayStr()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setStatus("saved", "데이터보내기 완료");
-  }
-
-  function importData(file) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(reader.result);
-        if (!parsed?.data) throw new Error("invalid");
-        state = mergeState(DEFAULT_STATE, parsed.data);
-        els.overviewText.textContent = state.overview;
-        renderAll();
-        persist();
-        setStatus("saved", "데이터 가져오기 완료");
-      } catch {
-        alert("올바른 JSON 파일이 아닙니다.");
-      }
-    };
-    reader.readAsText(file);
-  }
-
   function setYtStat(el, value) {
     if (!el) return;
     el.textContent = value ?? "—";
@@ -525,6 +550,9 @@
 
     try {
       const res = await fetch(`${API_BASE}/api/dddit/youtube/channel`);
+      if (res.status === 404) {
+        throw new Error("API_NOT_DEPLOYED");
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -540,16 +568,20 @@
       renderYoutubeVideos(data.videos);
 
       if (data.source === "scrape" && data.subscriberCountText === "—") {
-        showYtError("구독자·총 조회수는 NAS .env에 YOUTUBE_API_KEY를 넣으면 표시됩니다. 최근 영상은 채널 페이지에서 불러왔습니다.");
+        showYtError("구독자·총 조회수는 NAS .env에 YOUTUBE_API_KEY를 넣으면 표시됩니다.");
       } else {
         showYtError("");
       }
-    } catch {
+    } catch (err) {
       setYtStat(els.ytSubs, "—");
       setYtStat(els.ytViews, "—");
       setYtStat(els.ytVideosCount, "—");
       renderYoutubeVideos([]);
-      showYtError("YouTube 정보를 불러오지 못했습니다. NAS API(works-api)가 실행 중인지 확인하세요.");
+      if (err?.message === "API_NOT_DEPLOYED") {
+        showYtError("YouTube API가 아직 NAS에 배포되지 않았습니다. DSM 작업 스케줄러 또는 수동 docker rebuild가 필요합니다.");
+      } else {
+        showYtError("YouTube 정보를 불러오지 못했습니다. works-api 상태를 확인하세요.");
+      }
     }
   }
 
@@ -567,22 +599,14 @@
     });
   }
 
-  function init() {
-    load();
+  async function init() {
+    await load();
     bindOverview();
     bindTables();
     initTabs();
     renderAll();
-    persist();
+    await persist();
     loadYoutube();
-
-    els.btnExport.addEventListener("click", exportData);
-    els.btnImport.addEventListener("click", () => els.importFile.click());
-    els.importFile.addEventListener("change", () => {
-      const file = els.importFile.files?.[0];
-      if (file) importData(file);
-      els.importFile.value = "";
-    });
   }
 
   init();

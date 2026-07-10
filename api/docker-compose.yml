@@ -7,6 +7,8 @@ services:
       - "8788:8788"
     env_file:
       - .env
+    volumes:
+      - ./data:/app/data
     environment:
       WORKS_HOST: "0.0.0.0"
       WORKS_PORT: "8788"

@@ -129,6 +129,15 @@ async def _fetch_via_api(client: httpx.AsyncClient, handle: str, api_key: str) -
 
 async def _fetch_via_scrape(client: httpx.AsyncClient, handle: str) -> dict[str, Any]:
     channel_id = await _resolve_channel_id(client, handle)
+
+    about_res = await client.get(
+        f"https://www.youtube.com/@{handle}/about",
+        headers=_YT_HEADERS,
+        follow_redirects=True,
+    )
+    about_res.raise_for_status()
+    about_html = about_res.text
+
     res = await client.get(
         f"https://www.youtube.com/@{handle}/videos",
         headers=_YT_HEADERS,
@@ -183,24 +192,27 @@ async def _fetch_via_scrape(client: httpx.AsyncClient, handle: str) -> dict[str,
             if len(videos) >= 4:
                 break
 
+    combined = about_html + html
     sub_text = view_text = video_text = None
     for pattern in [
         r'"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([^"]+)"',
         r'"subscriberCountText":\{"simpleText":"([^"]+)"',
+        r'"accessibilityText":"([^"]*구독자[^"]*)"',
     ]:
-        m = re.search(pattern, html)
+        m = re.search(pattern, combined)
         if m:
-            sub_text = m.group(1).replace("구독자 ", "").strip()
+            sub_text = re.sub(r"^구독자\s*", "", m.group(1)).strip()
             break
     for pattern in [
         r'"viewCountText":\{"simpleText":"([^"]+)"',
         r'"viewCountText":\{"runs":\[\{"text":"([^"]+)"',
+        r'"accessibilityText":"([^"]*조회[^"]*)"',
     ]:
-        m = re.search(pattern, html)
+        m = re.search(pattern, combined)
         if m:
-            view_text = m.group(1).replace("조회수 ", "").strip()
+            view_text = re.sub(r"^(총\s*)?조회수\s*", "", m.group(1)).strip()
             break
-    m = re.search(r'"videoCountText":\{"runs":\[\{"text":"([^"]+)"', html)
+    m = re.search(r'"videoCountText":\{"runs":\[\{"text":"([^"]+)"', combined)
     if m:
         video_text = m.group(1).strip()
 
