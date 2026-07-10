@@ -129,13 +129,23 @@
     return res.json();
   }
 
-  async function apiPut(path, payload) {
+  function destroyCharts() {
     Object.keys(charts).forEach((key) => {
       if (charts[key]) {
         charts[key].destroy();
         charts[key] = null;
       }
     });
+  }
+
+  async function loadAnalyticsExtras(refresh) {
+    const q = refresh ? "?refresh=1" : "";
+    const [traffic, retention, demographics] = await Promise.all([
+      apiGet(`/api/dddit/youtube/report/traffic-sources${q}`).catch(() => null),
+      apiGet(`/api/dddit/youtube/report/retention${q}`).catch(() => null),
+      apiGet(`/api/dddit/youtube/report/demographics${q}`).catch(() => null),
+    ]);
+    return { traffic, retention, demographics };
   }
 
   function renderKpis(kpis) {
@@ -320,7 +330,11 @@
     }
 
     const items = [
-      { label: "노출수", value: formatNum(analytics.impressions) },
+      { label: "조회수 (28일)", value: formatNum(analytics.views) },
+      {
+        label: "노출수",
+        value: analytics.impressions != null ? formatNum(analytics.impressions) : "—",
+      },
       { label: "CTR", value: analytics.ctr != null ? `${analytics.ctr}%` : "—" },
       {
         label: "평균 시청률",
