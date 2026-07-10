@@ -21,7 +21,8 @@ works.mansejin.com/
     └── xenics/
         ├── index.html
         ├── plan/
-        ├── storyboard/               → script/?project=xenics 리다이렉트
+        ├── storyboard/               → conti/ 리다이렉트
+        ├── conti/                    # 완성 콘티 읽기 전용
         └── productlist/
 ```
 

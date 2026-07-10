@@ -52,6 +52,14 @@ sgb와 동일하게 `cloudflared`에 public hostname 추가:
 
 Cloudflare DNS: `works-api` CNAME → tunnel (**Proxied ON**)
 
+콘티 **실시간 동시 편집** WebSocket은 별도 호스트:
+
+| Subdomain | Service |
+|-----------|---------|
+| `conti-ws` | `http://NAS_IP:8789` |
+
+→ `wss://conti-ws.mansejin.com` (상세: [docs/conti-collab.md](docs/conti-collab.md))
+
 ### 5. 확인
 
 ```bash

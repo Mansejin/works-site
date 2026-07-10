@@ -12,3 +12,16 @@ services:
     environment:
       WORKS_HOST: "0.0.0.0"
       WORKS_PORT: "8788"
+
+  conti-collab:
+    build: ./conti-collab
+    container_name: conti-collab
+    restart: unless-stopped
+    ports:
+      - "8789:8789"
+    volumes:
+      - ./data:/data
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8789"
+      CONTI_DATA_DIR: "/data/conti"

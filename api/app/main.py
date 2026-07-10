@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import allowed_origins
+from app.routes.conti import router as conti_router
 from app.routes.dddit import router as dddit_router
 from app.routes.hub import router as hub_router
 from app.routes.youtube import router as youtube_router
@@ -19,6 +20,7 @@ def create_app() -> FastAPI:
         allow_headers=["Content-Type"],
     )
     app.include_router(dddit_router)
+    app.include_router(conti_router)
     app.include_router(hub_router)
     app.include_router(youtube_router)
 

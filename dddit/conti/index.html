@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="canonical" href="https://works.mansejin.com/dddit/conti/" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <title>콘티 작성 · 디디딧</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --header-bg: #0f172a;
+      --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+      --radius: 12px;
+      --success: #16a34a;
+      --danger: #dc2626;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      background: linear-gradient(160deg, #eef2ff 0%, var(--bg) 45%, #f8fafc 100%);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 24px 20px 48px;
+    }
+
+    .page { max-width: 1200px; margin: 0 auto; }
+
+    .hub-nav { margin-bottom: 14px; }
+    .hub-nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    .hub-nav a:hover { color: var(--accent); }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      background: var(--header-bg);
+      color: #f8fafc;
+      padding: 20px 22px;
+    }
+
+    .card-header h1 { font-size: 1.3rem; font-weight: 700; }
+    .card-header p { color: #cbd5e1; font-size: 0.86rem; margin-top: 6px; }
+
+    .card-body { padding: 20px 22px; }
+
+    .picker-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+
+    .picker-card {
+      display: block;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      text-decoration: none;
+      color: inherit;
+      background: #fafbfc;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .picker-card:hover {
+      border-color: #93c5fd;
+      box-shadow: 0 2px 12px rgba(37, 99, 235, 0.08);
+    }
+
+    .picker-card h2 { font-size: 0.98rem; margin-bottom: 4px; }
+    .picker-card p { font-size: 0.82rem; color: var(--text-muted); }
+    .picker-card .meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; }
+
+    .new-project {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .new-project h3 { font-size: 0.92rem; margin-bottom: 10px; }
+
+    .form-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .form-row input {
+      flex: 1;
+      min-width: 140px;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font: inherit;
+      font-size: 0.88rem;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 9px 14px;
+      font: inherit;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn:hover { filter: brightness(1.05); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-ghost {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-danger {
+      background: #fff;
+      color: var(--danger);
+      border: 1px solid #fecaca;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #fafbfc;
+    }
+
+    .toolbar-left, .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .status-bar {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .status-bar.ok { color: var(--success); }
+    .status-bar.error { color: var(--danger); }
+
+    .share-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .share-box input {
+      width: min(320px, 50vw);
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      background: #fff;
+    }
+
+    .title-input {
+      width: 100%;
+      max-width: 420px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font: inherit;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+    }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 6px 8px;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .row-num {
+      width: 36px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.76rem;
+    }
+
+    .cell-edit {
+      width: 100%;
+      min-width: 80px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 0.84rem;
+      resize: vertical;
+      background: transparent;
+    }
+
+    .cell-edit:hover { border-color: #e2e8f0; background: #fff; }
+    .cell-edit:focus {
+      outline: none;
+      border-color: #93c5fd;
+      background: #fff;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+    }
+
+    textarea.cell-edit { min-height: 52px; }
+
+    .presence-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .presence-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #0f172a;
+      background: color-mix(in srgb, var(--chip-color) 14%, white);
+      border: 1px solid color-mix(in srgb, var(--chip-color) 35%, white);
+    }
+
+    .presence-chip::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--chip-color);
+    }
+
+    .presence-empty {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+
+  </style>
+</head>
+<body>
+  <div class="page">
+    <nav class="hub-nav"><a href="../">← 디디딧 워크스페이스</a></nav>
+
+    <div id="picker-view" class="card" hidden>
+      <div class="card-header">
+        <h1>콘티 작성</h1>
+        <p>프로젝트별 콘티 · NAS 실시간 동기화 (2~3명 동시 편집)</p>
+      </div>
+      <div class="card-body">
+        <div id="project-list" class="picker-grid"></div>
+        <div class="new-project">
+          <h3>새 프로젝트</h3>
+          <div class="form-row">
+            <input id="new-slug" type="text" placeholder="slug (예: xenics, brand-b)" pattern="[a-z0-9-]+" />
+            <input id="new-title" type="text" placeholder="표시 이름 (선택)" />
+            <button id="btn-create" class="btn" type="button">만들기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="editor-view" class="card" hidden>
+      <div class="card-header">
+        <h1 id="editor-title">콘티 작성</h1>
+        <p id="editor-subtitle">프로젝트 · 실시간 동기화</p>
+      </div>
+      <div id="presence-bar" class="presence-bar"></div>
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back" class="btn btn-ghost" type="button">프로젝트 목록</button>
+          <button id="btn-add-row" class="btn btn-ghost" type="button">행 추가</button>
+          <button id="btn-delete-row" class="btn btn-danger" type="button">선택 행 삭제</button>
+        </div>
+        <div class="toolbar-right">
+          <span id="status-bar" class="status-bar">불러오는 중…</span>
+          <button id="btn-reload" class="btn btn-ghost" type="button">새로고침</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <input id="title-input" class="title-input" type="text" placeholder="콘티 제목 (선택)" />
+        <div class="share-box">
+          <span>브랜드 공유</span>
+          <input id="share-url" type="text" readonly />
+          <button id="btn-copy-share" class="btn btn-ghost" type="button">복사</button>
+        </div>
+        <div class="table-wrap" style="margin-top: 14px;">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>#</th>
+                <th>대본</th>
+                <th>장면</th>
+                <th>사이즈</th>
+                <th>자막</th>
+                <th>코멘트</th>
+              </tr>
+            </thead>
+            <tbody id="conti-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/conti-api.js"></script>
+  <script type="module" src="js/editor.js"></script>
+</body>
+</html>
