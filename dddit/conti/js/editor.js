@@ -1,5 +1,4 @@
-import * as Y from "https://esm.sh/yjs@13.6.27";
-import { WebsocketProvider } from "https://esm.sh/y-websocket@2.1.0";
+import { Y, WebsocketProvider } from "../vendor/collab-lib.js";
 
 const api = window.DdditContiApi;
 const HEADERS = api.HEADERS;
@@ -385,11 +384,19 @@ titleInput.addEventListener("input", () => {
 });
 
 async function init() {
-  if (!project) {
-    await loadPicker();
-    return;
+  try {
+    if (!api) throw new Error("conti-api not loaded");
+    if (!project) {
+      await loadPicker();
+      return;
+    }
+    loadEditor();
+  } catch (err) {
+    console.error(err);
+    pickerView.hidden = false;
+    editorView.hidden = true;
+    projectList.innerHTML = `<p style="color:#dc2626;font-size:0.88rem;">페이지를 불러오지 못했습니다. ${esc(err.message || err)}</p>`;
   }
-  loadEditor();
 }
 
 init();

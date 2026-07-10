@@ -1,7 +1,9 @@
 {
   "name": "conti-collab",
   "private": true,
-  "type": "module",
+  "scripts": {
+    "build:vendor": "esbuild collab-lib-entry.js --bundle --format=esm --outfile=../../dddit/conti/vendor/collab-lib.js --platform=browser"
+  },
   "dependencies": {
     "ws": "^8.18.3",
     "y-websocket": "^2.1.0",
