@@ -147,17 +147,32 @@ async def fetch_analytics_overview(refresh: bool = False) -> dict[str, Any]:
                 channel_id,
                 start_date=start_date,
                 end_date=end_date,
-                metrics="views,impressions,annotationClickThroughRate,averageViewDuration,averageViewPercentage",
+                metrics="views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage",
             )
             rows = _parse_rows(body)
             totals = rows[0] if rows else {}
 
-            impressions = _safe_int(totals.get("impressions"))
+            impressions = None
+            ctr = None
+            try:
+                reach_body = await _analytics_get(
+                    client,
+                    token,
+                    channel_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    metrics="cardImpressions,cardClicks,cardClickRate",
+                )
+                reach = _parse_rows(reach_body)
+                reach_totals = reach[0] if reach else {}
+                impressions = _safe_int(reach_totals.get("cardImpressions")) or None
+                ctr_rate = _safe_float(reach_totals.get("cardClickRate"))
+                if ctr_rate is not None:
+                    ctr = round(ctr_rate * 100, 2)
+            except Exception:
+                pass
+
             views = _safe_int(totals.get("views"))
-            ctr_api = _safe_float(totals.get("annotationClickThroughRate"))
-            ctr = round(ctr_api * 100, 2) if ctr_api is not None else (
-                round(views / impressions * 100, 2) if impressions > 0 else None
-            )
 
             payload = {
                 "ok": True,
@@ -169,6 +184,12 @@ async def fetch_analytics_overview(refresh: bool = False) -> dict[str, Any]:
                 "ctrUnit": "percent",
                 "averageViewDurationSec": _safe_int(totals.get("averageViewDuration")),
                 "averageViewPercentage": _safe_float(totals.get("averageViewPercentage")),
+                "estimatedMinutesWatched": _safe_int(totals.get("estimatedMinutesWatched")),
+                "impressionsNote": (
+                    None
+                    if impressions is not None
+                    else "썸네일 노출/CTR은 YouTube Reporting API 전용. 카드 노출은 지원 시 표시."
+                ),
                 "message": None,
             }
             _cache_set(cache_key, payload)
@@ -256,6 +277,7 @@ async def fetch_retention(video_id: str | None = None, refresh: bool = False) ->
         async with httpx.AsyncClient(timeout=30.0) as client:
             token, channel_id = await _get_token_and_channel(client)
 
+            avg_pct = None
             if video_id:
                 body = await _analytics_get(
                     client,

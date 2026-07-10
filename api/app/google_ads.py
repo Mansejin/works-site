@@ -11,7 +11,7 @@ from app.config import google_ads_config
 from app.google_oauth import get_access_token
 from app.youtube_report_store import merge_ads_into_promotions, read_ads_sync, write_ads_sync
 
-_ADS_API_VERSION = "v18"
+_ADS_API_VERSION = "v20"
 _CACHE_TTL = 3600
 _SYNC_CACHE: dict[str, Any] = {}
 
@@ -58,11 +58,16 @@ async def _search_ads(
         "developer-token": cfg["developer_token"],
         "Content-Type": "application/json",
     }
-    if cfg.get("login_customer_id"):
-        headers["login-customer-id"] = cfg["login_customer_id"]
+    if not cfg.get("login_customer_id"):
+        raise RuntimeError(
+            "GOOGLE_ADS_LOGIN_CUSTOMER_ID(MCC ID)가 필요합니다. 예: 1987587717"
+        )
+    headers["login-customer-id"] = cfg["login_customer_id"]
 
     res = await client.post(url, headers=headers, json={"query": query})
-    res.raise_for_status()
+    if not res.is_success:
+        detail = res.text[:500]
+        raise RuntimeError(f"Google Ads API {res.status_code}: {detail}")
     body = res.json()
     return list(body.get("results") or [])
 
