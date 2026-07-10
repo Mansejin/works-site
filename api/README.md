@@ -32,7 +32,7 @@ nano .env
 | `DDDIT_SHEETS_OAUTH_REFRESH_TOKEN` | **권장** Google Sheets API refresh token |
 | `DDDIT_SHEETS_DRIVE_FOLDER_ID` | 콘티 시트 저장 Drive 폴더 ID |
 
-콘티 시트 연동: **[docs/sheets-oauth.md](docs/sheets-oauth.md)** (Apps Script 웹앱 없이 NAS에서 직접)
+콘티 시트 연동: **[docs/sheets-oauth.md](docs/sheets-oauth.md)** (Apps Script 웹앱 없이 NAS Google Sheets API)
 | `YOUTUBE_API_KEY` | YouTube Data API v3 키 (구독자·조회수) |
 | `YOUTUBE_CHANNEL_HANDLE` | 채널 핸들 (기본 `DD-DIT`) |
 | `YOUTUBE_CHANNEL_ID` | 채널 ID (`UC…`, Analytics·OAuth 필수) |
