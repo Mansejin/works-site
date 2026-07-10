@@ -111,7 +111,12 @@
       <h3 class="settings-subtitle">Google 시트 연동</h3>
       <p class="hint">팀 콘티 편집용. 저장소의 <code>google-apps-script/README.md</code> 참고</p>
       <label>시트 API URL (Apps Script 웹 앱)<input id="sheet-api-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" /></label>
-      <label>API 토큰<input id="sheet-api-token" type="password" placeholder="팀 공유 토큰" autocomplete="off" /></label>
+      <label>API 토큰
+        <span class="secret-field">
+          <input id="sheet-api-token" type="password" placeholder="팀 공유 토큰" autocomplete="off" />
+          <button id="btn-toggle-sheet-token" class="btn btn-ghost btn-sm secret-toggle" type="button" aria-pressed="false">표시</button>
+        </span>
+      </label>
       <label>시트 열기 URL<input id="sheet-open-url" type="url" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" /></label>
       <p id="sheet-sync-status" class="hint sheet-sync-status"></p>
     </div>

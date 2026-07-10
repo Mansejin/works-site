@@ -1732,6 +1732,23 @@ td:nth-child(2) {
 .sheet-sync-status {
   margin-top: 0.35rem;
   color: var(--muted);
+  line-height: 1.6;
+}
+
+.secret-field {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.secret-field input {
+  flex: 1;
+  min-width: 0;
+}
+
+.secret-toggle {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .drawer-inner code {

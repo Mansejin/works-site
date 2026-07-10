@@ -2706,11 +2706,28 @@ function updateSheetSyncStatus() {
   const cfg = sheetConfig();
   const project = window.DdditSheetSync?.projectSlug() || 'default';
   const tab = window.DdditSheetSync?.tabLabel(project) || project;
-  if (!cfg.apiUrl || !cfg.token) {
-    el.textContent = `연동 미설정 · 프로젝트 탭: ${tab}`;
-    return;
-  }
-  el.textContent = `연동 준비됨 · 프로젝트 탭: ${tab}`;
+  const parts = [`프로젝트 탭: ${tab}`];
+
+  if (!cfg.apiUrl) parts.push('시트 API URL 미설정');
+  else parts.push('API URL 설정됨');
+
+  if (!cfg.token) parts.push('API 토큰 미설정');
+  else parts.push(`API 토큰 설정됨 (${cfg.token.length}자)`);
+
+  if (!cfg.openUrl) parts.push('시트 열기 URL 미설정');
+  else parts.push('시트 링크 설정됨');
+
+  el.textContent = parts.join(' · ');
+}
+
+function toggleSheetTokenVisibility() {
+  const input = $('#sheet-api-token');
+  const btn = $('#btn-toggle-sheet-token');
+  if (!input || !btn) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.textContent = show ? '숨기기' : '표시';
+  btn.setAttribute('aria-pressed', show ? 'true' : 'false');
 }
 
 async function pushContiToSheet() {
@@ -5312,8 +5329,14 @@ function bindEvents() {
   $('#btn-sheet-push').addEventListener('click', pushContiToSheet);
   $('#btn-sheet-pull').addEventListener('click', pullContiFromSheet);
   $('#btn-sheet-open').addEventListener('click', openContiSheet);
+  $('#btn-toggle-sheet-token').addEventListener('click', toggleSheetTokenVisibility);
   $('#btn-reset').addEventListener('click', resetProject);
   ['sheet-api-url', 'sheet-api-token', 'sheet-open-url'].forEach((id) => {
+    $('#' + id)?.addEventListener('input', () => {
+      syncSheetSettingsFromDOM();
+      saveSettings();
+      updateSheetSyncStatus();
+    });
     $('#' + id)?.addEventListener('change', () => {
       syncSheetSettingsFromDOM();
       saveSettings();
