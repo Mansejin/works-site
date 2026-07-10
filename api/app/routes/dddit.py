@@ -12,6 +12,7 @@ router = APIRouter(prefix="/api/dddit", tags=["dddit"])
 
 SHEET_TIMEOUT = 60.0
 GEMINI_TIMEOUT = 180.0
+# Sheet proxy: Apps Script web app (DDDIT_SHEET_API_URL in NAS .env)
 
 
 class SheetRowsBody(BaseModel):
