@@ -113,6 +113,13 @@
 
     .block-link:hover { text-decoration: underline; }
 
+    .block-head-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
     /* YouTube panel */
     .yt-panel .block-body { padding: 14px 16px 16px; }
 
@@ -554,7 +561,10 @@
       <section class="block yt-panel" id="yt-panel">
         <div class="block-head">
           <h2><span class="block-icon">▶</span> <span id="yt-channel-title">디디딧 YouTube</span></h2>
-          <a class="block-link" id="yt-channel-link" href="https://www.youtube.com/@DD-DIT" target="_blank" rel="noopener">@DD-DIT 열기 →</a>
+          <div class="block-head-actions">
+            <a class="block-link" href="report/">자세히 보기 →</a>
+            <a class="block-link" id="yt-channel-link" href="https://www.youtube.com/@DD-DIT" target="_blank" rel="noopener">@DD-DIT 열기 →</a>
+          </div>
         </div>
         <div class="block-body">
           <div id="yt-error" class="yt-error" hidden></div>
@@ -682,6 +692,6 @@
     </p>
   </div>
 
-  <script src="js/hub.js?v=3"></script>
+  <script src="js/hub.js?v=4"></script>
 </body>
 </html>

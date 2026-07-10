@@ -8,9 +8,17 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.config import youtube_api_key, youtube_channel_handle
+from app.config import google_ads_config, youtube_analytics_oauth_config, youtube_api_key, youtube_channel_handle
+from app.google_ads import get_ads_status, sync_campaigns
 from app.routes.youtube import _fetch_via_api, _fetch_via_scrape, _format_count
+from app.youtube_analytics import (
+    fetch_analytics_overview,
+    fetch_demographics,
+    fetch_retention,
+    fetch_traffic_sources,
+)
 from app.youtube_report_store import (
+    read_merged_promotions,
     read_promotions,
     read_snapshots,
     write_promotions,
@@ -271,7 +279,7 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             return cached
 
     handle = youtube_channel_handle()
-    promotions_data = read_promotions()
+    promotions_data = read_merged_promotions()
     snapshots_data = read_snapshots()
     promotions = promotions_data.get("promotions") or []
     enriched_promos = [{**p, "metrics": _promotion_metrics(p)} for p in promotions]
@@ -329,6 +337,23 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             sum(v.get("views", 0) for v in recent_six) / len(recent_six) if recent_six else 0
         )
 
+        analytics_overview = await fetch_analytics_overview(refresh=refresh)
+        ads_status = await get_ads_status()
+        if google_ads_config() and not ads_status.get("lastSync"):
+            await sync_campaigns(force=False)
+
+        limitations = [
+            "YouTube Data API: 조회수·구독자·영상 목록 (현재 지원)",
+        ]
+        if youtube_analytics_oauth_config():
+            limitations.append("YouTube Analytics API (OAuth): 노출·CTR·유입·시청 유지·인구통계 (연동됨)")
+        else:
+            limitations.append("YouTube Analytics API (OAuth): NAS .env에 OAuth 토큰 설정 필요")
+        if google_ads_config():
+            limitations.append("Google Ads API: 프로모션 비용·노출 동기화 (연동됨)")
+        else:
+            limitations.append("Google Ads API: 프로모션 비용·노출 실시간 동기화 (미설정)")
+
         payload = {
             "ok": True,
             "generatedAt": datetime.now(timezone.utc).isoformat(),
@@ -352,11 +377,9 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             "promotions": enriched_promos,
             "issues": promotions_data.get("issues") or [],
             "insights": _overview_insights(videos, promotions_data.get("issues") or []),
-            "limitations": [
-                "YouTube Data API: 조회수·구독자·영상 목록 (현재 지원)",
-                "YouTube Analytics API (OAuth): 노출·CTR·유입·시청 유지·인구통계",
-                "Google Ads API: 프로모션 비용·노출 실시간 동기화",
-            ],
+            "analytics": analytics_overview,
+            "adsSync": ads_status,
+            "limitations": limitations,
         }
         _cache_set(cache_key, payload)
         _cache_set("videos", {"ok": True, "videos": videos, "generatedAt": payload["generatedAt"]})
@@ -407,7 +430,7 @@ async def report_subscribers_trend(refresh: bool = Query(False)) -> dict[str, An
 
 @router.get("/promotions")
 def get_promotions() -> dict[str, Any]:
-    data = read_promotions()
+    data = read_merged_promotions()
     promos = [{**p, "metrics": _promotion_metrics(p)} for p in data.get("promotions") or []]
     return {"ok": True, "promotions": promos, "issues": data.get("issues") or []}
 
@@ -431,3 +454,38 @@ def put_snapshots(body: SnapshotsBody) -> dict[str, Any]:
     write_snapshots(payload)
     _REPORT_CACHE.clear()
     return {"ok": True, **payload}
+
+
+@router.get("/analytics-overview")
+async def report_analytics_overview(refresh: bool = Query(False)) -> dict[str, Any]:
+    return await fetch_analytics_overview(refresh=refresh)
+
+
+@router.get("/traffic-sources")
+async def report_traffic_sources(refresh: bool = Query(False)) -> dict[str, Any]:
+    return await fetch_traffic_sources(refresh=refresh)
+
+
+@router.get("/retention")
+async def report_retention(
+    video_id: str | None = Query(None),
+    refresh: bool = Query(False),
+) -> dict[str, Any]:
+    return await fetch_retention(video_id=video_id, refresh=refresh)
+
+
+@router.get("/demographics")
+async def report_demographics(refresh: bool = Query(False)) -> dict[str, Any]:
+    return await fetch_demographics(refresh=refresh)
+
+
+@router.get("/ads/status")
+async def report_ads_status() -> dict[str, Any]:
+    return await get_ads_status()
+
+
+@router.post("/ads/sync")
+async def report_ads_sync(force: bool = Query(True)) -> dict[str, Any]:
+    result = await sync_campaigns(force=force)
+    _REPORT_CACHE.clear()
+    return result

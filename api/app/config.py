@@ -42,3 +42,45 @@ def youtube_api_key() -> str:
 
 def youtube_channel_handle() -> str:
     return os.getenv("YOUTUBE_CHANNEL_HANDLE", "DD-DIT").strip().lstrip("@")
+
+
+def youtube_channel_id() -> str:
+    return os.getenv("YOUTUBE_CHANNEL_ID", "").strip()
+
+
+def youtube_analytics_oauth_config() -> dict[str, str] | None:
+    client_id = os.getenv("YOUTUBE_OAUTH_CLIENT_ID", "").strip()
+    client_secret = os.getenv("YOUTUBE_OAUTH_CLIENT_SECRET", "").strip()
+    refresh_token = os.getenv("YOUTUBE_OAUTH_REFRESH_TOKEN", "").strip()
+    if not all([client_id, client_secret, refresh_token]):
+        return None
+    return {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token,
+    }
+
+
+def google_ads_config() -> dict[str, str] | None:
+    developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN", "").strip()
+    client_id = (
+        os.getenv("GOOGLE_ADS_CLIENT_ID", "").strip()
+        or os.getenv("YOUTUBE_OAUTH_CLIENT_ID", "").strip()
+    )
+    client_secret = (
+        os.getenv("GOOGLE_ADS_CLIENT_SECRET", "").strip()
+        or os.getenv("YOUTUBE_OAUTH_CLIENT_SECRET", "").strip()
+    )
+    refresh_token = os.getenv("GOOGLE_ADS_REFRESH_TOKEN", "").strip()
+    customer_id = os.getenv("GOOGLE_ADS_CUSTOMER_ID", "").strip()
+    if not all([developer_token, client_id, client_secret, refresh_token, customer_id]):
+        return None
+    login_customer_id = os.getenv("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "").strip()
+    return {
+        "developer_token": developer_token,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token,
+        "customer_id": customer_id.replace("-", ""),
+        "login_customer_id": login_customer_id.replace("-", "") if login_customer_id else "",
+    }

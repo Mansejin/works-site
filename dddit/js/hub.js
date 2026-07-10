@@ -18,13 +18,6 @@
 
   const CHANNEL_TOOLS = [
     {
-      name: "채널 보고",
-      path: "report/",
-      summary: "구독자·영상·프로모션 효율 월간 보고 (링크 공유)",
-      status: "사용 가능",
-      ready: true,
-    },
-    {
       name: "콘티 작성",
       path: "conti/",
       summary: "프로젝트별 콘티 작성 · NAS 저장 · 브랜드 공유",

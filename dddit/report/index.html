@@ -234,6 +234,44 @@
       border-radius: 6px;
     }
 
+    .analytics-banner {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px dashed var(--border);
+      margin-bottom: 10px;
+    }
+    .analytics-banner.warn { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+    .analytics-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .analytics-kpi {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fafbfc;
+    }
+    .analytics-kpi .label { font-size: 0.72rem; color: var(--text-muted); font-weight: 700; }
+    .analytics-kpi .value { font-size: 1.1rem; font-weight: 700; margin-top: 4px; }
+
+    .source-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: #e0e7ff;
+      color: #3730a3;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+    .source-badge.ads { background: #dcfce7; color: #166534; }
+    .source-badge.merged { background: #fef3c7; color: #92400e; }
+
     .limitations {
       margin-top: 14px;
       padding: 12px 14px;
@@ -285,7 +323,7 @@
     <header class="report-header">
       <div>
         <h1 id="report-title">채널 현황 분석</h1>
-        <p id="report-subtitle">YouTube Data API · 프로모션 수동 입력 · 링크 공유용 보고</p>
+        <p id="report-subtitle">YouTube Data · Analytics · Google Ads · 링크 공유용 보고</p>
       </div>
       <div class="header-actions">
         <span id="report-status" class="status-pill">불러오는 중…</span>
@@ -300,6 +338,37 @@
 
     <div id="report-root" class="hidden">
       <div class="kpi-grid" id="kpi-grid"></div>
+
+      <section class="card" style="margin-bottom:14px;" id="analytics-section">
+        <div class="card-head">
+          <h2>YouTube Analytics (28일)</h2>
+          <span id="analytics-status" class="status-pill" style="font-size:0.72rem;">—</span>
+        </div>
+        <div class="card-body">
+          <div id="analytics-banner" class="analytics-banner hidden"></div>
+          <div class="analytics-kpi-grid" id="analytics-kpi-grid"></div>
+          <div class="grid grid-2">
+            <div>
+              <p class="video-note" style="margin-bottom:8px;">유입 경로</p>
+              <div class="chart-wrap short"><canvas id="chart-traffic-sources"></canvas></div>
+            </div>
+            <div>
+              <p class="video-note" style="margin-bottom:8px;">시청 유지 (채널 평균)</p>
+              <div class="chart-wrap short"><canvas id="chart-retention"></canvas></div>
+            </div>
+          </div>
+          <div class="grid grid-2" style="margin-top:12px;">
+            <div>
+              <p class="video-note" style="margin-bottom:8px;">연령대</p>
+              <div class="chart-wrap short"><canvas id="chart-age"></canvas></div>
+            </div>
+            <div>
+              <p class="video-note" style="margin-bottom:8px;">성별</p>
+              <div class="chart-wrap short"><canvas id="chart-gender"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div class="grid grid-2" style="margin-bottom:14px;">
         <section class="card">
@@ -332,7 +401,10 @@
           <div class="card-body"><ul class="insights" id="insights-list"></ul></div>
         </section>
         <section class="card">
-          <div class="card-head"><h2>프로모션 효율 요약</h2></div>
+          <div class="card-head">
+            <h2>프로모션 효율 요약</h2>
+            <span id="ads-sync-status" class="status-pill" style="font-size:0.72rem;">—</span>
+          </div>
           <div class="card-body promo-table-wrap">
             <table>
               <thead>
@@ -360,7 +432,7 @@
         </div>
         <div class="card-body">
           <p class="video-note" style="margin-bottom:12px;">
-            스튜디오 캡처 대신 API 기준 조회수·길이·게시일을 표시합니다. 노출·CTR·유입·시청 유지는 Analytics OAuth 연동 후 자동화 예정.
+            스튜디오 캡처 대신 API 기준 조회수·길이·게시일을 표시합니다. 노출·CTR·유입·시청 유지는 Analytics OAuth 연동 시 자동 표시됩니다.
           </p>
           <div id="video-grid" class="video-grid"></div>
         </div>
@@ -391,6 +463,6 @@
     <div id="loading" class="card loading-block">보고 데이터를 불러오는 중…</div>
   </div>
 
-  <script src="js/report.js?v=1"></script>
+  <script src="js/report.js?v=2"></script>
 </body>
 </html>

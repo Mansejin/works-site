@@ -18,13 +18,52 @@
     subscriberNote: document.getElementById("subscriber-trend-note"),
     viewsTrendNote: document.getElementById("views-trend-note"),
     limitations: document.getElementById("limitations-list"),
+    analyticsBanner: document.getElementById("analytics-banner"),
+    analyticsKpiGrid: document.getElementById("analytics-kpi-grid"),
+    analyticsStatus: document.getElementById("analytics-status"),
+    adsSyncStatus: document.getElementById("ads-sync-status"),
     issuesEditor: document.getElementById("issues-editor"),
     promotionsEditor: document.getElementById("promotions-editor"),
     snapshotsEditor: document.getElementById("snapshots-editor"),
     saveStatus: document.getElementById("save-status"),
   };
 
-  let charts = { recent: null, views7d: null, subs: null };
+  let charts = {
+    recent: null,
+    views7d: null,
+    subs: null,
+    traffic: null,
+    retention: null,
+    age: null,
+    gender: null,
+  };
+
+  const TRAFFIC_LABELS = {
+    ADVERTISING: "광고",
+    ANNOTATION: "주석",
+    CAMPAIGN_CARD: "캠페인 카드",
+    END_SCREEN: "종료 화면",
+    EXT_URL: "외부",
+    HASHTAGS: "해시태그",
+    LIVE_REDIRECT: "라이브",
+    NO_LINK_EMBEDDED: "임베드",
+    NOTIFICATION: "알림",
+    PLAYLIST: "재생목록",
+    PRODUCT_PAGE: "상품",
+    PROMOTED: "프로모션",
+    RELATED_VIDEO: "관련 영상",
+    SHORTS: "Shorts",
+    SOUND_PAGE: "사운드",
+    SUBSCRIBER: "구독자",
+    YT_CHANNEL: "채널",
+    YT_OTHER_PAGE: "기타 YouTube",
+    YT_PLAYLIST_PAGE: "재생목록 페이지",
+    YT_SEARCH: "검색",
+    VIDEO_REMIXES: "리믹스",
+    YT_REDIRECT: "리다이렉트",
+  };
+
+  const GENDER_LABELS = { female: "여성", male: "남성", user_specified: "기타" };
 
   function esc(value) {
     return String(value ?? "")
@@ -59,8 +98,17 @@
     setStatus("오류", "error");
   }
 
-  async function apiGet(path) {
-    const res = await fetch(`${API_BASE}${path}`);
+  async function apiPost(path) {
+    const res = await fetch(`${API_BASE}${path}`, { method: "POST" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || body.message || `HTTP ${res.status}`);
+    }
+    return res.json();
+  }
+
+  async function apiGet(path, options = {}) {
+    const res = await fetch(`${API_BASE}${path}`, options);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.detail || `HTTP ${res.status}`);
@@ -81,7 +129,7 @@
     return res.json();
   }
 
-  function destroyCharts() {
+  async function apiPut(path, payload) {
     Object.keys(charts).forEach((key) => {
       if (charts[key]) {
         charts[key].destroy();
@@ -226,6 +274,218 @@
       .join("");
   }
 
+  function sourceBadge(source) {
+    if (!source || source === "manual") return "";
+    const cls = source === "google-ads" ? "ads" : source === "merged" ? "merged" : "";
+    const label = source === "google-ads" ? "Ads" : source === "merged" ? "병합" : source;
+    return `<span class="source-badge ${cls}">${esc(label)}</span>`;
+  }
+
+  function renderAnalyticsOverview(analytics) {
+    const banner = els.analyticsBanner;
+    const status = els.analyticsStatus;
+    if (!analytics) {
+      if (banner) {
+        banner.classList.remove("hidden");
+        banner.classList.add("warn");
+        banner.textContent = "Analytics 데이터를 불러오지 못했습니다.";
+      }
+      return;
+    }
+
+    if (status) {
+      status.textContent = analytics.configured
+        ? analytics.ok
+          ? "연동됨"
+          : "오류"
+        : "미설정";
+      status.className = `status-pill ${analytics.ok ? "ok" : analytics.configured ? "error" : ""}`;
+    }
+
+    if (banner) {
+      if (analytics.message && !analytics.ok) {
+        banner.classList.remove("hidden");
+        banner.classList.add("warn");
+        banner.textContent = analytics.message;
+      } else {
+        banner.classList.add("hidden");
+        banner.textContent = "";
+      }
+    }
+
+    if (!els.analyticsKpiGrid) return;
+    if (!analytics.ok) {
+      els.analyticsKpiGrid.innerHTML = "";
+      return;
+    }
+
+    const items = [
+      { label: "노출수", value: formatNum(analytics.impressions) },
+      { label: "CTR", value: analytics.ctr != null ? `${analytics.ctr}%` : "—" },
+      {
+        label: "평균 시청률",
+        value:
+          analytics.averageViewPercentage != null
+            ? `${Number(analytics.averageViewPercentage).toFixed(1)}%`
+            : "—",
+      },
+    ];
+    els.analyticsKpiGrid.innerHTML = items
+      .map(
+        (item) => `
+      <div class="analytics-kpi">
+        <div class="label">${esc(item.label)}</div>
+        <div class="value">${esc(item.value)}</div>
+      </div>`
+      )
+      .join("");
+  }
+
+  function renderTrafficChart(data) {
+    const ctx = document.getElementById("chart-traffic-sources");
+    if (!ctx) return;
+    const sources = (data?.sources || []).slice(0, 8);
+    if (!sources.length) return;
+    charts.traffic = new Chart(ctx, {
+      type: "doughnut",
+      data: {
+        labels: sources.map((s) => TRAFFIC_LABELS[s.source] || s.source),
+        datasets: [
+          {
+            data: sources.map((s) => s.views),
+            backgroundColor: [
+              "#2563eb",
+              "#dc2626",
+              "#16a34a",
+              "#d97706",
+              "#7c3aed",
+              "#0891b2",
+              "#be185d",
+              "#64748b",
+            ],
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "right", labels: { boxWidth: 10, font: { size: 10 } } } },
+      },
+    });
+  }
+
+  function renderRetentionChart(data) {
+    const ctx = document.getElementById("chart-retention");
+    if (!ctx) return;
+    const points = data?.points || [];
+    if (points.length) {
+      charts.retention = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: points.map((p) => `${Math.round(p.ratio * 100)}%`),
+          datasets: [
+            {
+              label: "시청 유지",
+              data: points.map((p) => (p.watchRatio || 0) * 100),
+              borderColor: "#dc2626",
+              backgroundColor: "rgba(220,38,38,0.1)",
+              fill: true,
+              tension: 0.3,
+              pointRadius: 2,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { min: 0, max: 100, ticks: { callback: (v) => `${v}%` } },
+          },
+        },
+      });
+      return;
+    }
+    const avg = data?.averageViewPercentage;
+    if (avg == null) return;
+    charts.retention = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: ["평균 시청률"],
+        datasets: [{ data: [avg], backgroundColor: "#dc2626", borderRadius: 6 }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { min: 0, max: 100, ticks: { callback: (v) => `${v}%` } } },
+      },
+    });
+  }
+
+  function renderDemographicsCharts(data) {
+    const ageCtx = document.getElementById("chart-age");
+    const genderCtx = document.getElementById("chart-gender");
+    const ages = data?.ageGroups || [];
+    const genders = data?.gender || [];
+
+    if (ageCtx && ages.length) {
+      charts.age = new Chart(ageCtx, {
+        type: "bar",
+        data: {
+          labels: ages.map((a) => a.ageGroup),
+          datasets: [
+            {
+              label: "시청 비율 %",
+              data: ages.map((a) => a.viewerPercentage),
+              backgroundColor: "rgba(37,99,235,0.75)",
+              borderRadius: 4,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { ticks: { callback: (v) => `${v}%` } } },
+        },
+      });
+    }
+
+    if (genderCtx && genders.length) {
+      charts.gender = new Chart(genderCtx, {
+        type: "pie",
+        data: {
+          labels: genders.map((g) => GENDER_LABELS[g.gender] || g.gender),
+          datasets: [
+            {
+              data: genders.map((g) => g.viewerPercentage),
+              backgroundColor: ["#ec4899", "#3b82f6", "#94a3b8"],
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: "bottom" } },
+        },
+      });
+    }
+  }
+
+  function renderAdsSyncStatus(adsSync) {
+    if (!els.adsSyncStatus || !adsSync) return;
+    if (!adsSync.configured) {
+      els.adsSyncStatus.textContent = "Ads 미설정";
+      return;
+    }
+    const when = adsSync.lastSync
+      ? new Date(adsSync.lastSync).toLocaleString("ko-KR")
+      : "미동기화";
+    els.adsSyncStatus.textContent = `Ads · ${when}`;
+    els.adsSyncStatus.className = `status-pill ${adsSync.lastSync ? "ok" : ""}`;
+  }
+
   function renderPromotions(promotions) {
     if (!promotions?.length) {
       els.promoBody.innerHTML = `<tr><td colspan="8">등록된 프로모션이 없습니다. 아래 JSON 편집으로 추가하세요.</td></tr>`;
@@ -238,7 +498,7 @@
         return `
         <tr>
           <td>
-            <strong>${esc(p.title)}</strong>
+            <strong>${esc(p.title)}</strong>${sourceBadge(p.source)}
             <div><span class="badge${p.status === "완료" ? " done" : ""}">${esc(p.status || "—")}</span></div>
           </td>
           <td>${formatWon(p.cost)}</td>
@@ -331,6 +591,11 @@
     try {
       const overview = await apiGet(`/api/dddit/youtube/report/overview${refresh ? "?refresh=1" : ""}`);
       const videosData = await apiGet(`/api/dddit/youtube/report/videos${refresh ? "?refresh=1" : ""}`);
+      const { traffic, retention, demographics } = await loadAnalyticsExtras(refresh);
+
+      if (overview.adsSync?.configured && refresh) {
+        apiPost("/api/dddit/youtube/report/ads/sync?force=1").catch(() => null);
+      }
 
       const ch = overview.channel || {};
       els.title.textContent = `${ch.title || "디디딧"} · 채널 현황 분석`;
@@ -340,6 +605,11 @@
       }
 
       renderKpis(overview.kpis || {});
+      renderAnalyticsOverview(overview.analytics);
+      renderTrafficChart(traffic);
+      renderRetentionChart(retention);
+      renderDemographicsCharts(demographics);
+      renderAdsSyncStatus(overview.adsSync);
       renderRecentVideosChart(overview.recentVideosBar || []);
       renderViews7dChart(overview.viewsTrend7d || [], overview.viewsTrendNote);
       renderSubscriberChart(overview.subscriberTrend);
@@ -363,6 +633,15 @@
   }
 
   document.getElementById("btn-refresh")?.addEventListener("click", () => loadReport(true));
+  document.getElementById("btn-ads-sync")?.addEventListener("click", async () => {
+    try {
+      setStatus("Ads 동기화 중…");
+      await apiPost("/api/dddit/youtube/report/ads/sync?force=1");
+      await loadReport(true);
+    } catch (err) {
+      showError(err.message || "Ads 동기화 실패");
+    }
+  });
   document.getElementById("btn-copy-link")?.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(location.href.split("?")[0]);
