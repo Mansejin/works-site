@@ -1884,3 +1884,59 @@ body.ad-mode-on .step-rail {
     display: none;
   }
 }
+
+/* ── Pipeline v2 ── */
+.chapter-panel {
+  margin: 1rem 0;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.chapter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.chapter-item {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: #fafbfc;
+}
+
+.chapter-add-row {
+  margin-top: 0.5rem;
+}
+
+textarea.prose-draft {
+  width: 100%;
+  min-height: 320px;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  resize: vertical;
+}
+
+.pipeline-dock .pipeline-dock-inner {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto;
+}
+
+.pipeline-dock-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.pipeline-dock-actions [hidden] {
+  display: none !important;
+}
+
+body[data-workflow-page="2"] .app-shell,
+body[data-workflow-page="3"] .app-shell,
+body[data-workflow-page="4"] .app-shell,
+body[data-workflow-page="5"] .app-shell {
+  padding-bottom: calc(var(--dock-h) + 12px);
+}
