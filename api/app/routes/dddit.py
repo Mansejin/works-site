@@ -35,6 +35,11 @@ async def sheet_meta() -> dict[str, Any]:
     return await _sheet_request("GET", {"action": "meta"})
 
 
+@router.get("/sheet/ensure")
+async def sheet_ensure(project: str = "default") -> dict[str, Any]:
+    return await _sheet_request("GET", {"action": "ensure", "project": project})
+
+
 @router.get("/sheet/get")
 async def sheet_get(project: str = "default") -> dict[str, Any]:
     return await _sheet_request("GET", {"action": "get", "project": project})

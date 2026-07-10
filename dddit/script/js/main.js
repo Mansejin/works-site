@@ -2536,6 +2536,7 @@ const REQUIRED_PART_KEYWORDS = ['디자인', '실사용', '가격', '총평'];
 
 const STORAGE_KEY = 'dididit-script-machine-v1';
 const PROJECT_STORAGE_KEY = 'dididit-project-v1';
+const SHEET_SETTINGS_KEY = 'dididit-sheet-settings-v1';
 
 const state = {
   apiKey: '',
@@ -2572,6 +2573,7 @@ const state = {
   searchDeviceId: 'dehumidifier',
   workflowStep: 1,
   currentPage: 1,
+  sheetOpenUrl: '',
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -5026,6 +5028,237 @@ function reindexPartSegments() {
     });
 }
 
+/* ── Google 시트 연동 ── */
+
+function getSheetSlug() {
+  return window.DdditSheetSync?.projectSlug?.() || 'default';
+}
+
+function loadSheetSettingsStore() {
+  try {
+    return JSON.parse(localStorage.getItem(SHEET_SETTINGS_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveSheetSettingsStore(store) {
+  localStorage.setItem(SHEET_SETTINGS_KEY, JSON.stringify(store));
+}
+
+function getSheetConfig() {
+  if (window.DdditSheetSync?.useBackend?.()) return {};
+  const store = loadSheetSettingsStore();
+  return {
+    apiUrl: store.apiUrl || '',
+    token: store.token || '',
+  };
+}
+
+function rememberSheetUrl(project, url) {
+  if (!url) return;
+  const store = loadSheetSettingsStore();
+  store.projects = store.projects || {};
+  store.projects[project] = { url, updatedAt: new Date().toISOString() };
+  saveSheetSettingsStore(store);
+  state.sheetOpenUrl = url;
+  updateSheetLinkBar(url, project);
+}
+
+function getRememberedSheetUrl(project) {
+  return loadSheetSettingsStore().projects?.[project]?.url || '';
+}
+
+function updateSheetStatus(text, isError) {
+  const el = $('#sheet-sync-status');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('is-error', !!isError);
+}
+
+function updateSheetLinkBar(url, project) {
+  const bar = $('#sheet-link-bar');
+  const link = $('#sheet-open-link');
+  if (!bar || !link) return;
+  if (!url) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  link.href = url;
+  const label = window.DdditSheetSync?.projectLabel?.(project || getSheetSlug()) || project || '시트';
+  link.textContent = `${label} 콘티 시트 열기`;
+}
+
+function syncLocalSheetSettingsFromDOM() {
+  const store = loadSheetSettingsStore();
+  store.apiUrl = $('#sheet-api-url')?.value.trim() || '';
+  store.token = $('#sheet-api-token')?.value || '';
+  store.openUrl = $('#sheet-open-url')?.value.trim() || '';
+  saveSheetSettingsStore(store);
+}
+
+function applyLocalSheetSettingsToDOM() {
+  const store = loadSheetSettingsStore();
+  if ($('#sheet-api-url')) $('#sheet-api-url').value = store.apiUrl || '';
+  if ($('#sheet-api-token')) $('#sheet-api-token').value = store.token || '';
+  if ($('#sheet-open-url')) $('#sheet-open-url').value = store.openUrl || '';
+}
+
+async function refreshSheetConnection() {
+  const sync = window.DdditSheetSync;
+  if (!sync) return;
+
+  const project = getSheetSlug();
+  const remembered = getRememberedSheetUrl(project);
+  if (remembered) {
+    state.sheetOpenUrl = remembered;
+    updateSheetLinkBar(remembered, project);
+  }
+
+  try {
+    const info = await sync.lookup(getSheetConfig(), project);
+    if (info.exists && info.spreadsheetUrl) {
+      rememberSheetUrl(project, info.spreadsheetUrl);
+      updateSheetStatus(`시트 연결됨 · ${info.title || project}`);
+    }
+  } catch (err) {
+    if (sync.useBackend()) {
+      updateSheetStatus('시트 미연결 — 「시트로 보내기」로 최초 생성', false);
+    } else if (!getSheetConfig().apiUrl) {
+      updateSheetStatus('API 설정에서 시트 URL·토큰을 입력하세요', true);
+    } else {
+      updateSheetStatus(err.message || '시트 연결 실패', true);
+    }
+  }
+}
+
+async function initSheetIntegration() {
+  const project = getSheetSlug();
+  const badge = $('#workspace-project-badge');
+  if (badge && project !== 'default') {
+    badge.textContent = `프로젝트: ${project}`;
+    badge.classList.remove('hidden');
+  }
+
+  const backendNote = $('#backend-settings-note');
+  if (window.DdditWorksApi?.isBackendMode?.()) {
+    backendNote?.removeAttribute('hidden');
+    try {
+      await window.DdditWorksApi.loadConfig();
+      updateSheetStatus('NAS 시트 연동 준비됨');
+    } catch {
+      updateSheetStatus('works-api 연결 실패', true);
+    }
+  } else {
+    applyLocalSheetSettingsToDOM();
+    updateSheetStatus(
+      getSheetConfig().apiUrl ? '로컬 시트 설정 적용됨' : '로컬: 시트 API URL·토큰 필요'
+    );
+  }
+
+  const remembered = getRememberedSheetUrl(project);
+  if (remembered) {
+    state.sheetOpenUrl = remembered;
+    updateSheetLinkBar(remembered, project);
+  }
+
+  await refreshSheetConnection();
+}
+
+async function pushToSheet() {
+  const sync = window.DdditSheetSync;
+  if (!sync) return showToast('시트 모듈을 불러오지 못했습니다.', true);
+  if (!state.allRows.length) return showToast('보낼 대본이 없습니다.', true);
+
+  const project = getSheetSlug();
+  setLoading(true, 'Google 시트로 보내는 중…');
+  try {
+    const result = await sync.exportToSheet(getSheetConfig(), state.allRows, project);
+    const url = result.spreadsheetUrl || '';
+    if (url) rememberSheetUrl(project, url);
+    updateSheetStatus(`시트 반영 · ${result.rowCount ?? state.allRows.length}행`);
+    showToast(result.created ? '새 시트를 만들고 보냈습니다.' : '시트에 반영했습니다.');
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  } catch (err) {
+    reportError('pushToSheet', err);
+    showToast(err.message || '시트 전송 실패', true);
+    updateSheetStatus(err.message || '시트 전송 실패', true);
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function pullFromSheet() {
+  const sync = window.DdditSheetSync;
+  if (!sync) return showToast('시트 모듈을 불러오지 못했습니다.', true);
+
+  if (state.allRows.length && !confirm('시트 내용으로 현재 콘티 표를 덮어쓸까요?')) return;
+
+  const project = getSheetSlug();
+  setLoading(true, '시트에서 불러오는 중…');
+  try {
+    const data = await sync.pull(getSheetConfig(), project);
+    state.allRows = (data.rows || []).map((r) => ({
+      대본: r.대본 || '',
+      장면: r.장면 || '',
+      사이즈: r.사이즈 || '',
+      자막: r.자막 || '',
+      코멘트: r.코멘트 || '',
+    }));
+    if (data.spreadsheetUrl) rememberSheetUrl(project, data.spreadsheetUrl);
+    saveProject();
+    renderTable();
+    updateSheetStatus(`시트에서 ${state.allRows.length}행 불러옴`);
+    showToast(`시트에서 ${state.allRows.length}행을 불러왔습니다.`);
+  } catch (err) {
+    reportError('pullFromSheet', err);
+    showToast(err.message || '시트 불러오기 실패', true);
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function openProjectSheet() {
+  const project = getSheetSlug();
+  if (state.sheetOpenUrl) {
+    window.open(state.sheetOpenUrl, '_blank', 'noopener,noreferrer');
+    return;
+  }
+
+  try {
+    const info = await window.DdditSheetSync.ensure(getSheetConfig(), project);
+    if (info.spreadsheetUrl) {
+      rememberSheetUrl(project, info.spreadsheetUrl);
+      window.open(info.spreadsheetUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+  } catch (err) {
+    reportError('openProjectSheet', err);
+  }
+  showToast('연결된 시트가 없습니다. 먼저 「시트로 보내기」를 실행하세요.', true);
+}
+
+function bindSheetSettings() {
+  const save = () => {
+    syncLocalSheetSettingsFromDOM();
+    refreshSheetConnection();
+  };
+  $('#sheet-api-url')?.addEventListener('change', save);
+  $('#sheet-api-url')?.addEventListener('blur', save);
+  $('#sheet-api-token')?.addEventListener('change', save);
+  $('#sheet-open-url')?.addEventListener('change', save);
+  $('#btn-toggle-sheet-token')?.addEventListener('click', () => {
+    const input = $('#sheet-api-token');
+    const btn = $('#btn-toggle-sheet-token');
+    if (!input || !btn) return;
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', String(show));
+    btn.textContent = show ? '숨기기' : '표시';
+  });
+}
+
 function exportTsv() {
   if (!state.allRows.length) return showToast('보낼 대본이 없습니다.', true);
 
@@ -5249,6 +5482,10 @@ function bindEvents() {
   $('#btn-export').addEventListener('click', exportTsv);
   $('#btn-copy').addEventListener('click', copyTable);
   $('#btn-reset').addEventListener('click', resetProject);
+  $('#btn-sheet-push').addEventListener('click', pushToSheet);
+  $('#btn-sheet-pull').addEventListener('click', pullFromSheet);
+  $('#btn-sheet-open').addEventListener('click', openProjectSheet);
+  bindSheetSettings();
   $('#toggle-settings').addEventListener('click', () => {
     togglePanel('#settings-panel', '#toggle-settings');
   });
@@ -5314,6 +5551,7 @@ async function boot() {
     $('#api-key').value = state.apiKey;
     bindEvents();
     bindScriptTableSpreadsheet();
+    await initSheetIntegration();
     bindErrorLogUI();
     bindErrorLogging();
     bindBeforeUnload();

@@ -27,7 +27,7 @@
     {
       name: "시나리오 머신",
       path: "script/",
-      summary: "서치 · 브리프 · 파트 대본 · 콘티 TSV",
+      summary: "서치 · 브리프 · 파트 대본 · Google 시트보내기",
       status: "사용 가능",
       ready: true,
     },

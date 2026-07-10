@@ -356,7 +356,7 @@
           <span class="step-title">콘티 작성 · TSV보내기</span>
         </div>
         <div class="step-body">
-          <p class="hint">하단 작업 바에서 <strong>파트 생성</strong>으로 콘티를 쌓습니다. 전체 파트 완료 시 NAS 콘티 에디터에 자동 저장됩니다.</p>
+          <p class="hint">하단 작업 바에서 <strong>파트 생성</strong> 후 <strong>시트로 보내기</strong>로 Google 시트에 콘티를 올립니다. 실무 편집은 시트에서 진행합니다.</p>
           <p id="part-validation" class="validation"></p>
         </div>
       </section>
@@ -365,22 +365,24 @@
     <aside class="script-column">
       <div class="script-panel panel">
         <div class="table-header">
-          <h2>콘티 표 <span class="hint-inline">Tab·Enter 이동 · TSV 붙여넣기 · 시트</span></h2>
+          <h2>콘티 미리보기 <span class="hint-inline">편집은 Google 시트</span></h2>
           <div class="table-stats">
             <span><strong id="stat-rows">0</strong>행</span>
             <span><strong id="stat-bytes">0</strong>B</span>
           </div>
           <div class="table-actions">
-            <button id="btn-conti-push" class="btn btn-primary btn-sm" type="button" title="NAS 콘티 에디터에 덮어쓰기">에디터로 보내기</button>
-            <button id="btn-conti-open" class="btn btn-secondary btn-sm" type="button" title="콘티 에디터 열기">에디터 열기</button>
-            <button id="btn-sheet-push" class="btn btn-secondary btn-sm" type="button" title="Google 시트에 덮어쓰기">시트로 보내기</button>
-            <button id="btn-sheet-pull" class="btn btn-secondary btn-sm" type="button" title="시트에서 불러오기">시트에서 불러오기</button>
+            <button id="btn-sheet-push" class="btn btn-primary btn-sm" type="button" title="Google 시트에 생성·덮어쓰기">시트로 보내기</button>
             <button id="btn-sheet-open" class="btn btn-secondary btn-sm" type="button" title="스프레드시트 열기">시트 열기</button>
+            <button id="btn-sheet-pull" class="btn btn-secondary btn-sm" type="button" title="시트에서 불러오기">시트에서 불러오기</button>
             <button id="btn-copy" class="btn btn-secondary btn-sm" type="button">복사</button>
             <button id="btn-export" class="btn btn-secondary btn-sm" type="button">TSV</button>
             <button id="btn-reset" class="btn btn-ghost btn-sm" type="button">초기화</button>
           </div>
         </div>
+        <p id="sheet-link-bar" class="sheet-link-bar" hidden>
+          <a id="sheet-open-link" href="#" target="_blank" rel="noopener noreferrer">콘티 시트 열기</a>
+          <span class="hint-inline">· 브랜드별 시트 · 디디딧 Drive</span>
+        </p>
         <div class="table-wrap">
           <table id="script-table">
             <thead>
@@ -417,6 +419,6 @@
   <script src="../js/spreadsheet-cells.js"></script>
   <script src="js/works-api.js"></script>
   <script src="js/sheet-sync.js"></script>
-  <script src="js/main.js?v=13"></script>
+  <script src="js/main.js?v=14"></script>
 </body>
 </html>

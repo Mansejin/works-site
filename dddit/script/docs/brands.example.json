@@ -1,0 +1,8 @@
+{
+  "xenics": {
+    "name": "Xenics",
+    "brand": "제닉스",
+    "sheetProject": "xenics",
+    "publicScriptPath": "/dddit/xenics/script/"
+  }
+}

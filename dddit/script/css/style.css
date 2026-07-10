@@ -1786,6 +1786,29 @@ td:nth-child(2) {
   line-height: 1.6;
 }
 
+.sheet-sync-status.is-error {
+  color: #b91c1c;
+}
+
+.sheet-link-bar {
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  background: var(--accent-soft, #eff6ff);
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+
+.sheet-link-bar a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sheet-link-bar a:hover {
+  text-decoration: underline;
+}
+
 .secret-field {
   display: flex;
   gap: 0.35rem;
