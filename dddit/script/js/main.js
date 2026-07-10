@@ -1376,6 +1376,72 @@ function navigatePipeline(step) {
   document.querySelector('.step-section.step-active')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function updatePlanSyncUI() {
+  const SYNC = window.DdditPlanBriefSync;
+  const bar = $('#plan-sync-bar');
+  const hint = $('#plan-sync-hint');
+  const link = $('#plan-edit-link');
+  const project = getSheetSlug();
+  if (!SYNC || project === 'default') {
+    bar?.classList.add('hidden');
+    return;
+  }
+  bar?.classList.remove('hidden');
+  const status = SYNC.getSyncStatus(project);
+  if (hint) hint.textContent = SYNC.formatSyncHint(project);
+  bar?.classList.toggle('is-script-newer', status.newer === 'script');
+  const planUrl = SYNC.planEditUrl(project);
+  if (link && planUrl) link.href = planUrl;
+}
+
+function pullPlanToBrief(force = false) {
+  const SYNC = window.DdditPlanBriefSync;
+  const project = getSheetSlug();
+  if (!SYNC || project === 'default') return showToast('프로젝트 URL에 ?project= 를 지정하세요.', true);
+  syncBriefFromDOM();
+  const result = SYNC.importPlanToBrief(state, project, { force });
+  if (!result.ok) {
+    if (result.reason === 'script-newer') {
+      showToast('브리프가 더 최신입니다. 덮어쓰려면 다시 누르세요.', true);
+      if (!force) {
+        setTimeout(() => {
+          if (confirm('기획안 내용으로 브리프를 덮어쓸까요?')) pullPlanToBrief(true);
+        }, 0);
+      }
+      return;
+    }
+    return showToast('불러올 기획안이 없습니다. 기획안 페이지에서 먼저 작성하세요.', true);
+  }
+  applyBriefToDOM();
+  saveProject();
+  updatePlanSyncUI();
+  updatePipelineUI();
+  showToast('기획안을 불러왔습니다.');
+}
+
+function pushBriefToPlan() {
+  const SYNC = window.DdditPlanBriefSync;
+  const project = getSheetSlug();
+  if (!SYNC || project === 'default') return showToast('프로젝트 URL에 ?project= 를 지정하세요.', true);
+  syncBriefFromDOM();
+  SYNC.exportBriefToPlan(project, state);
+  saveProject();
+  updatePlanSyncUI();
+  showToast('기획안에 반영했습니다.');
+}
+
+function autoSyncPlanOnBoot() {
+  const SYNC = window.DdditPlanBriefSync;
+  const project = getSheetSlug();
+  if (!SYNC || project === 'default') return;
+  const result = SYNC.importPlanToBrief(state, project);
+  if (result.ok) {
+    state.briefSource = 'team';
+    return true;
+  }
+  return false;
+}
+
 function updatePipelineUI() {
   const labels = ['', '브리프', '줄글 초안', '시트 변환', '장면·사이즈', '자막·공유'];
   const hints = [
@@ -1742,9 +1808,10 @@ function bindDrawerPanels() {
 
 function renderCategoryOptions() {
   const sel = $('#category');
-  if (!sel || !BRIEF) return;
-  sel.innerHTML = BRIEF.getCategories().map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  sel.value = state.categoryId;
+  const cats = getCategories();
+  if (!sel || !cats.length) return;
+  sel.innerHTML = cats.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  sel.value = cats.some((c) => c.id === state.categoryId) ? state.categoryId : 'other';
 }
 
 function bindEvents() {
@@ -1783,6 +1850,9 @@ function bindEvents() {
   $('#btn-ad-guide-add-paste')?.addEventListener('click', addAdGuideFromPaste);
   $('#ad-guide-file-input')?.addEventListener('change', (e) => addAdGuideFiles(e.target.files));
   $('#btn-ad-guide-clear')?.addEventListener('click', clearAdGuides);
+  $('#btn-plan-pull')?.addEventListener('click', () => pullPlanToBrief(false));
+  $('#btn-plan-push')?.addEventListener('click', pushBriefToPlan);
+  $('#team-brief-notes')?.addEventListener('input', () => { saveProject(); updatePlanSyncUI(); });
   bindDrawerPanels();
 }
 
@@ -1806,10 +1876,12 @@ async function boot() {
     LOG?.updateBadge?.();
     loadState();
     loadProject();
+    const planImported = autoSyncPlanOnBoot();
     await importProjectSeed(getSheetSlug());
     syncModelSelect();
     renderCategoryOptions();
     applyBriefToDOM();
+    if (planImported) showToast('기획안에서 브리프를 불러왔습니다.');
     $('#api-key').value = state.apiKey;
     bindEvents();
     if (window.DdditWorksApi?.isBackendMode?.()) await window.DdditWorksApi.loadConfig().catch(() => null);
@@ -1817,6 +1889,7 @@ async function boot() {
     await initPromptOnBoot();
     navigatePipeline(state.pipelineStep || 1);
     renderTable();
+    updatePlanSyncUI();
     if (!isApiReady() && !window.DdditWorksApi?.isBackendMode?.()) {
       $('#settings-panel')?.classList.remove('collapsed');
     }

@@ -1,4 +1,5 @@
 (function () {
+  const PROJECT_SLUG = "xenics";
   const STORAGE_KEY = "works/dddit/xenics/plan";
 
   const DEFAULT_STATE = {
@@ -103,6 +104,18 @@
     load();
     renderAll();
     persist();
+    if (window.DdditPlanBriefSync) {
+      window.DdditPlanBriefSync.mountPlanPageSync(PROJECT_SLUG, {
+        getState: () => state,
+        applyState: (next) => {
+          state = { ...DEFAULT_STATE, ...next };
+        },
+        rerender: () => {
+          renderAll();
+          persist();
+        },
+      });
+    }
   }
 
   init();

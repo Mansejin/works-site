@@ -119,12 +119,26 @@
         <!-- 1 브리프 -->
         <section class="block step-section step-active page-visible" data-step="1" id="step-brief">
           <div class="block-head">
-            <h2><span class="step-num-badge">1</span> 제품 브리프</h2>
+            <h2><span class="step-num-badge">1</span> 기획안 · 브리프</h2>
             <div class="block-head-actions">
               <button id="btn-pipeline-next-brief" class="btn btn-primary btn-sm step-next-btn" type="button" data-goto="2">다음: 줄글 →</button>
             </div>
           </div>
           <div class="block-body form-stack">
+            <div class="plan-sync-bar" id="plan-sync-bar">
+              <div class="plan-sync-text">
+                <strong>기획안 연동</strong>
+                <p id="plan-sync-hint" class="hint">같은 브라우저의 기획안과 자동 연동됩니다.</p>
+              </div>
+              <div class="btn-row plan-sync-actions">
+                <a id="plan-edit-link" class="btn btn-secondary btn-sm" href="#" target="_blank" rel="noopener">기획안 열기</a>
+                <button id="btn-plan-pull" class="btn btn-primary btn-sm" type="button">불러오기</button>
+                <button id="btn-plan-push" class="btn btn-ghost btn-sm" type="button">기획안에 반영</button>
+              </div>
+            </div>
+
+            <p class="hint">기획안을 먼저 쓰거나, 여기서 수정해도 됩니다. 둘 중 어디서 작성해도 연동됩니다.</p>
+
             <details class="fold open" id="team-brief-panel">
               <summary>팀 제공 자료</summary>
               <p class="hint">본사 가이드·제원·촬영 메모 — 생성 시 최우선 반영</p>
@@ -312,8 +326,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" async></script>
+  <script src="../js/plan-brief-sync.js"></script>
   <script src="js/works-api.js"></script>
   <script src="js/sheet-sync.js"></script>
-  <script src="js/main.js?v=19"></script>
+  <script src="js/main.js?v=20"></script>
 </body>
 </html>

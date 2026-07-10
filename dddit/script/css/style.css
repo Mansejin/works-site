@@ -789,6 +789,32 @@ body.hosted [data-local-only] { display: none !important; }
 .panel { /* noop */ }
 .hint-inline { font-weight: 400; color: var(--text-muted); font-size: 0.78rem; }
 
+/* plan ↔ brief sync bar */
+.plan-sync-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+
+.plan-sync-text strong {
+  font-size: 0.85rem;
+}
+
+.plan-sync-actions {
+  flex-shrink: 0;
+}
+
+.plan-sync-bar.is-script-newer {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
 @media (max-width: 640px) {
   .page { padding: 12px 12px 0; }
   .app-header { margin-bottom: 10px; }

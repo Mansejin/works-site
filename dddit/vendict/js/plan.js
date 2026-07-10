@@ -1,4 +1,5 @@
 (function () {
+  const PROJECT_SLUG = "vendict";
   const STORAGE_KEY = "works/dddit/vendict/plan";
 
   const DEFAULT_STATE = {
@@ -138,6 +139,18 @@
     load();
     renderAll();
     persist();
+    if (window.DdditPlanBriefSync) {
+      window.DdditPlanBriefSync.mountPlanPageSync(PROJECT_SLUG, {
+        getState: () => state,
+        applyState: (next) => {
+          state = { ...DEFAULT_STATE, ...next };
+        },
+        rerender: () => {
+          renderAll();
+          persist();
+        },
+      });
+    }
   }
 
   init();
