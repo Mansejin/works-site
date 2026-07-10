@@ -198,19 +198,22 @@
 
     .table-wrap { overflow-x: auto; }
 
-    table {
+    #conti-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 0.84rem;
+      table-layout: fixed;
     }
 
-    th, td {
+    #conti-table th,
+    #conti-table td {
       border-bottom: 1px solid var(--border);
       padding: 6px 8px;
       vertical-align: top;
+      overflow: hidden;
     }
 
-    th {
+    #conti-table th {
       position: sticky;
       top: 0;
       background: #f8fafc;
@@ -218,6 +221,47 @@
       font-weight: 700;
       color: var(--text-muted);
       white-space: nowrap;
+      z-index: 1;
+    }
+
+    #conti-table th.th-resizable {
+      padding-right: 14px;
+    }
+
+    .col-resize {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 8px;
+      height: 100%;
+      cursor: col-resize;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .col-resize::after {
+      content: "";
+      position: absolute;
+      top: 20%;
+      bottom: 20%;
+      right: 3px;
+      width: 2px;
+      border-radius: 1px;
+      background: #cbd5e1;
+    }
+
+    .col-resize:hover::after,
+    body.is-col-resizing .col-resize::after {
+      background: var(--accent);
+    }
+
+    body.is-col-resizing {
+      cursor: col-resize;
+      user-select: none;
+    }
+
+    body.is-col-resizing * {
+      cursor: col-resize !important;
     }
 
     .row-num {
@@ -333,16 +377,25 @@
           <button id="btn-copy-share" class="btn btn-ghost" type="button">복사</button>
         </div>
         <div class="table-wrap" style="margin-top: 14px;">
-          <table>
+          <table id="conti-table">
+            <colgroup>
+              <col data-col="select" style="width:32px" />
+              <col data-col="num" style="width:40px" />
+              <col data-col="대본" />
+              <col data-col="장면" />
+              <col data-col="사이즈" />
+              <col data-col="자막" />
+              <col data-col="코멘트" />
+            </colgroup>
             <thead>
               <tr>
                 <th></th>
                 <th>#</th>
-                <th>대본</th>
-                <th>장면</th>
-                <th>사이즈</th>
-                <th>자막</th>
-                <th>코멘트</th>
+                <th class="th-resizable" data-col="대본">대본<span class="col-resize" data-col="대본" title="열 너비 조절"></span></th>
+                <th class="th-resizable" data-col="장면">장면<span class="col-resize" data-col="장면" title="열 너비 조절"></span></th>
+                <th class="th-resizable" data-col="사이즈">사이즈<span class="col-resize" data-col="사이즈" title="열 너비 조절"></span></th>
+                <th class="th-resizable" data-col="자막">자막<span class="col-resize" data-col="자막" title="열 너비 조절"></span></th>
+                <th class="th-resizable" data-col="코멘트">코멘트<span class="col-resize" data-col="코멘트" title="열 너비 조절"></span></th>
               </tr>
             </thead>
             <tbody id="conti-body"></tbody>
@@ -353,6 +406,6 @@
   </div>
 
   <script src="../js/conti-api.js"></script>
-  <script type="module" src="js/editor.js?v=2"></script>
+  <script type="module" src="js/editor.js?v=3"></script>
 </body>
 </html>

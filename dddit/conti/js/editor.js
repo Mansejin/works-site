@@ -37,7 +37,21 @@ let yTitle = null;
 let wsProvider = null;
 
 const USER_KEY = "works/dddit/conti/user";
+const COL_WIDTH_KEY = "works/dddit/conti/col-widths";
 const USER_COLORS = ["#2563eb", "#16a34a", "#d97706", "#db2777", "#7c3aed", "#0891b2"];
+const RESIZABLE_COLS = ["대본", "장면", "사이즈", "자막", "코멘트"];
+const DEFAULT_COL_WIDTHS = {
+  대본: 220,
+  장면: 160,
+  사이즈: 72,
+  자막: 140,
+  코멘트: 140,
+};
+const MIN_COL_WIDTH = 56;
+
+const contiTable = document.getElementById("conti-table");
+let colResizeReady = false;
+let activeColResize = null;
 
 function esc(value) {
   return String(value ?? "")
@@ -78,6 +92,80 @@ function getUserProfile() {
   };
   localStorage.setItem(USER_KEY, JSON.stringify(profile));
   return profile;
+}
+
+function loadColWidths() {
+  const widths = { ...DEFAULT_COL_WIDTHS };
+  try {
+    const saved = JSON.parse(localStorage.getItem(COL_WIDTH_KEY) || "null");
+    if (saved && typeof saved === "object") {
+      RESIZABLE_COLS.forEach((key) => {
+        const value = Number(saved[key]);
+        if (Number.isFinite(value) && value >= MIN_COL_WIDTH) widths[key] = value;
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+  return widths;
+}
+
+function saveColWidths(widths) {
+  localStorage.setItem(COL_WIDTH_KEY, JSON.stringify(widths));
+}
+
+function applyColWidths() {
+  if (!contiTable) return;
+  const widths = loadColWidths();
+  contiTable.querySelectorAll("col[data-col]").forEach((col) => {
+    const key = col.dataset.col;
+    if (key && widths[key]) col.style.width = `${widths[key]}px`;
+  });
+}
+
+function setupColumnResize() {
+  if (colResizeReady || !contiTable) return;
+  colResizeReady = true;
+  applyColWidths();
+
+  contiTable.querySelectorAll(".col-resize").forEach((handle) => {
+    handle.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      const key = handle.dataset.col;
+      const col = contiTable.querySelector(`col[data-col="${key}"]`);
+      if (!col) return;
+
+      const widths = loadColWidths();
+      activeColResize = {
+        key,
+        col,
+        startX: event.clientX,
+        startWidth: widths[key] || col.getBoundingClientRect().width,
+      };
+      document.body.classList.add("is-col-resizing");
+
+      const onMove = (moveEvent) => {
+        if (!activeColResize) return;
+        const next = Math.max(
+          MIN_COL_WIDTH,
+          Math.round(activeColResize.startWidth + (moveEvent.clientX - activeColResize.startX))
+        );
+        activeColResize.col.style.width = `${next}px`;
+        widths[activeColResize.key] = next;
+      };
+
+      const onUp = () => {
+        if (activeColResize) saveColWidths(widths);
+        activeColResize = null;
+        document.body.classList.remove("is-col-resizing");
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    });
+  });
 }
 
 function captureFocus() {
@@ -315,6 +403,7 @@ function loadEditor() {
   editorSubtitle.textContent = `프로젝트 ${project} · 실시간 동기화`;
   shareUrlInput.value = api.shareUrl(project);
   setStatus("동기화 연결 중…");
+  setupColumnResize();
   connectCollab();
 }
 
