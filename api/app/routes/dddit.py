@@ -67,9 +67,12 @@ async def sheet_ensure(project: str = "default") -> dict[str, Any]:
 
 @router.get("/sheet/get")
 async def sheet_get(project: str = "default") -> dict[str, Any]:
-    if sheets_native_configured():
-        return await native_sheet_get(project)
-    return await _apps_script_request("GET", {"action": "get", "project": project})
+    try:
+        if sheets_native_configured():
+            return await native_sheet_get(project)
+        return await _apps_script_request("GET", {"action": "get", "project": project})
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/sheet/replace")

@@ -14,6 +14,9 @@ from app.sheet_registry import get_project, list_projects, upsert_project
 DRIVE_FILES = "https://www.googleapis.com/drive/v3/files"
 SHEETS = "https://sheets.googleapis.com/v4/spreadsheets"
 CONTI_TAB = "콘티"
+_DRIVE_QUERY = (
+    "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
+)
 
 PROJECT_LABELS = {
     "xenics": "디디딧 콘티 · Xenics",
@@ -52,6 +55,70 @@ def _values_url(spreadsheet_id: str, cells: str, action: str = "") -> str:
     return f"{SHEETS}/{spreadsheet_id}/values/{_range_path(cells)}{suffix}"
 
 
+def _drive_list_params(**extra: str) -> dict[str, str]:
+    return {
+        "supportsAllDrives": "true",
+        "includeItemsFromAllDrives": "true",
+        **extra,
+    }
+
+
+def _google_error(res: httpx.Response, label: str) -> RuntimeError:
+    detail = res.text[:800]
+    return RuntimeError(f"{label} failed ({res.status_code}): {detail}")
+
+
+async def _find_spreadsheet_in_folder(
+    client: httpx.AsyncClient,
+    folder_id: str,
+    title: str,
+) -> dict[str, Any] | None:
+    token = await _token(client)
+    safe_title = title.replace("'", "\\'")
+    query = f"{_DRIVE_QUERY} and '{folder_id}' in parents and name='{safe_title}'"
+    res = await client.get(
+        DRIVE_FILES,
+        headers={"Authorization": f"Bearer {token}"},
+        params=_drive_list_params(
+            q=query,
+            spaces="drive",
+            fields="files(id,webViewLink)",
+            pageSize="1",
+        ),
+    )
+    if res.status_code >= 400:
+        raise _google_error(res, "Drive search")
+    files = res.json().get("files") or []
+    if not files:
+        return None
+    file_id = files[0]["id"]
+    return {
+        "spreadsheetId": file_id,
+        "spreadsheetUrl": files[0].get("webViewLink")
+        or f"https://docs.google.com/spreadsheets/d/{file_id}/edit",
+        "title": title,
+    }
+
+
+async def _move_to_folder(
+    client: httpx.AsyncClient,
+    spreadsheet_id: str,
+    folder_id: str,
+) -> str | None:
+    token = await _token(client)
+    res = await client.patch(
+        f"{DRIVE_FILES}/{spreadsheet_id}",
+        headers={"Authorization": f"Bearer {token}"},
+        params=_drive_list_params(
+            addParents=folder_id,
+            fields="id,webViewLink",
+        ),
+    )
+    if res.status_code >= 400:
+        raise _google_error(res, "Drive move")
+    return res.json().get("webViewLink")
+
+
 async def _ensure_conti_tab(client: httpx.AsyncClient, spreadsheet_id: str) -> None:
     token = await _token(client)
     meta = await client.get(
@@ -59,60 +126,88 @@ async def _ensure_conti_tab(client: httpx.AsyncClient, spreadsheet_id: str) -> N
         headers={"Authorization": f"Bearer {token}"},
         params={"fields": "sheets.properties"},
     )
-    meta.raise_for_status()
+    if meta.status_code >= 400:
+        raise _google_error(meta, "Sheets metadata")
     sheets = meta.json().get("sheets") or []
-    sheet_id = sheets[0]["properties"]["sheetId"] if sheets else 0
-
-    await client.post(
-        f"{SHEETS}/{spreadsheet_id}:batchUpdate",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "requests": [
-                {
-                    "updateSheetProperties": {
-                        "properties": {"sheetId": sheet_id, "title": CONTI_TAB},
-                        "fields": "title",
+    has_conti = any(
+        (sheet.get("properties") or {}).get("title") == CONTI_TAB for sheet in sheets
+    )
+    if not has_conti:
+        sheet_id = sheets[0]["properties"]["sheetId"] if sheets else 0
+        rename = await client.post(
+            f"{SHEETS}/{spreadsheet_id}:batchUpdate",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "requests": [
+                    {
+                        "updateSheetProperties": {
+                            "properties": {"sheetId": sheet_id, "title": CONTI_TAB},
+                            "fields": "title",
+                        }
                     }
-                }
-            ]
-        },
-    ).raise_for_status()
+                ]
+            },
+        )
+        if rename.status_code >= 400:
+            raise _google_error(rename, "Sheets tab rename")
 
-    await client.put(
+    header_res = await client.get(
+        _values_url(spreadsheet_id, "A1:E1"),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    if header_res.status_code >= 400:
+        raise _google_error(header_res, "Sheets header read")
+    current = (header_res.json().get("values") or [[]])[0]
+    if list(current[: len(HEADERS)]) == list(HEADERS):
+        return
+
+    put_res = await client.put(
         _values_url(spreadsheet_id, "A1:E1"),
         headers={"Authorization": f"Bearer {token}"},
         params={"valueInputOption": "USER_ENTERED"},
         json={"values": [list(HEADERS)]},
-    ).raise_for_status()
+    )
+    if put_res.status_code >= 400:
+        raise _google_error(put_res, "Sheets header write")
 
 
 async def _create_spreadsheet(client: httpx.AsyncClient, project: str) -> dict[str, Any]:
-    token = await _token(client)
     title = _project_title(project)
-    body: dict[str, Any] = {
-        "name": title,
-        "mimeType": "application/vnd.google-apps.spreadsheet",
-    }
     folder_id = sheets_drive_folder_id()
     if folder_id:
-        body["parents"] = [folder_id]
+        existing = await _find_spreadsheet_in_folder(client, folder_id, title)
+        if existing:
+            await _ensure_conti_tab(client, existing["spreadsheetId"])
+            return existing
 
+    token = await _token(client)
     res = await client.post(
-        DRIVE_FILES,
+        SHEETS,
         headers={"Authorization": f"Bearer {token}"},
-        params={"fields": "id,webViewLink"},
-        json=body,
+        json={
+            "properties": {"title": title},
+            "sheets": [{"properties": {"title": CONTI_TAB}}],
+        },
     )
     if res.status_code >= 400:
-        detail = res.text[:500]
-        raise RuntimeError(f"Drive create failed ({res.status_code}): {detail}")
+        raise _google_error(res, "Sheets create")
     payload = res.json()
-    spreadsheet_id = payload["id"]
+    spreadsheet_id = payload["spreadsheetId"]
+    spreadsheet_url = (
+        payload.get("spreadsheetUrl")
+        or f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
+    )
+
     await _ensure_conti_tab(client, spreadsheet_id)
+
+    if folder_id:
+        moved_url = await _move_to_folder(client, spreadsheet_id, folder_id)
+        if moved_url:
+            spreadsheet_url = moved_url
+
     return {
         "spreadsheetId": spreadsheet_id,
-        "spreadsheetUrl": payload.get("webViewLink")
-        or f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit",
+        "spreadsheetUrl": spreadsheet_url,
         "title": title,
     }
 
