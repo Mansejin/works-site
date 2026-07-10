@@ -139,6 +139,12 @@
     }
   }
 
+  function revealCalendar() {
+    document.body.classList.remove("is-loading");
+    const calendar = document.getElementById("calendar");
+    if (calendar) calendar.setAttribute("aria-busy", "false");
+  }
+
   async function initialLoad() {
     if (IS_WEB_HOSTED) {
       try {
@@ -254,7 +260,11 @@
 
   async function init() {
     bindDragDrop();
-    await initialLoad();
+    try {
+      await initialLoad();
+    } finally {
+      revealCalendar();
+    }
     if (IS_WEB_HOSTED) {
       setInterval(poll, POLL_MS);
     }

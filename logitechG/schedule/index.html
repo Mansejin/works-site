@@ -8,8 +8,9 @@
   <link rel="canonical" href="https://works.mansejin.com/logitechG/schedule/">
   <title>로지텍G 이스포츠 촬영 납품 일정</title>
   <link rel="stylesheet" href="css/schedule.css">
+  <style>body.is-loading .calendar-container{visibility:hidden}</style>
 </head>
-<body>
+<body class="is-loading">
   <header class="page-header">
     <div>
       <h1>로지텍G 이스포츠 촬영 납품 일정</h1>
@@ -26,7 +27,7 @@
     <span class="legend-item" role="listitem"><i class="swatch event-making"></i>메이킹</span>
   </div>
 
-  <div class="calendar-container">
+  <div class="calendar-container" id="calendar" aria-busy="true">
 
     <div class="month-title">2026년 6월</div>
     <table>
