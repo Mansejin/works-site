@@ -4,6 +4,7 @@
   const API_BASE = IS_WEB_HOSTED ? "https://works-api.mansejin.com" : "http://localhost:8788";
   const REFRESH_CACHE_KEY = "works/dddit/report/lastApiRefresh";
   const REFRESH_TTL_MS = 24 * 60 * 60 * 1000;
+  const SUBSCRIBER_POLL_MS = 90_000;
 
   const els = {
     root: document.getElementById("report-root"),
@@ -38,6 +39,10 @@
     age: null,
     gender: null,
   };
+  let retentionData = null;
+  let retentionVideos = [];
+  let activeRetentionFormat = "longform";
+  let subscriberPollTimer = null;
 
   const TRAFFIC_LABELS = {
     ADVERTISING: "광고",
@@ -187,9 +192,9 @@
     return { traffic, retention, demographics };
   }
 
-  function renderKpis(kpis) {
+  function renderKpis(kpis, subscriberRaw) {
     const items = [
-      { label: "구독자 수", value: kpis.subscribers },
+      { label: "구독자 수", value: kpis.subscribers, id: "kpi-subscribers", live: true },
       { label: "총 영상 수", value: kpis.videoCount },
       { label: "최고 조회수 (최근)", value: kpis.topViews },
       { label: "최근 평균 조회수", value: kpis.recentAvgViews },
@@ -197,12 +202,63 @@
     els.kpiGrid.innerHTML = items
       .map(
         (item) => `
-      <div class="kpi">
+      <div class="kpi"${item.id ? ` id="${esc(item.id)}"` : ""}>
         <div class="kpi-label">${esc(item.label)}</div>
         <div class="kpi-value">${esc(item.value)}</div>
+        ${item.live ? '<div class="kpi-live-delta">실시간 갱신 중</div>' : ""}
       </div>`
       )
       .join("");
+    if (Number.isFinite(subscriberRaw)) {
+      startSubscriberLivePoll(subscriberRaw);
+    }
+  }
+
+  function stopSubscriberLivePoll() {
+    if (subscriberPollTimer) {
+      clearInterval(subscriberPollTimer);
+      subscriberPollTimer = null;
+    }
+  }
+
+  function updateSubscriberKpi(countText, rawCount, deltaSinceLoad) {
+    const card = document.getElementById("kpi-subscribers");
+    if (!card) return;
+    const valueEl = card.querySelector(".kpi-value");
+    const deltaEl = card.querySelector(".kpi-live-delta");
+    if (valueEl && countText && valueEl.textContent !== countText) {
+      card.classList.add("pulse-update");
+      window.setTimeout(() => card.classList.remove("pulse-update"), 700);
+      valueEl.textContent = countText;
+    }
+    if (!deltaEl) return;
+    if (deltaSinceLoad > 0) {
+      deltaEl.textContent = `+${formatNum(deltaSinceLoad)} (페이지 로드 이후)`;
+      deltaEl.className = "kpi-live-delta";
+    } else if (deltaSinceLoad < 0) {
+      deltaEl.textContent = `${formatNum(deltaSinceLoad)} (페이지 로드 이후)`;
+      deltaEl.className = "kpi-live-delta down";
+    } else {
+      deltaEl.textContent = "실시간 갱신 중";
+      deltaEl.className = "kpi-live-delta";
+    }
+  }
+
+  function startSubscriberLivePoll(initialRaw) {
+    stopSubscriberLivePoll();
+    const baseline = initialRaw;
+    async function tick() {
+      if (document.hidden) return;
+      try {
+        const ch = await apiGet("/api/dddit/youtube/channel?refresh=1");
+        const raw = Number(ch.subscriberCount);
+        if (!Number.isFinite(raw)) return;
+        updateSubscriberKpi(ch.subscriberCountText || formatNum(raw), raw, raw - baseline);
+      } catch {
+        /* ignore */
+      }
+    }
+    subscriberPollTimer = window.setInterval(tick, SUBSCRIBER_POLL_MS);
   }
 
   function renderRecentVideosChart(rows) {
@@ -344,7 +400,12 @@
         },
       },
     });
-    if (els.subscriberNote) els.subscriberNote.textContent = trend.note || "";
+    if (els.subscriberNote && trend.note) {
+      els.subscriberNote.textContent = `${trend.note} 구독자 수 KPI는 90초마다 YouTube API로 갱신됩니다 (완전 실시간 아님).`;
+    } else if (els.subscriberNote) {
+      els.subscriberNote.textContent =
+        "구독자 수 KPI는 90초마다 YouTube API로 갱신됩니다 (완전 실시간 아님).";
+    }
   }
 
   function renderInsights(items) {
@@ -476,23 +537,82 @@
     return `${parts[1]}/${parts[2]}`;
   }
 
-  function renderRetentionChart(data, videos) {
+  function retentionBlock(data, format) {
+    if (data?.formats?.[format]) return data.formats[format];
+    return data;
+  }
+
+  function formatHasRetentionData(block) {
+    if (!block) return false;
+    return Boolean(
+      (block.series || []).some((item) => (item.points || []).length) ||
+        (block.trend || []).length ||
+        (block.points || []).length ||
+        block.averageViewPercentage != null
+    );
+  }
+
+  function bindRetentionTabs(data, videos) {
+    retentionData = data;
+    retentionVideos = videos || [];
+    const tabs = document.getElementById("retention-tabs");
+    if (!tabs) return;
+
+    tabs.querySelectorAll(".retention-tab").forEach((btn) => {
+      const format = btn.dataset.format || "longform";
+      const block = retentionBlock(data, format);
+      btn.disabled = !!data?.formats && !formatHasRetentionData(block);
+      btn.classList.toggle("active", format === activeRetentionFormat);
+      btn.onclick = () => {
+        if (btn.disabled) return;
+        activeRetentionFormat = format;
+        tabs.querySelectorAll(".retention-tab").forEach((tabBtn) => {
+          tabBtn.classList.toggle("active", tabBtn === btn);
+        });
+        renderRetentionChart(retentionData, retentionVideos, format);
+      };
+    });
+
+    if (data?.formats) {
+      const activeBlock = retentionBlock(data, activeRetentionFormat);
+      if (!formatHasRetentionData(activeBlock)) {
+        const fallback = formatHasRetentionData(retentionBlock(data, "longform"))
+          ? "longform"
+          : formatHasRetentionData(retentionBlock(data, "shorts"))
+            ? "shorts"
+            : activeRetentionFormat;
+        activeRetentionFormat = fallback;
+        tabs.querySelectorAll(".retention-tab").forEach((tabBtn) => {
+          tabBtn.classList.toggle("active", tabBtn.dataset.format === fallback);
+        });
+      }
+    }
+  }
+
+  function renderRetentionChart(data, videos, format = activeRetentionFormat) {
     const ctx = document.getElementById("chart-retention");
     const labelEl = document.getElementById("retention-chart-label");
     if (!ctx) return;
 
-    const series = (data?.series || []).filter((item) => (item.points || []).length);
-    const trend = data?.trend || [];
-    const points = data?.points || [];
+    const block = retentionBlock(data, format);
+    const formatLabel = format === "shorts" ? "쇼츠" : "롱폼";
+    const series = (block?.series || []).filter((item) => (item.points || []).length);
+    const trend = block?.trend || [];
+    const points = block?.points || data?.points || [];
     const colors = ["#dc2626", "#2563eb", "#16a34a"];
+
+    if (charts.retention) {
+      charts.retention.destroy();
+      charts.retention = null;
+    }
 
     if (series.length) {
       const labels = series[0].points.map((point) => `${Math.round(point.ratio * 100)}%`);
       if (labelEl) {
         labelEl.textContent =
           series.length === 1
-            ? `시청 유지 — ${retentionVideoTitle(videos, series[0].videoId)}`
-            : `시청 유지 — 최근 28일 조회 상위 ${series.length}개 영상`;
+            ? `시청 유지 (${formatLabel}) — ${retentionVideoTitle(videos, series[0].videoId)}`
+            : `시청 유지 (${formatLabel}) — 조회 상위 ${series.length}개`;
       }
       charts.retention = new Chart(ctx, {
         type: "line",
@@ -544,7 +664,7 @@
     }
 
     if (trend.length) {
-      if (labelEl) labelEl.textContent = "일별 평균 시청률 추이 (28일)";
+      if (labelEl) labelEl.textContent = `일별 평균 시청률 (${formatLabel}, 28일)`;
       charts.retention = new Chart(ctx, {
         type: "line",
         data: {
@@ -580,8 +700,8 @@
     if (points.length) {
       if (labelEl) {
         labelEl.textContent = data?.videoId
-          ? `시청 유지 — ${retentionVideoTitle(videos, data.videoId)}`
-          : "시청 유지";
+          ? `시청 유지 (${formatLabel}) — ${retentionVideoTitle(videos, data.videoId)}`
+          : `시청 유지 (${formatLabel})`;
       }
       charts.retention = new Chart(ctx, {
         type: "line",
@@ -615,9 +735,12 @@
       return;
     }
 
-    const avg = data?.averageViewPercentage;
-    if (avg == null) return;
-    if (labelEl) labelEl.textContent = "평균 시청률 (28일)";
+    const avg = block?.averageViewPercentage ?? data?.averageViewPercentage;
+    if (avg == null) {
+      if (labelEl) labelEl.textContent = `시청 유지 (${formatLabel}) — 데이터 없음`;
+      return;
+    }
+    if (labelEl) labelEl.textContent = `평균 시청률 (${formatLabel}, 28일)`;
     charts.retention = new Chart(ctx, {
       type: "bar",
       data: {
@@ -795,6 +918,7 @@
     els.root.classList.add("hidden");
     els.error?.classList.add("hidden");
     setStatus("불러오는 중…");
+    stopSubscriberLivePoll();
     destroyCharts();
 
     try {
@@ -813,10 +937,11 @@
         els.channelLink.href = ch.channelUrl;
       }
 
-      renderKpis(overview.kpis || {});
+      renderKpis(overview.kpis || {}, overview.channel?.subscriberCount);
       renderAnalyticsOverview(overview.analytics);
       renderTrafficChart(traffic);
-      renderRetentionChart(retention, videosData.videos || []);
+      bindRetentionTabs(retention, videosData.videos || []);
+      renderRetentionChart(retention, videosData.videos || [], activeRetentionFormat);
       renderDemographicsCharts(demographics);
       renderAdsSyncStatus(overview.adsSync);
       renderRecentVideosChart(overview.recentVideosBar || []);

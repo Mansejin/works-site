@@ -276,6 +276,52 @@
     .analytics-kpi .label { font-size: 0.72rem; color: var(--text-muted); font-weight: 700; }
     .analytics-kpi .value { font-size: 1.1rem; font-weight: 700; margin-top: 4px; }
 
+    .retention-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .retention-tabs {
+      display: flex;
+      gap: 4px;
+    }
+    .retention-tab {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-family: inherit;
+    }
+    .retention-tab.active {
+      background: var(--accent-soft);
+      border-color: #93c5fd;
+      color: var(--accent);
+    }
+    .retention-tab:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .kpi-live-delta {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--success);
+      margin-top: 4px;
+    }
+    .kpi-live-delta.down { color: var(--danger); }
+    .kpi.pulse-update .kpi-value { animation: kpiPulse 0.6s ease; }
+    @keyframes kpiPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+
     .source-badge {
       display: inline-block;
       font-size: 0.68rem;
@@ -372,7 +418,13 @@
               <div class="chart-wrap short"><canvas id="chart-traffic-sources"></canvas></div>
             </div>
             <div>
-              <p id="retention-chart-label" class="video-note" style="margin-bottom:8px;">시청 유지</p>
+              <div class="retention-head">
+                <p id="retention-chart-label" class="video-note" style="margin:0;">시청 유지</p>
+                <div class="retention-tabs" id="retention-tabs">
+                  <button type="button" class="retention-tab active" data-format="longform">롱폼</button>
+                  <button type="button" class="retention-tab" data-format="shorts">쇼츠</button>
+                </div>
+              </div>
               <div class="chart-wrap"><canvas id="chart-retention"></canvas></div>
             </div>
           </div>
@@ -406,7 +458,7 @@
       <section class="card" style="margin-bottom:14px;">
         <div class="card-head">
           <h2>구독자 추이</h2>
-          <span class="status-pill" style="font-size:0.72rem;">총 구독자 vs 자연 증가</span>
+          <span class="status-pill" style="font-size:0.72rem;">총 구독자 vs 자연 증가 · 90초 갱신</span>
         </div>
         <div class="card-body">
           <div class="chart-wrap"><canvas id="chart-subscribers"></canvas></div>
@@ -482,6 +534,6 @@
     <div id="loading" class="card loading-block">보고 데이터를 불러오는 중…</div>
   </div>
 
-  <script src="js/report.js?v=10"></script>
+  <script src="js/report.js?v=11"></script>
 </body>
 </html>

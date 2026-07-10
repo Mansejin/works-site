@@ -11,6 +11,8 @@ from app.google_oauth import get_access_token
 from app.youtube_reporting import fetch_reporting_reach
 
 _ANALYTICS_BASE = "https://youtubeanalytics.googleapis.com/v2/reports"
+_CONTENT_LONGFORM = "VIDEO_ON_DEMAND"
+_CONTENT_SHORTS = "SHORTS"
 _CACHE: dict[str, Any] = {}
 _CACHE_TTL = 3600  # 1 hour
 
@@ -290,7 +292,9 @@ async def _top_videos_by_views(
     start_date: str,
     end_date: str,
     limit: int = 3,
+    content_type: str | None = None,
 ) -> list[dict[str, Any]]:
+    filters = f"creatorContentType=={content_type}" if content_type else ""
     body = await _analytics_get(
         client,
         token,
@@ -299,6 +303,7 @@ async def _top_videos_by_views(
         end_date=end_date,
         metrics="views",
         dimensions="video",
+        filters=filters,
         sort="-views",
         max_results=limit,
     )
@@ -310,6 +315,29 @@ async def _top_videos_by_views(
     ]
 
 
+async def _average_view_percentage(
+    client: httpx.AsyncClient,
+    token: str,
+    channel_id: str,
+    *,
+    start_date: str,
+    end_date: str,
+    content_type: str | None = None,
+) -> float | None:
+    filters = f"creatorContentType=={content_type}" if content_type else ""
+    body = await _analytics_get(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+        metrics="averageViewPercentage",
+        filters=filters,
+    )
+    rows = _parse_rows(body)
+    return _safe_float((rows[0] if rows else {}).get("averageViewPercentage"))
+
+
 async def _daily_average_view_trend(
     client: httpx.AsyncClient,
     token: str,
@@ -317,7 +345,9 @@ async def _daily_average_view_trend(
     *,
     start_date: str,
     end_date: str,
+    content_type: str | None = None,
 ) -> list[dict[str, Any]]:
+    filters = f"creatorContentType=={content_type}" if content_type else ""
     body = await _analytics_get(
         client,
         token,
@@ -326,6 +356,7 @@ async def _daily_average_view_trend(
         end_date=end_date,
         metrics="averageViewPercentage",
         dimensions="day",
+        filters=filters,
         sort="day",
         max_results=31,
     )
@@ -337,6 +368,69 @@ async def _daily_average_view_trend(
         if day and pct is not None:
             trend.append({"date": day, "averageViewPercentage": round(pct, 2)})
     return trend
+
+
+async def _build_retention_for_format(
+    client: httpx.AsyncClient,
+    token: str,
+    channel_id: str,
+    *,
+    start_date: str,
+    end_date: str,
+    content_type: str,
+    format_key: str,
+) -> dict[str, Any]:
+    trend = await _daily_average_view_trend(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+        content_type=content_type,
+    )
+    avg_pct = await _average_view_percentage(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+        content_type=content_type,
+    )
+    top_videos = await _top_videos_by_views(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+        limit=3,
+        content_type=content_type,
+    )
+    series: list[dict[str, Any]] = []
+    for item in top_videos:
+        video_points = await _retention_points_for_video(
+            client,
+            token,
+            channel_id,
+            item["videoId"],
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if video_points:
+            series.append(
+                {
+                    "videoId": item["videoId"],
+                    "views": item["views"],
+                    "points": video_points,
+                    "format": format_key,
+                }
+            )
+    return {
+        "format": format_key,
+        "contentType": content_type,
+        "series": series,
+        "trend": trend,
+        "averageViewPercentage": avg_pct,
+    }
 
 
 async def fetch_retention(video_id: str | None = None, refresh: bool = False) -> dict[str, Any]:
@@ -351,8 +445,10 @@ async def fetch_retention(video_id: str | None = None, refresh: bool = False) ->
 
     start_date, end_date = _date_range(28)
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             token, channel_id = await _get_token_and_channel(client)
+
+            formats: dict[str, Any] | None = None
 
             if video_id:
                 points = await _retention_points_for_video(
@@ -368,50 +464,28 @@ async def fetch_retention(video_id: str | None = None, refresh: bool = False) ->
                 trend: list[dict[str, Any]] = []
                 avg_pct = None
             else:
-                trend = await _daily_average_view_trend(
+                longform = await _build_retention_for_format(
                     client,
                     token,
                     channel_id,
                     start_date=start_date,
                     end_date=end_date,
+                    content_type=_CONTENT_LONGFORM,
+                    format_key="longform",
                 )
-                summary_body = await _analytics_get(
+                shorts = await _build_retention_for_format(
                     client,
                     token,
                     channel_id,
                     start_date=start_date,
                     end_date=end_date,
-                    metrics="averageViewPercentage",
+                    content_type=_CONTENT_SHORTS,
+                    format_key="shorts",
                 )
-                summary_rows = _parse_rows(summary_body)
-                avg_pct = _safe_float((summary_rows[0] if summary_rows else {}).get("averageViewPercentage"))
-
-                top_videos = await _top_videos_by_views(
-                    client,
-                    token,
-                    channel_id,
-                    start_date=start_date,
-                    end_date=end_date,
-                    limit=3,
-                )
-                series = []
-                for item in top_videos:
-                    video_points = await _retention_points_for_video(
-                        client,
-                        token,
-                        channel_id,
-                        item["videoId"],
-                        start_date=start_date,
-                        end_date=end_date,
-                    )
-                    if video_points:
-                        series.append(
-                            {
-                                "videoId": item["videoId"],
-                                "views": item["views"],
-                                "points": video_points,
-                            }
-                        )
+                formats = {"longform": longform, "shorts": shorts}
+                series = longform["series"]
+                trend = longform["trend"]
+                avg_pct = longform["averageViewPercentage"]
                 points = series[0]["points"] if len(series) == 1 else []
                 scope = "channel"
 
@@ -432,6 +506,7 @@ async def fetch_retention(video_id: str | None = None, refresh: bool = False) ->
                 "period": {"startDate": start_date, "endDate": end_date},
                 "points": points,
                 "series": series,
+                "formats": formats,
                 "trend": trend,
                 "averageViewPercentage": avg_pct if not video_id else None,
                 "message": None,
