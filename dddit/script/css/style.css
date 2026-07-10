@@ -496,20 +496,52 @@ textarea.prose-draft {
 .chapter-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 10px;
+  margin: 12px 0;
 }
 
 .chapter-item {
-  padding: 10px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fff;
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chapter-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
-.chapter-item .field { font-size: 0.78rem; }
+.chapter-item-num {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.chapter-item .field {
+  margin: 0;
+}
+
+.chapter-item .chapter-notes {
+  min-height: 64px;
+  resize: vertical;
+}
+
+.chapter-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.fold .chapter-add-form + .btn {
+  margin-bottom: 4px;
+}
 
 /* ── File list ── */
 .file-list {

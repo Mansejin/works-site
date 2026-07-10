@@ -328,10 +328,26 @@ function renderChapters() {
   }
   list.innerHTML = state.chapters.map((ch, i) => `
     <div class="chapter-item" data-id="${esc(ch.id)}">
-      <label>챕터 ${i + 1} 제목<input class="chapter-title" type="text" value="${esc(ch.title)}" /></label>
-      <label>메모<textarea class="chapter-notes" rows="2" placeholder="이 챕터에서 다룰 내용">${esc(ch.notes)}</textarea></label>
-      <button type="button" class="btn btn-ghost btn-sm btn-chapter-remove">삭제</button>
+      <div class="chapter-item-head">
+        <span class="chapter-item-num">챕터 ${i + 1}</span>
+        <button type="button" class="btn btn-ghost btn-sm btn-chapter-remove">삭제</button>
+      </div>
+      <label class="field">제목<input class="chapter-title" type="text" value="${esc(ch.title)}" /></label>
+      <label class="field">메모<textarea class="chapter-notes" rows="2" placeholder="이 챕터에서 다룰 내용">${esc(ch.notes)}</textarea></label>
     </div>`).join('');
+  list.querySelectorAll('.chapter-item').forEach((el) => {
+    const id = el.dataset.id;
+    el.querySelector('.chapter-title')?.addEventListener('input', (e) => {
+      const ch = state.chapters.find((c) => c.id === id);
+      if (ch) ch.title = e.target.value;
+      saveProject();
+    });
+    el.querySelector('.chapter-notes')?.addEventListener('input', (e) => {
+      const ch = state.chapters.find((c) => c.id === id);
+      if (ch) ch.notes = e.target.value;
+      saveProject();
+    });
+  });
   list.querySelectorAll('.btn-chapter-remove').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.closest('.chapter-item')?.dataset.id;
