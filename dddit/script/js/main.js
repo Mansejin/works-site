@@ -1090,10 +1090,19 @@ function getSystemRules() {
   return PM.getActiveSystemRules();
 }
 
+function getCategories() {
+  return window.DIDIDIT_CONFIG?.CATEGORIES || [];
+}
+
+function getCategory(id) {
+  const cats = getCategories();
+  return cats.find((c) => c.id === id) || cats.find((c) => c.id === 'other') || { id: 'other', name: '기타', focusHints: '' };
+}
+
 function buildProductContext() {
   const refBlock = REF?.buildReferenceContext?.(state.referenceScripts) || '';
   const adBlock = state.adMode ? (REF?.buildAdGuideContext?.(state.adGuides) || '') : '';
-  return BRIEF.buildPromptContext(state, BRIEF.getCategory(state.categoryId), refBlock, adBlock);
+  return BRIEF.buildPromptContext(state, getCategory(state.categoryId), refBlock, adBlock);
 }
 
 function esc(s) {
