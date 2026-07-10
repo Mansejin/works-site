@@ -1,6 +1,6 @@
 /**
- * 기획안(plan) ↔ 시나리오 머신 브리프 양방향 연동
- * 같은 origin localStorage 공유 (works.mansejin.com / localhost)
+ * 기획안(plan) → 시나리오 머신 런타임 변환
+ * 기획안이 SSOT. 시나리오 머신은 읽기만 함 (양방향 동기화 없음).
  */
 window.DdditPlanBriefSync = (function () {
   const PROJECT_META = {
@@ -8,14 +8,8 @@ window.DdditPlanBriefSync = (function () {
     xenics: { adBrand: '제닉스', label: 'Xenics', planPath: '/dddit/xenics/plan/' },
   };
 
-  const SCRIPT_PROJECT_PREFIX = 'dididit-project-v2';
-
   function planStorageKey(project) {
     return `works/dddit/${String(project || '').trim().toLowerCase()}/plan`;
-  }
-
-  function scriptStorageKey(project) {
-    return `${SCRIPT_PROJECT_PREFIX}-${String(project || '').trim().toLowerCase()}`;
   }
 
   function loadPlanEnvelope(project) {
@@ -30,42 +24,18 @@ window.DdditPlanBriefSync = (function () {
     }
   }
 
-  function loadScriptEnvelope(project) {
-    try {
-      const raw = localStorage.getItem(scriptStorageKey(project));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      const savedAt = parsed.savedAt ? new Date(parsed.savedAt).getTime() : 0;
-      return { savedAt, data: parsed };
-    } catch {
-      return null;
-    }
-  }
-
-  function savePlan(project, data) {
-    localStorage.setItem(
-      planStorageKey(project),
-      JSON.stringify({ updatedAt: Date.now(), data })
-    );
+  function loadPlan(project) {
+    return loadPlanEnvelope(project)?.data || null;
   }
 
   function parseStructureToChapters(structure) {
     const text = String(structure || '').trim();
     if (!text) return [];
-    const parts = text
+    return text
       .split(/\s*→\s*|\n+/)
       .map((s) => s.replace(/^[\d.)\s]+/, '').trim())
-      .filter(Boolean);
-    return parts.map((title, i) => ({
-      id: `ch-plan-${i}-${Date.now()}`,
-      title,
-      notes: '',
-    }));
-  }
-
-  function chaptersToStructure(chapters) {
-    if (!Array.isArray(chapters) || !chapters.length) return '';
-    return chapters.map((c) => c.title).filter(Boolean).join(' → ');
+      .filter(Boolean)
+      .map((title, i) => ({ id: `ch-plan-${i}`, title, notes: '' }));
   }
 
   function buildTeamBriefNotes(plan) {
@@ -81,10 +51,10 @@ window.DdditPlanBriefSync = (function () {
     return blocks.join('\n\n');
   }
 
-  function planToBriefPatch(plan, project) {
+  /** Gemini 프롬프트용 브리프 객체로 변환 */
+  function planToBriefState(plan, project) {
     const meta = PROJECT_META[project] || {};
     const contentParts = [plan.summary, plan.concept].map((s) => String(s || '').trim()).filter(Boolean);
-    const chapters = parseStructureToChapters(plan.structure);
 
     return {
       productName: String(plan.title || '').trim(),
@@ -93,6 +63,8 @@ window.DdditPlanBriefSync = (function () {
       briefSource: 'team',
       adMode: true,
       adBrand: meta.adBrand || '',
+      adToneLevel: 'balanced',
+      adDisclosure: true,
       reviewBrief: {
         thesis: String(plan.keyMessage || '').trim(),
         targetScenario: String(plan.targetAudience || '').trim(),
@@ -106,87 +78,8 @@ window.DdditPlanBriefSync = (function () {
       ]
         .filter(Boolean)
         .join('\n'),
-      chapters: chapters.length ? chapters : undefined,
+      chapters: parseStructureToChapters(plan.structure),
     };
-  }
-
-  function briefToPlanPatch(brief) {
-    const structure =
-      chaptersToStructure(brief.chapters) ||
-      extractSection(brief.teamBriefNotes, '영상 구성') ||
-      extractSection(brief.productNotes, '구성:');
-
-    return {
-      title: String(brief.productName || '').trim(),
-      summary: String(brief.contentDirection || '').split('\n\n')[0].trim(),
-      concept: String(brief.contentDirection || '').trim(),
-      keyMessage: String(brief.reviewBrief?.thesis || '').trim(),
-      targetAudience: String(brief.reviewBrief?.targetScenario || '').trim(),
-      brandMust: String(brief.reviewBrief?.mustHighlight || '').trim(),
-      brandAvoid: String(brief.reviewBrief?.carefulPoints || '').trim(),
-      structure,
-      reviewGuide: extractSection(brief.teamBriefNotes, '리뷰 가이드') || undefined,
-      notes: extractSection(brief.teamBriefNotes, '비고') || undefined,
-      tags: extractSection(brief.teamBriefNotes, '태그') || undefined,
-      descriptionDraft: extractSection(brief.teamBriefNotes, '설명란 초안') || undefined,
-      tone: extractSection(brief.teamBriefNotes, '톤앤매너') || undefined,
-    };
-  }
-
-  function extractSection(text, heading) {
-    const re = new RegExp(`##\\s*${heading}\\s*\\n([\\s\\S]*?)(?=\\n##|$)`, 'i');
-    const m = String(text || '').match(re);
-    return m ? m[1].trim() : '';
-  }
-
-  function getSyncStatus(project) {
-    const plan = loadPlanEnvelope(project);
-    const script = loadScriptEnvelope(project);
-    if (!plan && !script) return { hasPlan: false, hasScript: false, newer: null };
-    const planAt = plan?.updatedAt || 0;
-    const scriptAt = script?.savedAt || 0;
-    let newer = null;
-    if (planAt && scriptAt) newer = planAt > scriptAt ? 'plan' : scriptAt > planAt ? 'script' : 'same';
-    else if (planAt) newer = 'plan';
-    else if (scriptAt) newer = 'script';
-    return {
-      hasPlan: !!plan,
-      hasScript: !!script,
-      planUpdatedAt: planAt,
-      scriptSavedAt: scriptAt,
-      newer,
-      planTitle: plan?.data?.title || '',
-    };
-  }
-
-  function importPlanToBrief(state, project, { force = false } = {}) {
-    const envelope = loadPlanEnvelope(project);
-    if (!envelope?.data) return { ok: false, reason: 'no-plan' };
-
-    const status = getSyncStatus(project);
-    const briefEmpty = !String(state.productName || '').trim();
-    if (!force && !briefEmpty && status.newer !== 'plan') {
-      if (status.newer === 'script') return { ok: false, reason: 'script-newer', status };
-      return { ok: false, reason: 'unchanged', status };
-    }
-
-    const patch = planToBriefPatch(envelope.data, project);
-    Object.assign(state, patch);
-    if (patch.reviewBrief) state.reviewBrief = { ...state.reviewBrief, ...patch.reviewBrief };
-    if (patch.chapters?.length) state.chapters = patch.chapters;
-    return { ok: true, status, patch };
-  }
-
-  function exportBriefToPlan(project, brief) {
-    const envelope = loadPlanEnvelope(project);
-    const existing = envelope?.data || {};
-    const patch = briefToPlanPatch(brief);
-    const merged = { ...existing };
-    Object.entries(patch).forEach(([k, v]) => {
-      if (v !== undefined && v !== '') merged[k] = v;
-    });
-    savePlan(project, merged);
-    return { ok: true, data: merged };
   }
 
   function planEditUrl(project) {
@@ -195,83 +88,17 @@ window.DdditPlanBriefSync = (function () {
     return `${location.origin}${meta.planPath}`;
   }
 
-  function scriptMachineUrl(project) {
-    return `${location.origin}/dddit/script/?project=${encodeURIComponent(project)}`;
-  }
-
-  function mountPlanPageSync(project, api) {
-    const { getState, applyState, rerender } = api;
-    const status = getSyncStatus(project);
-    const page = document.querySelector('.page');
-    if (!page || !window.DdditPlanBriefSync) return;
-
-    let banner = document.getElementById('script-sync-banner');
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.id = 'script-sync-banner';
-      banner.className = 'sync-banner';
-      const nav = page.querySelector('.hub-nav');
-      if (nav?.nextSibling) page.insertBefore(banner, nav.nextSibling);
-      else page.prepend(banner);
-    }
-
-    const showPull = status.hasScript && status.newer === 'script';
-    banner.className = `sync-banner${showPull ? ' is-new' : ''}`;
-    banner.style.display = status.hasScript || status.hasPlan ? '' : 'none';
-    banner.innerHTML = `
-      <div>
-        <strong>시나리오 머신 연동</strong>
-        <p>${formatSyncHint(project)}</p>
-      </div>
-      <div class="sync-banner-actions">
-        <a class="sync-link" href="${scriptMachineUrl(project)}" target="_blank" rel="noopener">시나리오 머신</a>
-        ${showPull ? '<button type="button" class="sync-btn" id="btn-script-pull">브리프 가져오기</button>' : ''}
-      </div>`;
-
-    banner.querySelector('#btn-script-pull')?.addEventListener('click', () => {
-      const script = loadScriptEnvelope(project);
-      if (!script?.data) return;
-      const merged = { ...getState(), ...briefToPlanPatch(script.data) };
-      applyState(merged);
-      savePlan(project, merged);
-      rerender();
-      mountPlanPageSync(project, api);
-    });
-  }
-
-  function formatSyncHint(project) {
-    const status = getSyncStatus(project);
-    const meta = PROJECT_META[project];
-    if (!meta) return '프로젝트를 URL에 지정하세요 (?project=vendict)';
-    if (!status.hasPlan && !status.hasScript) {
-      return `${meta.label} 기획안을 작성하면 여기에 자동 반영됩니다.`;
-    }
-    if (status.newer === 'plan') {
-      return `기획안이 더 최신입니다 · ${status.planTitle || '제목 없음'}`;
-    }
-    if (status.newer === 'script') {
-      return '시나리오 머신 브리프가 기획안보다 최신입니다.';
-    }
-    if (status.hasPlan) {
-      return `기획안 연동됨 · ${status.planTitle || ''}`;
-    }
-    return '기획안 없음 — 브리프만 저장됨';
+  function projectLabel(project) {
+    return PROJECT_META[project]?.label || project;
   }
 
   return {
     PROJECT_META,
-    planStorageKey,
-    scriptStorageKey,
     loadPlanEnvelope,
-    loadScriptEnvelope,
-    planToBriefPatch,
-    briefToPlanPatch,
-    getSyncStatus,
-    importPlanToBrief,
-    exportBriefToPlan,
+    loadPlan,
+    planToBriefState,
     planEditUrl,
-    scriptMachineUrl,
-    mountPlanPageSync,
-    formatSyncHint,
+    projectLabel,
+    parseStructureToChapters,
   };
 })();

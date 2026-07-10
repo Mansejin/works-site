@@ -47,7 +47,7 @@
     </header>
 
     <nav class="tab-bar step-rail" aria-label="작성 단계">
-      <button class="step-rail-item tab-btn active" type="button" data-rail="1"><span>1</span> 브리프</button>
+      <button class="step-rail-item tab-btn active" type="button" data-rail="1"><span>1</span> 기획안</button>
       <button class="step-rail-item tab-btn" type="button" data-rail="2"><span>2</span> 줄글</button>
       <button class="step-rail-item tab-btn" type="button" data-rail="3"><span>3</span> 변환</button>
       <button class="step-rail-item tab-btn" type="button" data-rail="4"><span>4</span> 장면</button>
@@ -116,91 +116,28 @@
 
     <div class="layout-grid app-shell" data-page="1">
       <div class="work-column">
-        <!-- 1 브리프 -->
+        <!-- 1 기획안 (읽기 전용) -->
         <section class="block step-section step-active page-visible" data-step="1" id="step-brief">
           <div class="block-head">
-            <h2><span class="step-num-badge">1</span> 기획안 · 브리프</h2>
+            <h2><span class="step-num-badge">1</span> 기획안</h2>
             <div class="block-head-actions">
+              <a id="plan-edit-link" class="btn btn-secondary btn-sm" href="#" target="_blank" rel="noopener">기획안 편집</a>
               <button id="btn-pipeline-next-brief" class="btn btn-primary btn-sm step-next-btn" type="button" data-goto="2">다음: 줄글 →</button>
             </div>
           </div>
           <div class="block-body form-stack">
-            <div class="plan-sync-bar" id="plan-sync-bar">
-              <div class="plan-sync-text">
-                <strong>기획안 연동</strong>
-                <p id="plan-sync-hint" class="hint">같은 브라우저의 기획안과 자동 연동됩니다.</p>
-              </div>
-              <div class="btn-row plan-sync-actions">
-                <a id="plan-edit-link" class="btn btn-secondary btn-sm" href="#" target="_blank" rel="noopener">기획안 열기</a>
-                <button id="btn-plan-pull" class="btn btn-primary btn-sm" type="button">불러오기</button>
-                <button id="btn-plan-push" class="btn btn-ghost btn-sm" type="button">기획안에 반영</button>
-              </div>
-            </div>
-
-            <p class="hint">기획안을 먼저 쓰거나, 여기서 수정해도 됩니다. 둘 중 어디서 작성해도 연동됩니다.</p>
-
-            <details class="fold open" id="team-brief-panel">
-              <summary>팀 제공 자료</summary>
-              <p class="hint">본사 가이드·제원·촬영 메모 — 생성 시 최우선 반영</p>
-              <textarea id="team-brief-notes" rows="5" placeholder="팀 브리프 원문 붙여넣기…"></textarea>
-            </details>
-
-            <div class="field-row">
-              <label class="field field-required">제품명<input id="product-name" type="text" placeholder="예: LG 퓨리케어 제습기" /></label>
-              <label class="field">콘텐츠 방향<input id="content-direction" type="text" placeholder="예: 장마철 원룸 습도 체감" /></label>
-            </div>
-            <div class="field-row">
-              <label class="field">가격·라인업<input id="price-info" type="text" placeholder="출고가, 경쟁 대비" /></label>
-              <label class="field">카테고리<select id="category"></select></label>
-            </div>
+            <p class="hint">브랜드 <strong>기획안</strong>이 원본입니다. 여기서는 확인만 하고, 수정은 기획안 페이지에서 합니다.</p>
+            <div id="plan-summary" class="plan-summary"></div>
+            <p id="plan-missing" class="empty-hint hidden">기획안이 없습니다. 위 「기획안 편집」에서 작성하세요.</p>
 
             <details class="fold">
-              <summary>구조화 제원</summary>
-              <div id="spec-fields" class="field-row spec-fields"></div>
-            </details>
-
-            <details class="fold">
-              <summary>리뷰 방향</summary>
-              <label class="field">한 줄 테제<textarea id="brief-thesis" rows="2"></textarea></label>
-              <label class="field">타깃 시나리오<textarea id="brief-scenario" rows="2"></textarea></label>
+              <summary>생성 보조 (선택) · 카테고리·제원</summary>
+              <p class="hint">기획안에 없는 스펙만 보완할 때 사용합니다.</p>
               <div class="field-row">
-                <label class="field">반드시 다룰 것<textarea id="brief-must" rows="2"></textarea></label>
-                <label class="field">단점·주의<textarea id="brief-careful" rows="2"></textarea></label>
+                <label class="field">가격·라인업<input id="price-info" type="text" placeholder="출고가, 경쟁 대비" /></label>
+                <label class="field">카테고리<select id="category"></select></label>
               </div>
-              <label class="field">비교 모델<input id="brief-compare" type="text" /></label>
-            </details>
-
-            <label class="field">추가 메모<textarea id="product-notes" rows="2"></textarea></label>
-
-            <details class="fold ad-fold" id="ad-mode-panel">
-              <summary>
-                <label class="check-inline" onclick="event.stopPropagation()">
-                  <input type="checkbox" id="ad-mode" /> 광고·협찬 모드
-                </label>
-              </summary>
-              <div id="ad-mode-fields" class="form-stack hidden">
-                <div class="field-row">
-                  <label class="field">브랜드<input id="ad-brand" type="text" /></label>
-                  <label class="field">긍정 톤
-                    <select id="ad-tone-level">
-                      <option value="mild">은은</option>
-                      <option value="balanced" selected>균형</option>
-                      <option value="strong">강함</option>
-                    </select>
-                  </label>
-                </div>
-                <label class="check-inline"><input type="checkbox" id="ad-disclosure" checked /> 유료광고 표기</label>
-                <details class="fold nested">
-                  <summary>본사 가이드 · <span id="ad-guide-stats">0개</span></summary>
-                  <textarea id="ad-guide-paste" rows="3"></textarea>
-                  <div class="btn-row">
-                    <button id="btn-ad-guide-add-paste" class="btn btn-secondary btn-sm" type="button">추가</button>
-                    <label class="btn btn-secondary btn-sm file-btn">업로드<input id="ad-guide-file-input" type="file" multiple accept=".txt,.md,.docx" hidden /></label>
-                    <button id="btn-ad-guide-clear" class="btn btn-ghost btn-sm" type="button">삭제</button>
-                  </div>
-                  <ul id="ad-guide-list" class="file-list"></ul>
-                </details>
-              </div>
+              <div id="spec-fields" class="field-row spec-fields"></div>
             </details>
 
             <details class="fold">
@@ -213,6 +150,21 @@
               </div>
               <ul id="ref-file-list" class="file-list"></ul>
             </details>
+
+            <!-- plan-brief-sync / legacy hooks (hidden) -->
+            <input type="hidden" id="product-name" />
+            <textarea id="team-brief-notes" hidden></textarea>
+            <input type="hidden" id="content-direction" />
+            <textarea id="product-notes" hidden></textarea>
+            <textarea id="brief-thesis" hidden></textarea>
+            <textarea id="brief-scenario" hidden></textarea>
+            <textarea id="brief-must" hidden></textarea>
+            <textarea id="brief-careful" hidden></textarea>
+            <input type="hidden" id="brief-compare" />
+            <input type="checkbox" id="ad-mode" hidden checked />
+            <input type="hidden" id="ad-brand" />
+            <select id="ad-tone-level" hidden><option value="balanced" selected></option></select>
+            <input type="checkbox" id="ad-disclosure" hidden checked />
           </div>
         </section>
 
@@ -329,6 +281,6 @@
   <script src="../js/plan-brief-sync.js"></script>
   <script src="js/works-api.js"></script>
   <script src="js/sheet-sync.js"></script>
-  <script src="js/main.js?v=20"></script>
+  <script src="js/main.js?v=21"></script>
 </body>
 </html>

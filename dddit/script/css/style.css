@@ -789,7 +789,37 @@ body.hosted [data-local-only] { display: none !important; }
 .panel { /* noop */ }
 .hint-inline { font-weight: 400; color: var(--text-muted); font-size: 0.78rem; }
 
-/* plan ↔ brief sync bar */
+.plan-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plan-summary-row {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.plan-summary-key {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+
+.plan-summary-val {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: keep-all;
+}
+
+/* plan ↔ brief sync bar (legacy) */
 .plan-sync-bar {
   display: flex;
   flex-wrap: wrap;

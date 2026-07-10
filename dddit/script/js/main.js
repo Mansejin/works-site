@@ -1099,10 +1099,40 @@ function getCategory(id) {
   return cats.find((c) => c.id === id) || cats.find((c) => c.id === 'other') || { id: 'other', name: '기타', focusHints: '' };
 }
 
+function loadPlanData() {
+  const project = getSheetSlug();
+  if (!project || project === 'default') return null;
+  return window.DdditPlanBriefSync?.loadPlan(project) || null;
+}
+
+function getEffectiveState() {
+  const project = getSheetSlug();
+  const plan = loadPlanData();
+  const fromPlan = plan && window.DdditPlanBriefSync
+    ? window.DdditPlanBriefSync.planToBriefState(plan, project)
+    : {};
+  const chapters = state.chapters.length ? state.chapters : (fromPlan.chapters || []);
+  return {
+    ...fromPlan,
+    productSpecs: state.productSpecs,
+    priceInfo: state.priceInfo,
+    categoryId: state.categoryId,
+    referenceScripts: state.referenceScripts,
+    adGuides: state.adGuides,
+    chapters,
+  };
+}
+
+function hasPlanTitle() {
+  const plan = loadPlanData();
+  return Boolean(String(plan?.title || '').trim());
+}
+
 function buildProductContext() {
+  const effective = getEffectiveState();
   const refBlock = REF?.buildReferenceContext?.(state.referenceScripts) || '';
-  const adBlock = state.adMode ? (REF?.buildAdGuideContext?.(state.adGuides) || '') : '';
-  return BRIEF.buildPromptContext(state, getCategory(state.categoryId), refBlock, adBlock);
+  const adBlock = effective.adMode ? (REF?.buildAdGuideContext?.(state.adGuides) || '') : '';
+  return BRIEF.buildPromptContext(effective, getCategory(effective.categoryId), refBlock, adBlock);
 }
 
 function esc(s) {
@@ -1183,25 +1213,14 @@ function saveSettings() {
 
 function saveProject() {
   try {
-    syncBriefFromDOM();
+    syncSupplementsFromDOM();
     syncChaptersFromDOM();
     state.proseDraft = $('#prose-draft')?.value || state.proseDraft;
     localStorage.setItem(projectStorageKey(), JSON.stringify({
-      productName: state.productName,
-      contentDirection: state.contentDirection,
-      productNotes: state.productNotes,
       productSpecs: state.productSpecs,
-      reviewBrief: state.reviewBrief,
       priceInfo: state.priceInfo,
       categoryId: state.categoryId,
       referenceScripts: state.referenceScripts,
-      adMode: state.adMode,
-      adBrand: state.adBrand,
-      adToneLevel: state.adToneLevel,
-      adDisclosure: state.adDisclosure,
-      adGuides: state.adGuides,
-      teamBriefNotes: state.teamBriefNotes,
-      briefSource: state.briefSource,
       chapters: state.chapters,
       proseDraft: state.proseDraft,
       pipelineStep: state.pipelineStep,
@@ -1213,26 +1232,13 @@ function saveProject() {
 function loadProject() {
   try {
     const saved = JSON.parse(localStorage.getItem(projectStorageKey()) || '{}');
-    Object.assign(state, {
-      productName: saved.productName || state.productName,
-      contentDirection: saved.contentDirection || '',
-      productNotes: saved.productNotes || '',
-      priceInfo: saved.priceInfo || '',
-      categoryId: saved.categoryId || 'other',
-      productSpecs: saved.productSpecs || {},
-      reviewBrief: { ...state.reviewBrief, ...(saved.reviewBrief || {}) },
-      referenceScripts: saved.referenceScripts || [],
-      adMode: !!saved.adMode,
-      adBrand: saved.adBrand || '',
-      adToneLevel: saved.adToneLevel || 'balanced',
-      adDisclosure: saved.adDisclosure !== false,
-      adGuides: saved.adGuides || [],
-      teamBriefNotes: saved.teamBriefNotes || '',
-      briefSource: saved.briefSource || '',
-      chapters: saved.chapters || [],
-      proseDraft: saved.proseDraft || '',
-      pipelineStep: saved.pipelineStep || 1,
-    });
+    state.priceInfo = saved.priceInfo || '';
+    state.categoryId = saved.categoryId || 'other';
+    state.productSpecs = saved.productSpecs || {};
+    state.referenceScripts = saved.referenceScripts || [];
+    state.chapters = saved.chapters || [];
+    state.proseDraft = saved.proseDraft || '';
+    state.pipelineStep = saved.pipelineStep || 1;
   } catch { /* ignore */ }
 }
 
@@ -1244,57 +1250,63 @@ function loadState() {
   } catch { /* ignore */ }
 }
 
-async function importProjectSeed(project) {
-  if (!project || project === 'default') return;
-  try {
-    const res = await fetch(`data/project-seeds/${encodeURIComponent(project)}.json`, { cache: 'no-store' });
-    if (!res.ok) return;
-    const seed = await res.json();
-    if (seed.productName && !state.productName) state.productName = seed.productName;
-    if (seed.contentDirection && !state.contentDirection) state.contentDirection = seed.contentDirection;
-    if (seed.teamBriefNotes && !state.teamBriefNotes) state.teamBriefNotes = seed.teamBriefNotes;
-    if (seed.briefSource) state.briefSource = seed.briefSource;
-    if (seed.reviewBrief) state.reviewBrief = { ...state.reviewBrief, ...seed.reviewBrief };
-    if (seed.adMode) state.adMode = true;
-    if (seed.adBrand) state.adBrand = seed.adBrand;
-    if (seed.adGuides?.length) state.adGuides = seed.adGuides;
-    if (seed.categoryId) state.categoryId = seed.categoryId;
-  } catch { /* ignore */ }
+function renderPlanSummary() {
+  const project = getSheetSlug();
+  const SYNC = window.DdditPlanBriefSync;
+  const container = $('#plan-summary');
+  const missing = $('#plan-missing');
+  const link = $('#plan-edit-link');
+
+  if (link && SYNC) {
+    const url = SYNC.planEditUrl(project);
+    if (url) link.href = url;
+    link.classList.toggle('hidden', !url || project === 'default');
+  }
+
+  const plan = loadPlanData();
+  if (!plan || !container) {
+    container && (container.innerHTML = '');
+    missing?.classList.remove('hidden');
+    return;
+  }
+  missing?.classList.add('hidden');
+
+  const rows = [
+    ['제목', plan.title],
+    ['요약', plan.summary],
+    ['콘셉트', plan.concept],
+    ['핵심 메시지', plan.keyMessage],
+    ['타깃', plan.targetAudience],
+    ['톤', plan.tone],
+    ['구성', plan.structure],
+    ['필수 언급', plan.brandMust],
+    ['지양', plan.brandAvoid],
+  ].filter(([, v]) => String(v || '').trim());
+
+  container.innerHTML = rows.map(([k, v]) => `
+    <div class="plan-summary-row">
+      <span class="plan-summary-key">${esc(k)}</span>
+      <div class="plan-summary-val">${esc(v)}</div>
+    </div>`).join('');
+
+  if (!state.chapters.length && plan.structure) {
+    state.chapters = SYNC.parseStructureToChapters(plan.structure);
+  }
 }
 
 function applyBriefToDOM() {
-  $('#product-name').value = state.productName;
-  $('#content-direction').value = state.contentDirection;
-  $('#product-notes').value = state.productNotes;
+  renderPlanSummary();
   $('#price-info').value = state.priceInfo;
   $('#category').value = state.categoryId;
-  $('#brief-thesis').value = state.reviewBrief.thesis || '';
-  $('#brief-scenario').value = state.reviewBrief.targetScenario || '';
-  $('#brief-must').value = state.reviewBrief.mustHighlight || '';
-  $('#brief-careful').value = state.reviewBrief.carefulPoints || '';
-  $('#brief-compare').value = state.reviewBrief.compareWith || '';
-  $('#team-brief-notes').value = state.teamBriefNotes || '';
   $('#prose-draft').value = state.proseDraft || '';
   renderSpecFields();
   renderChapters();
-  updateAdModeUI();
   renderReferenceList();
-  renderAdGuideList();
 }
 
-function syncBriefFromDOM() {
-  state.productName = $('#product-name')?.value || '';
-  state.contentDirection = $('#content-direction')?.value || '';
-  state.productNotes = $('#product-notes')?.value || '';
+function syncSupplementsFromDOM() {
   state.priceInfo = $('#price-info')?.value || '';
-  state.teamBriefNotes = $('#team-brief-notes')?.value || '';
-  state.reviewBrief = {
-    thesis: $('#brief-thesis')?.value.trim() || '',
-    targetScenario: $('#brief-scenario')?.value.trim() || '',
-    mustHighlight: $('#brief-must')?.value.trim() || '',
-    carefulPoints: $('#brief-careful')?.value.trim() || '',
-    compareWith: $('#brief-compare')?.value.trim() || '',
-  };
+  state.categoryId = $('#category')?.value || state.categoryId;
 }
 
 function syncChaptersFromDOM() {
@@ -1376,109 +1388,48 @@ function navigatePipeline(step) {
   document.querySelector('.step-section.step-active')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function updatePlanSyncUI() {
-  const SYNC = window.DdditPlanBriefSync;
-  const bar = $('#plan-sync-bar');
-  const hint = $('#plan-sync-hint');
-  const link = $('#plan-edit-link');
-  const project = getSheetSlug();
-  if (!SYNC || project === 'default') {
-    bar?.classList.add('hidden');
-    return;
-  }
-  bar?.classList.remove('hidden');
-  const status = SYNC.getSyncStatus(project);
-  if (hint) hint.textContent = SYNC.formatSyncHint(project);
-  bar?.classList.toggle('is-script-newer', status.newer === 'script');
-  const planUrl = SYNC.planEditUrl(project);
-  if (link && planUrl) link.href = planUrl;
-}
-
-function pullPlanToBrief(force = false) {
-  const SYNC = window.DdditPlanBriefSync;
-  const project = getSheetSlug();
-  if (!SYNC || project === 'default') return showToast('프로젝트 URL에 ?project= 를 지정하세요.', true);
-  syncBriefFromDOM();
-  const result = SYNC.importPlanToBrief(state, project, { force });
-  if (!result.ok) {
-    if (result.reason === 'script-newer') {
-      showToast('브리프가 더 최신입니다. 덮어쓰려면 다시 누르세요.', true);
-      if (!force) {
-        setTimeout(() => {
-          if (confirm('기획안 내용으로 브리프를 덮어쓸까요?')) pullPlanToBrief(true);
-        }, 0);
-      }
-      return;
-    }
-    return showToast('불러올 기획안이 없습니다. 기획안 페이지에서 먼저 작성하세요.', true);
-  }
-  applyBriefToDOM();
-  saveProject();
-  updatePlanSyncUI();
-  updatePipelineUI();
-  showToast('기획안을 불러왔습니다.');
-}
-
-function pushBriefToPlan() {
-  const SYNC = window.DdditPlanBriefSync;
-  const project = getSheetSlug();
-  if (!SYNC || project === 'default') return showToast('프로젝트 URL에 ?project= 를 지정하세요.', true);
-  syncBriefFromDOM();
-  SYNC.exportBriefToPlan(project, state);
-  saveProject();
-  updatePlanSyncUI();
-  showToast('기획안에 반영했습니다.');
-}
-
-function autoSyncPlanOnBoot() {
-  const SYNC = window.DdditPlanBriefSync;
-  const project = getSheetSlug();
-  if (!SYNC || project === 'default') return;
-  const result = SYNC.importPlanToBrief(state, project);
-  if (result.ok) {
-    state.briefSource = 'team';
-    return true;
-  }
-  return false;
-}
-
 function updatePipelineUI() {
-  const labels = ['', '브리프', '줄글 초안', '시트 변환', '장면·사이즈', '자막·공유'];
+  const labels = ['', '기획안', '줄글 초안', '시트 변환', '장면·사이즈', '자막·공유'];
   const hints = [
     '',
-    '제품명·브리프 입력 후 줄글 단계로',
+    '기획안 확인 후 줄글 단계로',
     '챕터 지정 후 AI 생성, 또는 직접 작성',
     '줄글을 5열 대본으로 변환',
     '장면·사이즈 열 자동 생성',
     '자막·코멘트 추가 후 시트 전송',
   ];
+  const effective = getEffectiveState();
   const stage = $('#pipeline-stage-label');
   if (stage) stage.textContent = labels[state.pipelineStep] || '';
   const toolbarHint = $('#toolbar-stage-hint');
   if (toolbarHint) toolbarHint.textContent = hints[state.pipelineStep] || '';
   const productEl = $('#header-product');
   if (productEl) {
-    const name = state.productName.trim();
+    const name = String(effective.productName || '').trim();
     productEl.textContent = name;
     productEl.classList.toggle('hidden', !name);
   }
   $('#btn-pipeline-prev')?.toggleAttribute('disabled', state.pipelineStep <= 1);
   $('#btn-pipeline-next')?.toggleAttribute('disabled', state.pipelineStep >= 5);
-  $('#btn-gen-prose')?.toggleAttribute('disabled', !isApiReady() || !state.productName.trim());
+  const ready = hasPlanTitle();
+  $('#btn-gen-prose')?.toggleAttribute('disabled', !isApiReady() || !ready);
   $('#btn-convert-sheet')?.toggleAttribute('disabled', !isApiReady() || !state.proseDraft.trim());
   $('#btn-add-scenes')?.toggleAttribute('disabled', !isApiReady() || !state.allRows.length);
   $('#btn-add-captions')?.toggleAttribute('disabled', !isApiReady() || !state.allRows.length);
+  if (state.pipelineStep === 1) renderPlanSummary();
 }
 
 async function runProseDraft() {
-  if (!requireApiReady() || !state.productName.trim()) return showToast('제품명을 입력하세요.', true);
-  syncBriefFromDOM();
+  if (!requireApiReady()) return;
+  if (!hasPlanTitle()) return showToast('기획안에 제목을 입력하세요.', true);
+  syncSupplementsFromDOM();
   syncChaptersFromDOM();
+  const effective = getEffectiveState();
   const ctx = buildProductContext();
   setLoading(true, '줄글 초안 작성 중…');
   try {
     let prose = '';
-    const chapters = state.chapters.length ? state.chapters : [{ title: '전체', notes: state.contentDirection }];
+    const chapters = state.chapters.length ? state.chapters : [{ title: '전체', notes: effective.contentDirection }];
     for (let i = 0; i < chapters.length; i++) {
       setLoading(true, `줄글 작성 중… (${i + 1}/${chapters.length})`);
       const prompt = PIPE.buildProsePrompt(ctx, chapters[i], i, chapters.length) +
@@ -1835,24 +1786,14 @@ function bindEvents() {
   });
   $('#btn-sheet-open')?.addEventListener('click', openSheetUrl);
   $('#btn-sheet-open-inline')?.addEventListener('click', openSheetUrl);
-  $('#product-name')?.addEventListener('input', (e) => { state.productName = e.target.value; saveProject(); updatePipelineUI(); });
   $('#prose-draft')?.addEventListener('input', (e) => { state.proseDraft = e.target.value; saveProject(); updatePipelineUI(); });
-  $('#ad-mode')?.addEventListener('change', (e) => { state.adMode = e.target.checked; updateAdModeUI(); saveProject(); });
-  $('#ad-brand')?.addEventListener('input', (e) => { state.adBrand = e.target.value; saveProject(); });
-  $('#ad-tone-level')?.addEventListener('change', (e) => { state.adToneLevel = e.target.value; saveProject(); });
-  $('#ad-disclosure')?.addEventListener('change', (e) => { state.adDisclosure = e.target.checked; saveProject(); });
+  $('#price-info')?.addEventListener('input', (e) => { state.priceInfo = e.target.value; saveProject(); });
   $('#category')?.addEventListener('change', (e) => { state.categoryId = e.target.value; renderSpecFields(); saveProject(); });
   $('#api-key')?.addEventListener('input', (e) => { state.apiKey = e.target.value.trim(); saveSettings(); updatePipelineUI(); });
   $('#model-pro')?.addEventListener('change', (e) => { state.modelPro = e.target.value; saveSettings(); });
   $('#btn-ref-add-paste')?.addEventListener('click', addReferenceFromPaste);
   $('#ref-file-input')?.addEventListener('change', (e) => addReferenceFiles(e.target.files));
   $('#btn-ref-clear')?.addEventListener('click', clearReferences);
-  $('#btn-ad-guide-add-paste')?.addEventListener('click', addAdGuideFromPaste);
-  $('#ad-guide-file-input')?.addEventListener('change', (e) => addAdGuideFiles(e.target.files));
-  $('#btn-ad-guide-clear')?.addEventListener('click', clearAdGuides);
-  $('#btn-plan-pull')?.addEventListener('click', () => pullPlanToBrief(false));
-  $('#btn-plan-push')?.addEventListener('click', pushBriefToPlan);
-  $('#team-brief-notes')?.addEventListener('input', () => { saveProject(); updatePlanSyncUI(); });
   bindDrawerPanels();
 }
 
@@ -1876,12 +1817,9 @@ async function boot() {
     LOG?.updateBadge?.();
     loadState();
     loadProject();
-    const planImported = autoSyncPlanOnBoot();
-    await importProjectSeed(getSheetSlug());
     syncModelSelect();
     renderCategoryOptions();
     applyBriefToDOM();
-    if (planImported) showToast('기획안에서 브리프를 불러왔습니다.');
     $('#api-key').value = state.apiKey;
     bindEvents();
     if (window.DdditWorksApi?.isBackendMode?.()) await window.DdditWorksApi.loadConfig().catch(() => null);
@@ -1889,7 +1827,6 @@ async function boot() {
     await initPromptOnBoot();
     navigatePipeline(state.pipelineStep || 1);
     renderTable();
-    updatePlanSyncUI();
     if (!isApiReady() && !window.DdditWorksApi?.isBackendMode?.()) {
       $('#settings-panel')?.classList.remove('collapsed');
     }
