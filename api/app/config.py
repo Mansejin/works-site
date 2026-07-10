@@ -18,22 +18,53 @@ def gemini_api_key() -> str:
     return key
 
 
-def sheet_api_url() -> str:
+def sheet_open_url() -> str:
+    return os.getenv("DDDIT_SHEET_OPEN_URL", "").strip()
+
+
+def apps_script_sheet_config() -> tuple[str, str] | None:
     url = os.getenv("DDDIT_SHEET_API_URL", "").strip().rstrip("/")
-    if not url:
+    token = os.getenv("DDDIT_SHEET_API_TOKEN", "").strip()
+    if url and token:
+        return url, token
+    return None
+
+
+def sheet_api_url() -> str:
+    cfg = apps_script_sheet_config()
+    if not cfg:
         raise RuntimeError("DDDIT_SHEET_API_URL is not set")
-    return url
+    return cfg[0]
 
 
 def sheet_api_token() -> str:
-    token = os.getenv("DDDIT_SHEET_API_TOKEN", "").strip()
-    if not token:
+    cfg = apps_script_sheet_config()
+    if not cfg:
         raise RuntimeError("DDDIT_SHEET_API_TOKEN is not set")
-    return token
+    return cfg[1]
 
 
-def sheet_open_url() -> str:
-    return os.getenv("DDDIT_SHEET_OPEN_URL", "").strip()
+def sheets_oauth_config() -> dict[str, str] | None:
+    client_id = (
+        os.getenv("DDDIT_SHEETS_OAUTH_CLIENT_ID", "").strip()
+        or os.getenv("YOUTUBE_OAUTH_CLIENT_ID", "").strip()
+    )
+    client_secret = (
+        os.getenv("DDDIT_SHEETS_OAUTH_CLIENT_SECRET", "").strip()
+        or os.getenv("YOUTUBE_OAUTH_CLIENT_SECRET", "").strip()
+    )
+    refresh_token = os.getenv("DDDIT_SHEETS_OAUTH_REFRESH_TOKEN", "").strip()
+    if not all([client_id, client_secret, refresh_token]):
+        return None
+    return {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token,
+    }
+
+
+def sheets_drive_folder_id() -> str:
+    return os.getenv("DDDIT_SHEETS_DRIVE_FOLDER_ID", "").strip()
 
 
 def youtube_api_key() -> str:

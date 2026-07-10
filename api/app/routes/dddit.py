@@ -6,13 +6,20 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from app.config import gemini_api_key, sheet_api_token, sheet_api_url, sheet_open_url
+from app.config import apps_script_sheet_config, gemini_api_key, sheet_open_url
+from app.google_sheets_conti import (
+    native_sheet_append,
+    native_sheet_ensure,
+    native_sheet_get,
+    native_sheet_meta,
+    native_sheet_replace,
+    sheets_native_configured,
+)
 
 router = APIRouter(prefix="/api/dddit", tags=["dddit"])
 
 SHEET_TIMEOUT = 60.0
 GEMINI_TIMEOUT = 180.0
-# Sheet proxy: Apps Script web app (DDDIT_SHEET_API_URL in NAS .env)
 
 
 class SheetRowsBody(BaseModel):
@@ -20,35 +27,53 @@ class SheetRowsBody(BaseModel):
     rows: list[dict[str, Any]] = Field(default_factory=list)
 
 
+def _sheet_backend() -> str:
+    if sheets_native_configured():
+        return "google-api"
+    if apps_script_sheet_config():
+        return "apps-script"
+    return "none"
+
+
 @router.get("/config")
 def dddit_config() -> dict[str, Any]:
+    backend = _sheet_backend()
     return {
         "ok": True,
         "backend": True,
         "gemini": True,
-        "sheet": True,
+        "sheet": backend != "none",
+        "sheetBackend": backend,
         "sheetOpenUrl": sheet_open_url() or None,
     }
 
 
 @router.get("/sheet/meta")
 async def sheet_meta() -> dict[str, Any]:
-    return await _sheet_request("GET", {"action": "meta"})
+    if sheets_native_configured():
+        return await native_sheet_meta()
+    return await _apps_script_request("GET", {"action": "meta"})
 
 
 @router.get("/sheet/ensure")
 async def sheet_ensure(project: str = "default") -> dict[str, Any]:
-    return await _sheet_request("GET", {"action": "ensure", "project": project})
+    if sheets_native_configured():
+        return await native_sheet_ensure(project)
+    return await _apps_script_request("GET", {"action": "ensure", "project": project})
 
 
 @router.get("/sheet/get")
 async def sheet_get(project: str = "default") -> dict[str, Any]:
-    return await _sheet_request("GET", {"action": "get", "project": project})
+    if sheets_native_configured():
+        return await native_sheet_get(project)
+    return await _apps_script_request("GET", {"action": "get", "project": project})
 
 
 @router.post("/sheet/replace")
 async def sheet_replace(body: SheetRowsBody) -> dict[str, Any]:
-    return await _sheet_request(
+    if sheets_native_configured():
+        return await native_sheet_replace(body.project, body.rows)
+    return await _apps_script_request(
         "POST",
         {"action": "replace"},
         {"project": body.project, "rows": body.rows},
@@ -57,20 +82,30 @@ async def sheet_replace(body: SheetRowsBody) -> dict[str, Any]:
 
 @router.post("/sheet/append")
 async def sheet_append(body: SheetRowsBody) -> dict[str, Any]:
-    return await _sheet_request(
+    if sheets_native_configured():
+        return await native_sheet_append(body.project, body.rows)
+    return await _apps_script_request(
         "POST",
         {"action": "append"},
         {"project": body.project, "rows": body.rows},
     )
 
 
-async def _sheet_request(
+async def _apps_script_request(
     method: str,
     params: dict[str, str],
     json_body: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    token = sheet_api_token()
-    url = sheet_api_url()
+    cfg = apps_script_sheet_config()
+    if not cfg:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Sheet API not configured. Set DDDIT_SHEETS_OAUTH_REFRESH_TOKEN "
+                "(Google Sheets API) or DDDIT_SHEET_API_URL (Apps Script)."
+            ),
+        )
+    url, token = cfg
     query = {**params, "token": token}
 
     try:

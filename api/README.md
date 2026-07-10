@@ -27,9 +27,12 @@ nano .env
 | 변수 | 설명 |
 |------|------|
 | `GEMINI_API_KEY` | 팀 공용 Gemini 키 |
-| `DDDIT_SHEET_API_URL` | Apps Script 웹 앱 URL (`.../exec`) |
-| `DDDIT_SHEET_API_TOKEN` | Apps Script 스크립트 속성 `API_TOKEN`과 동일 |
-| `DDDIT_SHEET_OPEN_URL` | 팀 공유 스프레드시트 URL |
+| `DDDIT_SHEET_API_URL` | (레거시) Apps Script 웹 앱 URL |
+| `DDDIT_SHEET_API_TOKEN` | (레거시) Apps Script 토큰 |
+| `DDDIT_SHEETS_OAUTH_REFRESH_TOKEN` | **권장** Google Sheets API refresh token |
+| `DDDIT_SHEETS_DRIVE_FOLDER_ID` | 콘티 시트 저장 Drive 폴더 ID |
+
+콘티 시트 연동: **[docs/sheets-oauth.md](docs/sheets-oauth.md)** (Apps Script 웹앱 없이 NAS에서 직접)
 | `YOUTUBE_API_KEY` | YouTube Data API v3 키 (구독자·조회수) |
 | `YOUTUBE_CHANNEL_HANDLE` | 채널 핸들 (기본 `DD-DIT`) |
 | `YOUTUBE_CHANNEL_ID` | 채널 ID (`UC…`, Analytics·OAuth 필수) |
