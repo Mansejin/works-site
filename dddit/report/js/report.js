@@ -2,6 +2,8 @@
   const IS_WEB_HOSTED =
     location.protocol === "https:" && /^works\.mansejin\.com$/i.test(location.hostname);
   const API_BASE = IS_WEB_HOSTED ? "https://works-api.mansejin.com" : "http://localhost:8788";
+  const REFRESH_CACHE_KEY = "works/dddit/report/lastApiRefresh";
+  const REFRESH_TTL_MS = 24 * 60 * 60 * 1000;
 
   const els = {
     root: document.getElementById("report-root"),
@@ -64,6 +66,44 @@
   };
 
   const GENDER_LABELS = { female: "여성", male: "남성", user_specified: "기타" };
+
+  function readLastApiRefresh() {
+    try {
+      const ts = Number(localStorage.getItem(REFRESH_CACHE_KEY));
+      return Number.isFinite(ts) && ts > 0 ? ts : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function shouldAutoRefresh() {
+    const last = readLastApiRefresh();
+    if (!last) return true;
+    return Date.now() - last >= REFRESH_TTL_MS;
+  }
+
+  function markApiRefreshed() {
+    try {
+      localStorage.setItem(REFRESH_CACHE_KEY, String(Date.now()));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function formatCacheAge(ms) {
+    const hours = Math.floor(ms / (60 * 60 * 1000));
+    if (hours >= 24) return `${Math.floor(hours / 24)}일 전`;
+    if (hours >= 1) return `${hours}시간 전`;
+    const minutes = Math.max(1, Math.floor(ms / (60 * 1000)));
+    return `${minutes}분 전`;
+  }
+
+  function cacheStatusText() {
+    const last = readLastApiRefresh();
+    if (!last) return "캐시 없음 · 데이터 갱신으로 API 요청";
+    const age = formatCacheAge(Date.now() - last);
+    return `캐시 (${age} 갱신) · 데이터 갱신 시 API 재요청`;
+  }
 
   function esc(value) {
     return String(value ?? "")
@@ -595,7 +635,7 @@
       snapshots: snapshotsPayload.snapshots || [],
       viewsTrend7d: snapshotsPayload.viewsTrend7d || [],
     });
-    els.saveStatus.textContent = "저장됨 · 새로고침 권장";
+    els.saveStatus.textContent = "저장됨 · 데이터 갱신 권장";
     els.saveStatus.className = "status-pill ok";
   }
 
@@ -647,14 +687,22 @@
 
       els.loading.classList.add("hidden");
       els.root.classList.remove("hidden");
-      setStatus("업데이트됨", "ok");
+      if (refresh) {
+        markApiRefreshed();
+        setStatus("API 갱신됨", "ok");
+      } else {
+        setStatus(cacheStatusText(), "");
+      }
     } catch (err) {
       els.loading.classList.add("hidden");
       showError(err.message || String(err));
     }
   }
 
-  document.getElementById("btn-refresh")?.addEventListener("click", () => loadReport(true));
+  document.getElementById("btn-refresh")?.addEventListener("click", () => {
+    setStatus("API 요청 중…");
+    loadReport(true);
+  });
   document.getElementById("btn-ads-sync")?.addEventListener("click", async () => {
     try {
       setStatus("Ads 동기화 중…");
@@ -682,5 +730,5 @@
     }
   });
 
-  loadReport(false);
+  loadReport(shouldAutoRefresh());
 })();
