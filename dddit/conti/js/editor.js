@@ -52,6 +52,8 @@ const MIN_COL_WIDTH = 56;
 const contiTable = document.getElementById("conti-table");
 let colResizeReady = false;
 let activeColResize = null;
+let composing = false;
+let pendingRender = false;
 
 function esc(value) {
   return String(value ?? "")
@@ -201,10 +203,80 @@ function plainRows() {
   return rows;
 }
 
+function isEditing() {
+  const el = document.activeElement;
+  if (!el) return false;
+  if (el === titleInput) return true;
+  return el.classList?.contains("cell-edit");
+}
+
+function flushPendingRender() {
+  if (suppressRender || composing || isEditing()) return;
+  if (!pendingRender) return;
+  pendingRender = false;
+  renderTable();
+}
+
 function scheduleRender() {
   if (suppressRender) return;
+  if (composing || isEditing()) {
+    pendingRender = true;
+    return;
+  }
   clearTimeout(renderTimer);
-  renderTimer = setTimeout(() => renderTable(), 60);
+  renderTimer = setTimeout(() => {
+    pendingRender = false;
+    renderTable();
+  }, 60);
+}
+
+function cellCoords(el) {
+  const tr = el?.closest("tr");
+  if (!tr) return null;
+  const index = Number(tr.dataset.index);
+  const field = el.dataset.field;
+  if (!Number.isFinite(index) || !field) return null;
+  return { index, field };
+}
+
+function commitCellFromElement(el) {
+  if (!ydoc || !yRows) return;
+  const coords = cellCoords(el);
+  if (!coords) return;
+  const yMap = yRows.get(coords.index);
+  if (!(yMap instanceof Y.Map)) return;
+  const value = el.value;
+  if ((yMap.get(coords.field) || "") === value) return;
+  ydoc.transact(() => {
+    yMap.set(coords.field, value);
+  });
+}
+
+function commitTitle() {
+  if (!yTitle || !ydoc) return;
+  const value = titleInput.value;
+  if (yTitle.toString() === value) return;
+  ydoc.transact(() => {
+    yTitle.delete(0, yTitle.length);
+    yTitle.insert(0, value);
+  });
+}
+
+function bindCellEditors() {
+  tbody.querySelectorAll(".cell-edit").forEach((el) => {
+    el.addEventListener("compositionstart", () => {
+      composing = true;
+    });
+    el.addEventListener("compositionend", (event) => {
+      composing = false;
+      commitCellFromElement(event.target);
+      flushPendingRender();
+    });
+    el.addEventListener("blur", (event) => {
+      commitCellFromElement(event.target);
+      queueMicrotask(flushPendingRender);
+    });
+  });
 }
 
 function renderTable() {
@@ -228,9 +300,7 @@ function renderTable() {
     )
     .join("");
 
-  tbody.querySelectorAll(".cell-edit").forEach((el) => {
-    el.addEventListener("input", onCellInput);
-  });
+  bindCellEditors();
 
   tbody.querySelectorAll('input[name="row-select"]').forEach((el) => {
     el.addEventListener("change", (event) => {
@@ -244,22 +314,6 @@ function renderTable() {
 
   restoreFocus(focusRef);
   updateStatusLine();
-}
-
-function onCellInput(event) {
-  const tr = event.target.closest("tr");
-  const index = Number(tr.dataset.index);
-  const field = event.target.dataset.field;
-  if (!Number.isFinite(index) || !field) return;
-
-  const yMap = yRows.get(index);
-  if (!(yMap instanceof Y.Map)) return;
-  const value = event.target.value;
-  if ((yMap.get(field) || "") === value) return;
-
-  ydoc.transact(() => {
-    yMap.set(field, value);
-  });
 }
 
 function ensureAtLeastOneRow() {
@@ -462,14 +516,17 @@ btnCopyShare.addEventListener("click", async () => {
   }
 });
 
-titleInput.addEventListener("input", () => {
-  if (!yTitle || !ydoc) return;
-  const value = titleInput.value;
-  if (yTitle.toString() === value) return;
-  ydoc.transact(() => {
-    yTitle.delete(0, yTitle.length);
-    yTitle.insert(0, value);
-  });
+titleInput.addEventListener("compositionstart", () => {
+  composing = true;
+});
+titleInput.addEventListener("compositionend", () => {
+  composing = false;
+  commitTitle();
+  flushPendingRender();
+});
+titleInput.addEventListener("blur", () => {
+  commitTitle();
+  queueMicrotask(flushPendingRender);
 });
 
 async function init() {
