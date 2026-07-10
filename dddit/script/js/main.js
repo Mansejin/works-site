@@ -1364,24 +1364,35 @@ function navigatePipeline(step) {
   document.querySelector('.app-shell')?.classList.toggle('page-preview', state.pipelineStep >= 2);
   updatePipelineUI();
   saveProject();
+  document.querySelector('.step-section.step-active')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function updatePipelineUI() {
-  const stage = $('#pipeline-stage-label');
   const labels = ['', '브리프', '줄글 초안', '시트 변환', '장면·사이즈', '자막·공유'];
+  const hints = [
+    '',
+    '제품명·브리프 입력 후 줄글 단계로',
+    '챕터 지정 후 AI 생성, 또는 직접 작성',
+    '줄글을 5열 대본으로 변환',
+    '장면·사이즈 열 자동 생성',
+    '자막·코멘트 추가 후 시트 전송',
+  ];
+  const stage = $('#pipeline-stage-label');
   if (stage) stage.textContent = labels[state.pipelineStep] || '';
+  const toolbarHint = $('#toolbar-stage-hint');
+  if (toolbarHint) toolbarHint.textContent = hints[state.pipelineStep] || '';
+  const productEl = $('#header-product');
+  if (productEl) {
+    const name = state.productName.trim();
+    productEl.textContent = name;
+    productEl.classList.toggle('hidden', !name);
+  }
   $('#btn-pipeline-prev')?.toggleAttribute('disabled', state.pipelineStep <= 1);
   $('#btn-pipeline-next')?.toggleAttribute('disabled', state.pipelineStep >= 5);
   $('#btn-gen-prose')?.toggleAttribute('disabled', !isApiReady() || !state.productName.trim());
   $('#btn-convert-sheet')?.toggleAttribute('disabled', !isApiReady() || !state.proseDraft.trim());
   $('#btn-add-scenes')?.toggleAttribute('disabled', !isApiReady() || !state.allRows.length);
   $('#btn-add-captions')?.toggleAttribute('disabled', !isApiReady() || !state.allRows.length);
-
-  const step = state.pipelineStep;
-  $('#btn-gen-prose')?.toggleAttribute('hidden', step !== 2);
-  $('#btn-convert-sheet')?.toggleAttribute('hidden', step !== 3);
-  $('#btn-add-scenes')?.toggleAttribute('hidden', step !== 4);
-  $('#btn-add-captions')?.toggleAttribute('hidden', step !== 5);
 }
 
 async function runProseDraft() {
@@ -1523,7 +1534,7 @@ function rememberSheetUrl(project, url) {
     state.sheetOpenUrl = url;
     const bar = $('#sheet-link-bar');
     const link = $('#sheet-open-link');
-    if (bar && link) { bar.hidden = false; link.href = url; link.textContent = '콘티 시트 열기'; }
+    if (bar && link) { bar.classList.remove('hidden'); link.href = url; link.textContent = '시트 열기'; }
   } catch { /* ignore */ }
 }
 
@@ -1581,9 +1592,13 @@ async function initSheetIntegration() {
 /* ── Ad / ref UI (minimal) ── */
 function updateAdModeUI() {
   $('#ad-mode').checked = state.adMode;
-  $('#ad-mode-fields')?.classList.toggle('hidden', !state.adMode);
+  const fields = $('#ad-mode-fields');
+  fields?.classList.toggle('hidden', !state.adMode);
+  if (state.adMode) document.querySelector('#ad-mode-panel')?.setAttribute('open', '');
   $('#ad-mode-badge')?.classList.toggle('hidden', !state.adMode);
   $('#ad-brand').value = state.adBrand || '';
+  $('#ad-tone-level').value = state.adToneLevel || 'balanced';
+  $('#ad-disclosure').checked = state.adDisclosure !== false;
 }
 
 function renderReferenceList() {
@@ -1737,6 +1752,11 @@ function bindEvents() {
   $('#btn-sheet-push')?.addEventListener('click', pushToSheet);
   $('#btn-sheet-push-inline')?.addEventListener('click', pushToSheet);
   $('#btn-sheet-pull')?.addEventListener('click', pullFromSheet);
+  $('#btn-sheet-pull-inline')?.addEventListener('click', pullFromSheet);
+  $('#btn-pipeline-next-brief')?.addEventListener('click', () => navigatePipeline(2));
+  document.querySelectorAll('[data-goto]').forEach((btn) => {
+    btn.addEventListener('click', () => navigatePipeline(Number(btn.dataset.goto)));
+  });
   $('#btn-sheet-open')?.addEventListener('click', openSheetUrl);
   $('#btn-sheet-open-inline')?.addEventListener('click', openSheetUrl);
   $('#product-name')?.addEventListener('input', (e) => { state.productName = e.target.value; saveProject(); updatePipelineUI(); });
