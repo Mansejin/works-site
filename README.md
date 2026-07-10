@@ -7,6 +7,7 @@
 - 시나리오 머신: https://works.mansejin.com/dddit/script/
 - Xenics 프로젝트: https://works.mansejin.com/dddit/xenics/
 - Xenics 콘티: https://works.mansejin.com/dddit/script/?project=xenics
+- 로지텍G 납품 일정: https://works.mansejin.com/logitechG/schedule/
 
 ## 경로 구조
 

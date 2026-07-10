@@ -1,0 +1,171 @@
+body {
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  background: #f8fafc;
+  color: #1e293b;
+  margin: 0;
+  padding: 24px 16px 48px;
+}
+
+.page-header {
+  max-width: 900px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.page-header h1 {
+  font-size: 1.35rem;
+  margin: 0 0 6px;
+}
+
+.subtitle {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.sync-status {
+  font-size: 0.8rem;
+  color: #64748b;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.sync-status.is-live {
+  color: #15803d;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.sync-status.is-offline {
+  color: #b45309;
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.calendar-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.month-title {
+  font-size: 20px;
+  font-weight: bold;
+  margin: 20px 0 10px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: #fff;
+}
+
+th,
+td {
+  border: 1px solid #ccc;
+  text-align: left;
+  vertical-align: top;
+  padding: 5px;
+  height: 80px;
+}
+
+th {
+  background-color: #f4f4f4;
+  text-align: center;
+  height: 30px;
+  vertical-align: middle;
+}
+
+.sun {
+  color: #d9534f;
+}
+
+.sat {
+  color: #5bc0de;
+}
+
+.date-num {
+  font-weight: bold;
+  margin-bottom: 5px;
+  display: block;
+  pointer-events: none;
+}
+
+.event {
+  color: #333;
+  font-size: 12px;
+  padding: 4px;
+  margin-top: 2px;
+  border-radius: 3px;
+  line-height: 1.4;
+  word-break: keep-all;
+  cursor: grab;
+  user-select: none;
+}
+
+.event:active {
+  cursor: grabbing;
+}
+
+.event-global {
+  background-color: #d9edf7;
+  border-left: 3px solid #31708f;
+}
+
+.event-main {
+  background-color: #e2f0d9;
+  border-left: 3px solid #5cb85c;
+}
+
+.event-pgpick {
+  background-color: #fcf8e3;
+  border-left: 3px solid #f0ad4e;
+}
+
+.event-sub {
+  background-color: #e1bee7;
+  border-left: 3px solid #8e24aa;
+}
+
+.event-making {
+  background-color: #f2dede;
+  border-left: 3px solid #d9534f;
+}
+
+.empty {
+  background-color: #fafafa;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+td.drop-target {
+  outline: 2px dashed #94a3b8;
+  outline-offset: -2px;
+}
