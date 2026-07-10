@@ -1,14 +1,15 @@
 {
+  "_comment": "브랜드 포털(dddit/{slug}/)은 광고주 공유용. 시나리오 머신(script/) 링크 금지 — 허브 채널 도구에서만 접근.",
   "xenics": {
     "name": "Xenics",
     "brand": "제닉스",
     "sheetProject": "xenics",
-    "publicScriptPath": "/dddit/script/?project=xenics"
+    "portalLinks": ["plan/", "conti/", "productlist/"]
   },
   "vendict": {
     "name": "벤딕트 실버라이닝 퓨어 PRO",
     "brand": "벤딕트",
     "sheetProject": "vendict",
-    "publicScriptPath": "/dddit/script/?project=vendict"
+    "portalLinks": ["plan/", "conti/", "productlist/"]
   }
 }

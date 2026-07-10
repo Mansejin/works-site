@@ -13,6 +13,7 @@
       status: "진행 중",
       summary: "데스크 세팅 콘텐츠 · 협찬 제품 리스트",
       contiPath: "conti/?project=xenics",
+      // script machine: hub CHANNEL_TOOLS only — never on brand portal pages
     },
     {
       id: "vendict",

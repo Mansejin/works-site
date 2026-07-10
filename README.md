@@ -8,7 +8,7 @@
 - Xenics 프로젝트: https://works.mansejin.com/dddit/xenics/
 - Xenics 콘티: https://works.mansejin.com/dddit/script/?project=xenics
 - 벤딕트 프로젝트: https://works.mansejin.com/dddit/vendict/
-- 벤딕트 시나리오: https://works.mansejin.com/dddit/script/?project=vendict
+- (내부) 벤딕트 시나리오: https://works.mansejin.com/dddit/script/?project=vendict — **허브에서만** 접근, 브랜드 페이지에 링크 금지
 - 로지텍G 납품 일정: https://works.mansejin.com/logitechG/schedule/
 
 ## 경로 구조
@@ -34,7 +34,9 @@ works.mansejin.com/
         └── productlist/
 ```
 
-추후 다른 프로젝트는 `/dddit/프로젝트명/` 형태로 추가합니다.
+추후 다른 프로젝트는 `/dddit/프로젝트명/` 형태로 추가합니다.  
+**브랜드 포털**(`dddit/{slug}/`)에는 기획안·콘티·제품 링크만 두고, **시나리오 머신은 허브**(`dddit/`) 채널 도구에서만 접근합니다.  
+새 브랜드 추가 시 `dddit/_template/brand/` 복사 · `node dddit/scripts/check-brand-portals.mjs` 로 검증.
 
 예: `/dddit/다른브랜드/`, `/dddit/script/`
 
