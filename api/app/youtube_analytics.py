@@ -6,13 +6,14 @@ from typing import Any
 
 import httpx
 
-from app.config import youtube_analytics_oauth_config, youtube_channel_id
+from app.config import youtube_analytics_oauth_config, youtube_channel_id, youtube_api_key
 from app.google_oauth import get_access_token
 from app.youtube_reporting import fetch_reporting_reach
 
 _ANALYTICS_BASE = "https://youtubeanalytics.googleapis.com/v2/reports"
 _CONTENT_LONGFORM = "VIDEO_ON_DEMAND"
 _CONTENT_SHORTS = "SHORTS"
+_SHORTS_MAX_DURATION_SEC = 60
 _CACHE: dict[str, Any] = {}
 _CACHE_TTL = 3600  # 1 hour
 
@@ -87,6 +88,71 @@ async def _analytics_get(
     )
     res.raise_for_status()
     return res.json()
+
+
+async def _analytics_get_safe(
+    client: httpx.AsyncClient,
+    access_token: str,
+    channel_id: str,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    try:
+        return await _analytics_get(client, access_token, channel_id, **kwargs)
+    except httpx.HTTPStatusError:
+        return {"rows": [], "columnHeaders": []}
+
+
+def _iso_duration_seconds(duration: str) -> int:
+    if not duration or not duration.startswith("PT"):
+        return 0
+    hours = minutes = seconds = 0
+    rest = duration[2:]
+    num = ""
+    for ch in rest:
+        if ch.isdigit():
+            num += ch
+        elif ch == "H":
+            hours = int(num or 0)
+            num = ""
+        elif ch == "M":
+            minutes = int(num or 0)
+            num = ""
+        elif ch == "S":
+            seconds = int(num or 0)
+            num = ""
+    return hours * 3600 + minutes * 60 + seconds
+
+
+async def _fetch_video_durations(
+    client: httpx.AsyncClient,
+    video_ids: list[str],
+) -> dict[str, int]:
+    api_key = youtube_api_key()
+    if not api_key or not video_ids:
+        return {}
+    durations: dict[str, int] = {}
+    for index in range(0, len(video_ids), 50):
+        chunk = video_ids[index : index + 50]
+        res = await client.get(
+            "https://www.googleapis.com/youtube/v3/videos",
+            params={
+                "part": "contentDetails",
+                "id": ",".join(chunk),
+                "key": api_key,
+            },
+        )
+        if res.status_code != 200:
+            continue
+        for item in res.json().get("items") or []:
+            video_id = str(item.get("id") or "")
+            duration = (item.get("contentDetails") or {}).get("duration") or ""
+            if video_id:
+                durations[video_id] = _iso_duration_seconds(duration)
+    return durations
+
+
+def _is_shorts_video(duration_sec: int) -> bool:
+    return 0 < duration_sec <= _SHORTS_MAX_DURATION_SEC
 
 
 def _parse_rows(body: dict[str, Any]) -> list[dict[str, Any]]:
@@ -295,7 +361,7 @@ async def _top_videos_by_views(
     content_type: str | None = None,
 ) -> list[dict[str, Any]]:
     filters = f"creatorContentType=={content_type}" if content_type else ""
-    body = await _analytics_get(
+    body = await _analytics_get_safe(
         client,
         token,
         channel_id,
@@ -325,7 +391,7 @@ async def _average_view_percentage(
     content_type: str | None = None,
 ) -> float | None:
     filters = f"creatorContentType=={content_type}" if content_type else ""
-    body = await _analytics_get(
+    body = await _analytics_get_safe(
         client,
         token,
         channel_id,
@@ -348,7 +414,7 @@ async def _daily_average_view_trend(
     content_type: str | None = None,
 ) -> list[dict[str, Any]]:
     filters = f"creatorContentType=={content_type}" if content_type else ""
-    body = await _analytics_get(
+    body = await _analytics_get_safe(
         client,
         token,
         channel_id,
@@ -370,51 +436,30 @@ async def _daily_average_view_trend(
     return trend
 
 
-async def _build_retention_for_format(
+async def _retention_series_for_videos(
     client: httpx.AsyncClient,
     token: str,
     channel_id: str,
+    videos: list[dict[str, Any]],
     *,
     start_date: str,
     end_date: str,
-    content_type: str,
     format_key: str,
-) -> dict[str, Any]:
-    trend = await _daily_average_view_trend(
-        client,
-        token,
-        channel_id,
-        start_date=start_date,
-        end_date=end_date,
-        content_type=content_type,
-    )
-    avg_pct = await _average_view_percentage(
-        client,
-        token,
-        channel_id,
-        start_date=start_date,
-        end_date=end_date,
-        content_type=content_type,
-    )
-    top_videos = await _top_videos_by_views(
-        client,
-        token,
-        channel_id,
-        start_date=start_date,
-        end_date=end_date,
-        limit=3,
-        content_type=content_type,
-    )
+    limit: int = 3,
+) -> list[dict[str, Any]]:
     series: list[dict[str, Any]] = []
-    for item in top_videos:
-        video_points = await _retention_points_for_video(
-            client,
-            token,
-            channel_id,
-            item["videoId"],
-            start_date=start_date,
-            end_date=end_date,
-        )
+    for item in videos[:limit]:
+        try:
+            video_points = await _retention_points_for_video(
+                client,
+                token,
+                channel_id,
+                item["videoId"],
+                start_date=start_date,
+                end_date=end_date,
+            )
+        except httpx.HTTPStatusError:
+            continue
         if video_points:
             series.append(
                 {
@@ -424,12 +469,117 @@ async def _build_retention_for_format(
                     "format": format_key,
                 }
             )
+    return series
+
+
+async def _partition_top_videos_by_format(
+    client: httpx.AsyncClient,
+    token: str,
+    channel_id: str,
+    *,
+    start_date: str,
+    end_date: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    top_all = await _top_videos_by_views(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+        limit=25,
+    )
+    if not top_all:
+        return [], []
+
+    durations = await _fetch_video_durations(client, [item["videoId"] for item in top_all])
+    if durations:
+        longform = [item for item in top_all if not _is_shorts_video(durations.get(item["videoId"], 0))]
+        shorts = [item for item in top_all if _is_shorts_video(durations.get(item["videoId"], 0))]
+        return longform, shorts
+
+    longform = await _top_videos_by_views(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+        limit=3,
+        content_type=_CONTENT_LONGFORM,
+    )
+    shorts = await _top_videos_by_views(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+        limit=3,
+        content_type=_CONTENT_SHORTS,
+    )
+    return longform, shorts
+
+
+async def _build_channel_retention_formats(
+    client: httpx.AsyncClient,
+    token: str,
+    channel_id: str,
+    *,
+    start_date: str,
+    end_date: str,
+) -> dict[str, dict[str, Any]]:
+    longform_videos, shorts_videos = await _partition_top_videos_by_format(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    longform_series = await _retention_series_for_videos(
+        client,
+        token,
+        channel_id,
+        longform_videos,
+        start_date=start_date,
+        end_date=end_date,
+        format_key="longform",
+    )
+    shorts_series = await _retention_series_for_videos(
+        client,
+        token,
+        channel_id,
+        shorts_videos,
+        start_date=start_date,
+        end_date=end_date,
+        format_key="shorts",
+    )
+    channel_trend = await _daily_average_view_trend(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    channel_avg = await _average_view_percentage(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
     return {
-        "format": format_key,
-        "contentType": content_type,
-        "series": series,
-        "trend": trend,
-        "averageViewPercentage": avg_pct,
+        "longform": {
+            "format": "longform",
+            "contentType": _CONTENT_LONGFORM,
+            "series": longform_series,
+            "trend": channel_trend if not longform_series else [],
+            "averageViewPercentage": channel_avg if not longform_series else None,
+        },
+        "shorts": {
+            "format": "shorts",
+            "contentType": _CONTENT_SHORTS,
+            "series": shorts_series,
+            "trend": [],
+            "averageViewPercentage": None,
+        },
     }
 
 
@@ -464,27 +614,17 @@ async def fetch_retention(video_id: str | None = None, refresh: bool = False) ->
                 trend: list[dict[str, Any]] = []
                 avg_pct = None
             else:
-                longform = await _build_retention_for_format(
+                formats = await _build_channel_retention_formats(
                     client,
                     token,
                     channel_id,
                     start_date=start_date,
                     end_date=end_date,
-                    content_type=_CONTENT_LONGFORM,
-                    format_key="longform",
                 )
-                shorts = await _build_retention_for_format(
-                    client,
-                    token,
-                    channel_id,
-                    start_date=start_date,
-                    end_date=end_date,
-                    content_type=_CONTENT_SHORTS,
-                    format_key="shorts",
-                )
-                formats = {"longform": longform, "shorts": shorts}
+                longform = formats["longform"]
+                shorts = formats["shorts"]
                 series = longform["series"]
-                trend = longform["trend"]
+                trend = longform["trend"] or shorts["trend"]
                 avg_pct = longform["averageViewPercentage"]
                 points = series[0]["points"] if len(series) == 1 else []
                 scope = "channel"
@@ -519,6 +659,8 @@ async def fetch_retention(video_id: str | None = None, refresh: bool = False) ->
             "configured": True,
             "message": f"시청 유지 조회 실패: {exc}",
             "points": [],
+            "series": [],
+            "formats": None,
         }
 
 

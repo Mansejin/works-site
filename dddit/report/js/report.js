@@ -594,10 +594,22 @@
     const labelEl = document.getElementById("retention-chart-label");
     if (!ctx) return;
 
+    if (!data?.ok) {
+      if (charts.retention) {
+        charts.retention.destroy();
+        charts.retention = null;
+      }
+      if (labelEl) labelEl.textContent = data?.message || "시청 유지 조회 실패";
+      return;
+    }
+
     const block = retentionBlock(data, format);
     const formatLabel = format === "shorts" ? "쇼츠" : "롱폼";
     const series = (block?.series || []).filter((item) => (item.points || []).length);
-    const trend = block?.trend || [];
+    let trend = block?.trend || [];
+    if (!trend.length && format === "longform" && (data?.trend || []).length) {
+      trend = data.trend;
+    }
     const points = block?.points || data?.points || [];
     const colors = ["#dc2626", "#2563eb", "#16a34a"];
 
@@ -735,7 +747,7 @@
       return;
     }
 
-    const avg = block?.averageViewPercentage ?? data?.averageViewPercentage;
+    const avg = block?.averageViewPercentage ?? (format === "longform" ? data?.averageViewPercentage : null);
     if (avg == null) {
       if (labelEl) labelEl.textContent = `시청 유지 (${formatLabel}) — 데이터 없음`;
       return;
