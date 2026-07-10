@@ -8,6 +8,7 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "youtube"
 PROMOTIONS_FILE = DATA_DIR / "promotions.json"
 SNAPSHOTS_FILE = DATA_DIR / "subscriber-snapshots.json"
 ADS_SYNC_FILE = DATA_DIR / "ads-sync.json"
+REPORTING_SYNC_FILE = DATA_DIR / "reporting-sync.json"
 
 
 def _read_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
@@ -47,6 +48,17 @@ def read_ads_sync() -> dict[str, Any]:
 
 def write_ads_sync(data: dict[str, Any]) -> None:
     _write_json(ADS_SYNC_FILE, data)
+
+
+def read_reporting_sync() -> dict[str, Any]:
+    return _read_json(
+        REPORTING_SYNC_FILE,
+        {"jobId": None, "reportTypeId": None, "impressions": None, "ctr": None},
+    )
+
+
+def write_reporting_sync(data: dict[str, Any]) -> None:
+    _write_json(REPORTING_SYNC_FILE, data)
 
 
 def _promo_match_key(promo: dict[str, Any]) -> str:

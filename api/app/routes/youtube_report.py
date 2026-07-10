@@ -222,10 +222,17 @@ async def _fetch_video_details(
 
 def _analytics_status_note(analytics: dict[str, Any] | None) -> str:
     if analytics and analytics.get("ok"):
-        return (
-            "YouTube Analytics OAuth 연동됨 — 상단에서 유입·시청 유지·인구통계를 표시합니다. "
-            "썸네일 노출/CTR은 Reporting API 전용이라 Studio에서 확인하세요."
-        )
+        reporting = analytics.get("reporting") or {}
+        if analytics.get("impressionsSource") == "reporting-api" and analytics.get("impressions") is not None:
+            return (
+                "YouTube Analytics + Reporting API 연동됨 — 썸네일 노출·CTR·유입·시청 유지·인구통계를 표시합니다."
+            )
+        if reporting.get("jobId"):
+            return (
+                "YouTube Analytics 연동됨. Reporting job 준비됨 — 썸네일 노출/CTR은 "
+                "첫 일별 CSV 생성(보통 24~48시간) 후 표시됩니다."
+            )
+        return "YouTube Analytics OAuth 연동됨 — 유입·시청 유지·인구통계를 표시합니다."
     if analytics and analytics.get("configured"):
         return "YouTube Analytics OAuth 설정됨 — 데이터 조회 오류 시 새로고침하세요."
     return (
@@ -367,7 +374,14 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             "YouTube Data API: 조회수·구독자·영상 목록 (현재 지원)",
         ]
         if youtube_analytics_oauth_config():
-            limitations.append("YouTube Analytics API (OAuth): 노출·CTR·유입·시청 유지·인구통계 (연동됨)")
+            limitations.append("YouTube Analytics API (OAuth): 유입·시청 유지·인구통계 (연동됨)")
+            reporting = (analytics_overview.get("reporting") or {}) if analytics_overview.get("ok") else {}
+            if analytics_overview.get("impressionsSource") == "reporting-api":
+                limitations.append("YouTube Reporting API (OAuth): 썸네일 노출·CTR (연동됨)")
+            elif reporting.get("jobId"):
+                limitations.append("YouTube Reporting API (OAuth): job 생성됨 — 첫 CSV 대기 중")
+            else:
+                limitations.append("YouTube Reporting API (OAuth): 썸네일 노출·CTR (GCP API 활성화 필요)")
         else:
             limitations.append("YouTube Analytics API (OAuth): NAS .env에 OAuth 토큰 설정 필요")
         if google_ads_config():
@@ -496,6 +510,13 @@ def put_snapshots(body: SnapshotsBody) -> dict[str, Any]:
 @router.get("/analytics-overview")
 async def report_analytics_overview(refresh: bool = Query(False)) -> dict[str, Any]:
     return await fetch_analytics_overview(refresh=refresh)
+
+
+@router.get("/reporting-reach")
+async def report_reporting_reach(refresh: bool = Query(False)) -> dict[str, Any]:
+    from app.youtube_reporting import fetch_reporting_reach
+
+    return await fetch_reporting_reach(refresh=refresh)
 
 
 @router.get("/traffic-sources")

@@ -8,6 +8,7 @@ import httpx
 
 from app.config import youtube_analytics_oauth_config, youtube_channel_id
 from app.google_oauth import get_access_token
+from app.youtube_reporting import fetch_reporting_reach
 
 _ANALYTICS_BASE = "https://youtubeanalytics.googleapis.com/v2/reports"
 _CACHE: dict[str, Any] = {}
@@ -127,6 +128,7 @@ async def _get_token_and_channel(client: httpx.AsyncClient) -> tuple[str, str]:
     return token, channel_id
 
 
+
 async def fetch_analytics_overview(refresh: bool = False) -> dict[str, Any]:
     cache_key = "overview"
     if not refresh:
@@ -152,46 +154,33 @@ async def fetch_analytics_overview(refresh: bool = False) -> dict[str, Any]:
             rows = _parse_rows(body)
             totals = rows[0] if rows else {}
 
-            impressions = None
-            ctr = None
-            try:
-                reach_body = await _analytics_get(
-                    client,
-                    token,
-                    channel_id,
-                    start_date=start_date,
-                    end_date=end_date,
-                    metrics="cardImpressions,cardClicks,cardClickRate",
-                )
-                reach = _parse_rows(reach_body)
-                reach_totals = reach[0] if reach else {}
-                impressions = _safe_int(reach_totals.get("cardImpressions")) or None
-                ctr_rate = _safe_float(reach_totals.get("cardClickRate"))
-                if ctr_rate is not None:
-                    ctr = round(ctr_rate * 100, 2)
-            except Exception:
-                pass
-
             views = _safe_int(totals.get("views"))
 
             payload = {
                 "ok": True,
                 "configured": True,
                 "period": {"startDate": start_date, "endDate": end_date, "days": 28},
-                "impressions": impressions,
+                "impressions": None,
                 "views": views,
-                "ctr": ctr,
+                "ctr": None,
                 "ctrUnit": "percent",
                 "averageViewDurationSec": _safe_int(totals.get("averageViewDuration")),
                 "averageViewPercentage": _safe_float(totals.get("averageViewPercentage")),
                 "estimatedMinutesWatched": _safe_int(totals.get("estimatedMinutesWatched")),
-                "impressionsNote": (
-                    None
-                    if impressions is not None
-                    else "썸네일 노출/CTR은 YouTube Reporting API 전용. 카드 노출은 지원 시 표시."
-                ),
+                "impressionsNote": None,
+                "impressionsSource": None,
                 "message": None,
             }
+
+            reach = await fetch_reporting_reach(refresh=refresh)
+            payload["reporting"] = reach
+            if reach.get("impressions") is not None:
+                payload["impressions"] = reach["impressions"]
+                payload["ctr"] = reach.get("ctr")
+                payload["impressionsSource"] = "reporting-api"
+            elif reach.get("message"):
+                payload["impressionsNote"] = reach["message"]
+
             _cache_set(cache_key, payload)
             return payload
     except Exception as exc:
@@ -262,6 +251,94 @@ async def fetch_traffic_sources(refresh: bool = False) -> dict[str, Any]:
         }
 
 
+async def _retention_points_for_video(
+    client: httpx.AsyncClient,
+    token: str,
+    channel_id: str,
+    video_id: str,
+    *,
+    start_date: str,
+    end_date: str,
+) -> list[dict[str, float]]:
+    body = await _analytics_get(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+        metrics="audienceWatchRatio",
+        dimensions="elapsedVideoTimeRatio",
+        filters=f"video=={video_id}",
+        sort="elapsedVideoTimeRatio",
+        max_results=100,
+    )
+    rows = _parse_rows(body)
+    return [
+        {
+            "ratio": _safe_float(row.get("elapsedVideoTimeRatio")) or 0,
+            "watchRatio": _safe_float(row.get("audienceWatchRatio")) or 0,
+        }
+        for row in rows
+    ]
+
+
+async def _top_videos_by_views(
+    client: httpx.AsyncClient,
+    token: str,
+    channel_id: str,
+    *,
+    start_date: str,
+    end_date: str,
+    limit: int = 3,
+) -> list[dict[str, Any]]:
+    body = await _analytics_get(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+        metrics="views",
+        dimensions="video",
+        sort="-views",
+        max_results=limit,
+    )
+    rows = _parse_rows(body)
+    return [
+        {"videoId": str(row.get("video") or ""), "views": _safe_int(row.get("views"))}
+        for row in rows
+        if row.get("video")
+    ]
+
+
+async def _daily_average_view_trend(
+    client: httpx.AsyncClient,
+    token: str,
+    channel_id: str,
+    *,
+    start_date: str,
+    end_date: str,
+) -> list[dict[str, Any]]:
+    body = await _analytics_get(
+        client,
+        token,
+        channel_id,
+        start_date=start_date,
+        end_date=end_date,
+        metrics="averageViewPercentage",
+        dimensions="day",
+        sort="day",
+        max_results=31,
+    )
+    rows = _parse_rows(body)
+    trend = []
+    for row in rows:
+        pct = _safe_float(row.get("averageViewPercentage"))
+        day = str(row.get("day") or "")
+        if day and pct is not None:
+            trend.append({"date": day, "averageViewPercentage": round(pct, 2)})
+    return trend
+
+
 async def fetch_retention(video_id: str | None = None, refresh: bool = False) -> dict[str, Any]:
     cache_key = f"retention:{video_id or 'channel'}"
     if not refresh:
@@ -277,31 +354,28 @@ async def fetch_retention(video_id: str | None = None, refresh: bool = False) ->
         async with httpx.AsyncClient(timeout=30.0) as client:
             token, channel_id = await _get_token_and_channel(client)
 
-            avg_pct = None
             if video_id:
-                body = await _analytics_get(
+                points = await _retention_points_for_video(
+                    client,
+                    token,
+                    channel_id,
+                    video_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                scope = "video"
+                series: list[dict[str, Any]] = []
+                trend: list[dict[str, Any]] = []
+                avg_pct = None
+            else:
+                trend = await _daily_average_view_trend(
                     client,
                     token,
                     channel_id,
                     start_date=start_date,
                     end_date=end_date,
-                    metrics="audienceWatchRatio",
-                    dimensions="elapsedVideoTimeRatio",
-                    filters=f"video=={video_id}",
-                    sort="elapsedVideoTimeRatio",
-                    max_results=100,
                 )
-                rows = _parse_rows(body)
-                points = [
-                    {
-                        "ratio": _safe_float(row.get("elapsedVideoTimeRatio")) or 0,
-                        "watchRatio": _safe_float(row.get("audienceWatchRatio")) or 0,
-                    }
-                    for row in rows
-                ]
-                scope = "video"
-            else:
-                body = await _analytics_get(
+                summary_body = await _analytics_get(
                     client,
                     token,
                     channel_id,
@@ -309,24 +383,58 @@ async def fetch_retention(video_id: str | None = None, refresh: bool = False) ->
                     end_date=end_date,
                     metrics="averageViewPercentage",
                 )
-                rows = _parse_rows(body)
-                avg_pct = _safe_float((rows[0] if rows else {}).get("averageViewPercentage"))
-                points = []
+                summary_rows = _parse_rows(summary_body)
+                avg_pct = _safe_float((summary_rows[0] if summary_rows else {}).get("averageViewPercentage"))
+
+                top_videos = await _top_videos_by_views(
+                    client,
+                    token,
+                    channel_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    limit=3,
+                )
+                series = []
+                for item in top_videos:
+                    video_points = await _retention_points_for_video(
+                        client,
+                        token,
+                        channel_id,
+                        item["videoId"],
+                        start_date=start_date,
+                        end_date=end_date,
+                    )
+                    if video_points:
+                        series.append(
+                            {
+                                "videoId": item["videoId"],
+                                "views": item["views"],
+                                "points": video_points,
+                            }
+                        )
+                points = series[0]["points"] if len(series) == 1 else []
                 scope = "channel"
+
+            chart_mode = "average"
+            if series:
+                chart_mode = "series" if len(series) > 1 else "curve"
+            elif trend:
+                chart_mode = "trend"
+            elif points:
+                chart_mode = "curve"
 
             payload = {
                 "ok": True,
                 "configured": True,
                 "scope": scope,
+                "chartMode": chart_mode,
                 "videoId": video_id,
                 "period": {"startDate": start_date, "endDate": end_date},
                 "points": points,
+                "series": series,
+                "trend": trend,
                 "averageViewPercentage": avg_pct if not video_id else None,
-                "message": (
-                    "영상별 시청 유지 곡선은 videoId 쿼리로 조회"
-                    if not video_id
-                    else None
-                ),
+                "message": None,
             }
             _cache_set(cache_key, payload)
             return payload

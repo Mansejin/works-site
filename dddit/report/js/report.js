@@ -355,7 +355,8 @@
     if (banner) {
       if (analytics.impressionsNote && analytics.ok) {
         banner.classList.remove("hidden");
-        banner.classList.remove("warn");
+        const waiting = analytics.impressions == null;
+        banner.classList.toggle("warn", waiting);
         banner.textContent = analytics.impressionsNote;
       } else if (analytics.message && !analytics.ok) {
         banner.classList.remove("hidden");
@@ -376,7 +377,8 @@
     const items = [
       { label: "조회수 (28일)", value: formatNum(analytics.views) },
       {
-        label: "노출수",
+        label:
+          analytics.impressionsSource === "reporting-api" ? "썸네일 노출 (28일)" : "노출수",
         value: analytics.impressions != null ? formatNum(analytics.impressions) : "—",
       },
       { label: "CTR", value: analytics.ctr != null ? `${analytics.ctr}%` : "—" },
@@ -432,24 +434,101 @@
     });
   }
 
-  function renderRetentionChart(data) {
+  function retentionVideoTitle(videos, videoId) {
+    const match = (videos || []).find((video) => video.id === videoId);
+    const title = match?.title || videoId || "영상";
+    return title.length > 26 ? `${title.slice(0, 26)}…` : title;
+  }
+
+  function formatShortDate(value) {
+    if (!value) return "";
+    const parts = String(value).split("-");
+    if (parts.length !== 3) return value;
+    return `${parts[1]}/${parts[2]}`;
+  }
+
+  function renderRetentionChart(data, videos) {
     const ctx = document.getElementById("chart-retention");
+    const labelEl = document.getElementById("retention-chart-label");
     if (!ctx) return;
+
+    const series = (data?.series || []).filter((item) => (item.points || []).length);
+    const trend = data?.trend || [];
     const points = data?.points || [];
-    if (points.length) {
+    const colors = ["#dc2626", "#2563eb", "#16a34a"];
+
+    if (series.length) {
+      const labels = series[0].points.map((point) => `${Math.round(point.ratio * 100)}%`);
+      if (labelEl) {
+        labelEl.textContent =
+          series.length === 1
+            ? `시청 유지 — ${retentionVideoTitle(videos, series[0].videoId)}`
+            : `시청 유지 — 최근 28일 조회 상위 ${series.length}개 영상`;
+      }
       charts.retention = new Chart(ctx, {
         type: "line",
         data: {
-          labels: points.map((p) => `${Math.round(p.ratio * 100)}%`),
+          labels,
+          datasets: series.map((item, index) => ({
+            label: retentionVideoTitle(videos, item.videoId),
+            data: item.points.map((point) => (point.watchRatio || 0) * 100),
+            borderColor: colors[index % colors.length],
+            backgroundColor: `${colors[index % colors.length]}1a`,
+            fill: false,
+            tension: 0.3,
+            pointRadius: 0,
+            borderWidth: 2,
+          })),
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: series.length > 1,
+              position: "bottom",
+              labels: { boxWidth: 10, font: { size: 10 } },
+            },
+            tooltip: {
+              callbacks: {
+                label(context) {
+                  return `${context.dataset.label}: ${Number(context.parsed.y).toFixed(1)}%`;
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              title: { display: true, text: "영상 진행률", font: { size: 11 } },
+              ticks: { maxTicksLimit: 8 },
+            },
+            y: {
+              min: 0,
+              max: 100,
+              title: { display: true, text: "시청 유지", font: { size: 11 } },
+              ticks: { callback: (value) => `${value}%` },
+            },
+          },
+        },
+      });
+      return;
+    }
+
+    if (trend.length) {
+      if (labelEl) labelEl.textContent = "일별 평균 시청률 추이 (28일)";
+      charts.retention = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: trend.map((point) => formatShortDate(point.date)),
           datasets: [
             {
-              label: "시청 유지",
-              data: points.map((p) => (p.watchRatio || 0) * 100),
+              label: "평균 시청률",
+              data: trend.map((point) => point.averageViewPercentage),
               borderColor: "#dc2626",
-              backgroundColor: "rgba(220,38,38,0.1)",
+              backgroundColor: "rgba(220,38,38,0.12)",
               fill: true,
               tension: 0.3,
-              pointRadius: 2,
+              pointRadius: 3,
             },
           ],
         },
@@ -458,14 +537,58 @@
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            y: { min: 0, max: 100, ticks: { callback: (v) => `${v}%` } },
+            y: {
+              min: 0,
+              max: 100,
+              ticks: { callback: (value) => `${value}%` },
+            },
           },
         },
       });
       return;
     }
+
+    if (points.length) {
+      if (labelEl) {
+        labelEl.textContent = data?.videoId
+          ? `시청 유지 — ${retentionVideoTitle(videos, data.videoId)}`
+          : "시청 유지";
+      }
+      charts.retention = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: points.map((point) => `${Math.round(point.ratio * 100)}%`),
+          datasets: [
+            {
+              label: "시청 유지",
+              data: points.map((point) => (point.watchRatio || 0) * 100),
+              borderColor: "#dc2626",
+              backgroundColor: "rgba(220,38,38,0.1)",
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              title: { display: true, text: "영상 진행률", font: { size: 11 } },
+              ticks: { maxTicksLimit: 8 },
+            },
+            y: { min: 0, max: 100, ticks: { callback: (value) => `${value}%` } },
+          },
+        },
+      });
+      return;
+    }
+
     const avg = data?.averageViewPercentage;
     if (avg == null) return;
+    if (labelEl) labelEl.textContent = "평균 시청률 (28일)";
     charts.retention = new Chart(ctx, {
       type: "bar",
       data: {
@@ -476,7 +599,7 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        scales: { y: { min: 0, max: 100, ticks: { callback: (v) => `${v}%` } } },
+        scales: { y: { min: 0, max: 100, ticks: { callback: (value) => `${value}%` } } },
       },
     });
   }
@@ -665,7 +788,7 @@
       renderKpis(overview.kpis || {});
       renderAnalyticsOverview(overview.analytics);
       renderTrafficChart(traffic);
-      renderRetentionChart(retention);
+      renderRetentionChart(retention, videosData.videos || []);
       renderDemographicsCharts(demographics);
       renderAdsSyncStatus(overview.adsSync);
       renderRecentVideosChart(overview.recentVideosBar || []);
