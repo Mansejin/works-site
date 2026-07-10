@@ -2,4 +2,6 @@ data/*
 !data/.gitkeep
 !data/youtube/
 !data/youtube/*.json
+__pycache__/
+*.pyc
 conti-collab/node_modules/
