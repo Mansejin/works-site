@@ -911,7 +911,6 @@ JSON만 출력: {"queries":["..."],"rationale":"계획 한 줄"}`;
 
   async function callGeminiGrounded(apiKey, prompt, options = {}) {
     const model = options.model || RESEARCH_GEMINI_MODEL;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     const generationConfig = { temperature: options.temperature ?? 0.25 };
     if (options.jsonMime !== false) {
@@ -928,22 +927,30 @@ JSON만 출력: {"queries":["..."],"rationale":"계획 한 줄"}`;
     if (options.useSearch !== false) {
       body.tools = [{ google_search: {} }];
     }
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
 
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      const msg = errBody?.error?.message || `API 오류 (${res.status})`;
-      const e = new Error(msg);
-      e.apiStatus = res.status;
-      e.apiModel = model;
-      throw e;
+    let data;
+    const api = window.DdditWorksApi;
+    if (api?.isBackendMode?.()) {
+      data = await api.postGemini(model, body, apiKey);
+    } else {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = errBody?.error?.message || `API 오류 (${res.status})`;
+        const e = new Error(msg);
+        e.apiStatus = res.status;
+        e.apiModel = model;
+        throw e;
+      }
+      data = await res.json();
     }
 
-    const data = await res.json();
     const candidate = data?.candidates?.[0];
     let text = candidate?.content?.parts?.[0]?.text;
     if (!text && candidate?.content?.parts) {

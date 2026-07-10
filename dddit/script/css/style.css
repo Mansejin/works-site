@@ -1572,6 +1572,23 @@ tr.part-dim td {
   opacity: 0.45;
 }
 
+body.hosted [data-local-only] {
+  display: none !important;
+}
+
+.cell-preview {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  padding: 0.2rem 0;
+}
+
+.cell-preview.is-empty {
+  color: var(--muted);
+}
+
 .cell-edit {
   width: 100%;
   background: transparent;
