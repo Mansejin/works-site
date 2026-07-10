@@ -1,0 +1,47 @@
+{
+  "issues": [
+    "채널 노출 부족: 콘텐츠 퀄리티에 비해 노출이 덜 되어 성장이 더딤. 프로모션으로 부스팅 중."
+  ],
+  "promotions": [
+    {
+      "id": "shokz-openfit-views",
+      "title": "샥즈 오픈핏 프로 조회수",
+      "videoTitle": "샥즈 오픈핏 프로",
+      "videoId": "",
+      "status": "진행중",
+      "cost": 84266,
+      "impressions": 29672,
+      "views": 3377,
+      "subscribers": 0,
+      "followOnViews": 0,
+      "targeting": {
+        "gender": ["female", "male"],
+        "age": ["18-24", "25-34"]
+      },
+      "notes": [
+        "18-24는 러닝 취미 적어 제외 검토",
+        "남녀 모두 타겟"
+      ]
+    },
+    {
+      "id": "ikko-mindone-pro-subs",
+      "title": "Ikko 마인드원 프로 (구독)",
+      "videoTitle": "Ikko 마인드원 프로",
+      "videoId": "",
+      "status": "진행중",
+      "cost": 156800,
+      "impressions": 56295,
+      "views": 1170,
+      "subscribers": 572,
+      "followOnViews": 5,
+      "targeting": {
+        "gender": ["female", "male"],
+        "age": ["18-24", "25-34", "35-44"]
+      },
+      "notes": [
+        "남녀 모두 타겟",
+        "10대부터 30대 타겟 설정"
+      ]
+    }
+  ]
+}

@@ -239,6 +239,106 @@ function cellCoords(el) {
   return { index, field };
 }
 
+function isHeaderRow(cells) {
+  const trimmed = cells.map((cell) => cell.trim());
+  if (!trimmed.length) return false;
+  if (trimmed[0] === "대본" && (trimmed.length === 1 || trimmed[1] === "장면")) return true;
+  if (trimmed.join("\t") === HEADERS.join("\t")) return true;
+  return false;
+}
+
+function parsePasteGrid(text) {
+  const normalized = String(text || "")
+    .replace(/\uFEFF/g, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+  const lines = normalized.split("\n");
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+
+  const grid = lines
+    .map((line) => line.split("\t"))
+    .filter((cells) => cells.some((cell) => cell.trim()));
+
+  if (grid.length && isHeaderRow(grid[0])) grid.shift();
+  return grid;
+}
+
+function isSpreadsheetPaste(text) {
+  const raw = String(text || "");
+  if (!raw.trim()) return false;
+  if (raw.includes("\t")) return true;
+  const lines = raw
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => line.trim());
+  return lines.length > 1;
+}
+
+function ensureRowAt(index) {
+  while (yRows.length <= index) {
+    const yMap = new Y.Map();
+    HEADERS.forEach((key) => yMap.set(key, ""));
+    yRows.push([yMap]);
+  }
+  const existing = yRows.get(index);
+  if (existing instanceof Y.Map) return existing;
+  const yMap = new Y.Map();
+  HEADERS.forEach((key) => yMap.set(key, ""));
+  yRows.insert(index, [yMap]);
+  return yMap;
+}
+
+function applySpreadsheetPaste(startRow, startField, grid) {
+  if (!ydoc || !yRows || !grid.length) return 0;
+  const startCol = HEADERS.indexOf(startField);
+  if (startCol < 0) return 0;
+
+  suppressRender = true;
+  ydoc.transact(() => {
+    grid.forEach((cells, rowOffset) => {
+      const rowIndex = startRow + rowOffset;
+      const yMap = ensureRowAt(rowIndex);
+      cells.forEach((cell, colOffset) => {
+        const headerIndex = startCol + colOffset;
+        if (headerIndex < 0 || headerIndex >= HEADERS.length) return;
+        yMap.set(HEADERS[headerIndex], String(cell ?? "").trim());
+      });
+    });
+  });
+  suppressRender = false;
+  renderTable();
+  return grid.length;
+}
+
+function bindTablePaste() {
+  if (!tbody || tbody.dataset.pasteBound === "1") return;
+  tbody.dataset.pasteBound = "1";
+
+  tbody.addEventListener("paste", (event) => {
+    if (!ydoc || !yRows) return;
+    const target = event.target;
+    if (!target?.classList?.contains("cell-edit")) return;
+
+    const text = event.clipboardData?.getData("text/plain");
+    if (!isSpreadsheetPaste(text)) return;
+
+    const coords = cellCoords(target);
+    if (!coords) return;
+
+    event.preventDefault();
+    composing = false;
+
+    const grid = parsePasteGrid(text);
+    if (!grid.length) return;
+
+    const count = applySpreadsheetPaste(coords.index, coords.field, grid);
+    if (count > 0) {
+      setStatus(`${count}행 붙여넣음 · 실시간 동기화`, "ok");
+    }
+  });
+}
+
 function commitCellFromElement(el) {
   if (!ydoc || !yRows) return;
   const coords = cellCoords(el);
@@ -458,6 +558,7 @@ function loadEditor() {
   shareUrlInput.value = api.shareUrl(project);
   setStatus("동기화 연결 중…");
   setupColumnResize();
+  bindTablePaste();
   connectCollab();
 }
 

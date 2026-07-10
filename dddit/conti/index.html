@@ -159,6 +159,11 @@
       flex-wrap: wrap;
     }
 
+    .paste-hint {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+
     .status-bar {
       font-size: 0.8rem;
       color: var(--text-muted);
@@ -363,6 +368,7 @@
           <button id="btn-back" class="btn btn-ghost" type="button">프로젝트 목록</button>
           <button id="btn-add-row" class="btn btn-ghost" type="button">행 추가</button>
           <button id="btn-delete-row" class="btn btn-danger" type="button">선택 행 삭제</button>
+          <span class="paste-hint">스프레드시트·TSV 복사 후 셀에 붙여넣기 (Ctrl+V)</span>
         </div>
         <div class="toolbar-right">
           <span id="status-bar" class="status-bar">불러오는 중…</span>
@@ -406,6 +412,6 @@
   </div>
 
   <script src="../js/conti-api.js"></script>
-  <script type="module" src="js/editor.js?v=4"></script>
+  <script type="module" src="js/editor.js?v=5"></script>
 </body>
 </html>

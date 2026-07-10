@@ -18,6 +18,13 @@
 
   const CHANNEL_TOOLS = [
     {
+      name: "채널 보고",
+      path: "report/",
+      summary: "구독자·영상·프로모션 효율 월간 보고 (링크 공유)",
+      status: "사용 가능",
+      ready: true,
+    },
+    {
       name: "콘티 작성",
       path: "conti/",
       summary: "프로젝트별 콘티 작성 · NAS 저장 · 브랜드 공유",
@@ -525,6 +532,7 @@
           return `<div class="yt-video"><div class="yt-video-placeholder">영상 없음</div></div>`;
         }
         const title = escapeHtml(video.title || "YouTube");
+        const url = escapeHtml(video.url || `https://www.youtube.com/watch?v=${video.id}`);
         return `
           <div class="yt-video" title="${title}">
             <iframe
@@ -534,6 +542,7 @@
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowfullscreen
             ></iframe>
+            <a class="yt-video-caption" href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>
           </div>
         `;
       })
@@ -551,11 +560,20 @@
     els.ytError.textContent = message;
   }
 
-  async function loadYoutube() {
+  async function loadYoutube(force = false) {
     if (!els.ytSubs) return;
 
+    if (force) {
+      setYtStat(els.ytSubs, "불러오는 중…");
+      setYtStat(els.ytViews, "불러오는 중…");
+      setYtStat(els.ytVideosCount, "불러오는 중…");
+      els.ytSubs.classList.add("loading");
+      els.ytViews.classList.add("loading");
+      els.ytVideosCount.classList.add("loading");
+    }
+
     try {
-      const res = await fetch(`${API_BASE}/api/dddit/youtube/channel`);
+      const res = await fetch(`${API_BASE}/api/dddit/youtube/channel${force ? "?refresh=1" : ""}`);
       if (res.status === 404) {
         throw new Error("API_NOT_DEPLOYED");
       }

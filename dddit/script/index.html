@@ -156,6 +156,13 @@
           <span class="step-title">IT·가전 서치 <span id="search-season-badge" class="priority-badge">2026 장마</span></span>
         </div>
         <div class="step-body">
+          <div class="team-brief-callout" id="team-brief-callout">
+            <div>
+              <strong>팀 제공 제품</strong>
+              <p class="hint">자동 서치 없이 팀에서 받은 브리프·자료로 바로 작성합니다.</p>
+            </div>
+            <button id="btn-skip-to-brief" class="btn btn-secondary" type="button">팀 자료로 시작 →</button>
+          </div>
           <p class="hint">Perplexity 방식 <strong>4단계 서치</strong>: 쿼리 계획 → 후보 발굴 → 제품별 검증(공식·가격·리뷰) → 순위·출처 정리. 링크는 Google 검색 그라운딩에서 확인된 것만 표시됩니다.</p>
           <label>기기 종류 *
             <select id="search-device"></select>
@@ -203,9 +210,14 @@
       <section class="step-section step-collapsed" data-step="2" id="step-input">
         <div class="step-header step-header-static">
           <span class="step-num">2</span>
-          <span class="step-title">제품 브리프 (제원 · 방향)</span>
+          <span class="step-title">제품 브리프 (제원 · 방향) <span id="brief-source-badge" class="brief-source-badge hidden">팀 제공</span></span>
         </div>
         <div class="step-body">
+          <details class="team-brief-panel" id="team-brief-panel" open>
+            <summary>팀 제공 자료 (원문 붙여넣기)</summary>
+            <p class="hint">팀 브리프, 제원표, 가이드, 링크 메모 등을 그대로 붙여넣으면 대본·콘티 생성에 최우선 반영됩니다.</p>
+            <textarea id="team-brief-notes" rows="6" placeholder="예: 본사 가이드, 핵심 USP, 촬영 제약, 반드시 언급할 포인트…"></textarea>
+          </details>
           <div class="grid-2">
             <label>제품명 *<input id="product-name" type="text" placeholder="예: LG 퓨리케어 제습기" /></label>
             <label>콘텐츠 방향<input id="content-direction" type="text" placeholder="예: 장마철 원룸 습도·곰팡이 체감 중심" /></label>
@@ -315,6 +327,10 @@
           </div>
 
           <p id="lineup-status" class="lineup-status">초안 없음</p>
+          <label class="checkbox-inline lineup-flex-toggle" id="lineup-flex-wrap">
+            <input type="checkbox" id="lineup-flexible" />
+            유동 파트 구성 (프롤로그·총평 + 본문 1~3개 — 팀 제공 시 자동)
+          </label>
           <p id="part-select-hint" class="hint part-select-hint hidden">확정 후 파트 칩을 클릭해 <strong>원하는 파트만</strong> 선택해 작성할 수 있습니다. 순서와 관계없이 추가 작성·재생성 가능합니다.</p>
           <div id="part-lineup-editor" class="part-lineup-editor"></div>
           <div id="part-lineup" class="part-lineup"></div>
@@ -340,7 +356,7 @@
           <span class="step-title">콘티 작성 · TSV보내기</span>
         </div>
         <div class="step-body">
-          <p class="hint">하단 작업 바에서 <strong>파트 생성</strong>으로 콘티(대본·장면·사이즈·자막·코멘트)를 쌓습니다. 파트 칩을 클릭하면 원하는 파트만 선택해 작성할 수 있습니다.</p>
+          <p class="hint">하단 작업 바에서 <strong>파트 생성</strong>으로 콘티를 쌓습니다. 전체 파트 완료 시 NAS 콘티 에디터에 자동 저장됩니다.</p>
           <p id="part-validation" class="validation"></p>
         </div>
       </section>
@@ -349,13 +365,15 @@
     <aside class="script-column">
       <div class="script-panel panel">
         <div class="table-header">
-          <h2>콘티 표 <span class="hint-inline">TSV → 구글 시트</span></h2>
+          <h2>콘티 표 <span class="hint-inline">NAS 에디터 · TSV · 시트</span></h2>
           <div class="table-stats">
             <span><strong id="stat-rows">0</strong>행</span>
             <span><strong id="stat-bytes">0</strong>B</span>
           </div>
           <div class="table-actions">
-            <button id="btn-sheet-push" class="btn btn-primary btn-sm" type="button" title="Google 시트에 덮어쓰기">시트로 보내기</button>
+            <button id="btn-conti-push" class="btn btn-primary btn-sm" type="button" title="NAS 콘티 에디터에 덮어쓰기">에디터로 보내기</button>
+            <button id="btn-conti-open" class="btn btn-secondary btn-sm" type="button" title="콘티 에디터 열기">에디터 열기</button>
+            <button id="btn-sheet-push" class="btn btn-secondary btn-sm" type="button" title="Google 시트에 덮어쓰기">시트로 보내기</button>
             <button id="btn-sheet-pull" class="btn btn-secondary btn-sm" type="button" title="시트에서 불러오기">시트에서 불러오기</button>
             <button id="btn-sheet-open" class="btn btn-secondary btn-sm" type="button" title="스프레드시트 열기">시트 열기</button>
             <button id="btn-copy" class="btn btn-secondary btn-sm" type="button">복사</button>
@@ -395,6 +413,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" async></script>
+  <script src="../js/conti-api.js"></script>
   <script src="js/works-api.js"></script>
   <script src="js/sheet-sync.js"></script>
   <script src="js/main.js"></script>

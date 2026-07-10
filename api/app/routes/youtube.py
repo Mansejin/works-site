@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.config import youtube_api_key, youtube_channel_handle
 
@@ -236,9 +236,9 @@ async def _fetch_via_scrape(client: httpx.AsyncClient, handle: str) -> dict[str,
 
 
 @router.get("/channel")
-async def get_channel() -> dict[str, Any]:
+async def get_channel(refresh: bool = Query(False)) -> dict[str, Any]:
     now = time.time()
-    if _CACHE["data"] and now - _CACHE["at"] < _CACHE_TTL:
+    if not refresh and _CACHE["data"] and now - _CACHE["at"] < _CACHE_TTL:
         return _CACHE["data"]
 
     handle = youtube_channel_handle()

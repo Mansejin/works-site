@@ -139,13 +139,20 @@
     const specsBlock = formatSpecsBlock(state.productSpecs, state.categoryId);
     const briefBlock = formatReviewBriefBlock(state.reviewBrief);
     const extraNotes = String(state.productNotes || '').trim();
+    const teamNotes = String(state.teamBriefNotes || '').trim();
+    const teamBlock = teamNotes ? `\n## 팀 제공 자료 (최우선 반영)\n${teamNotes}` : '';
+    const sourceNote =
+      state.briefSource === 'team'
+        ? '\n- 브리프 출처: 팀 제공 (자동 서치 생략). 팀 자료·구조화 제원·리뷰 방향을 함께 반영.'
+        : '';
 
     return `
 # 제품 브리프
 제품명: ${state.productName}
 카테고리: ${cat.name || '기타'} — ${cat.focusHints || ''}
 콘텐츠 방향: ${state.contentDirection || '(미입력)'}
-가격·라인업: ${state.priceInfo || '(미입력)'}
+가격·라인업: ${state.priceInfo || '(미입력)'}${sourceNote}
+${teamBlock}
 
 ## 구조화 제원
 ${specsBlock}
@@ -154,8 +161,9 @@ ${extraNotes ? `\n## 추가 메모\n${extraNotes}` : ''}
 ## 리뷰 방향 (콘티·대본에 반영)
 ${briefBlock}
 
-## 콘티 출력 규칙
-- 최종 산출물은 스프레드시트 5열: 대본 | 장면 | 사이즈 | 자막 | 코멘트
+## 작성 파이프라인
+- 1단계: 파트별 내레이션 원문(prose) — 행·글자 수 제한 없이 자연스러운 호흡으로
+- 2단계: 원문을 스프레드시트 5열로 변환 — 대본 | 장면 | 사이즈 | 자막 | 코멘트
 - 제원·수치는 대본에 자연스럽게 녹이고, 스펙 나열형 낭독은 지양
 - 리뷰 방향의 mustHighlight는 빠뜨리지 말 것, carefulPoints는 디디딧 톤으로 솔직히
 ${adBlock ? `\n${adBlock}\n` : ''}${refBlock ? `\n${refBlock}` : ''}`.trim();

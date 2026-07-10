@@ -1,3 +1,5 @@
 data/*
 !data/.gitkeep
+!data/youtube/
+!data/youtube/*.json
 conti-collab/node_modules/

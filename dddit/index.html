@@ -171,6 +171,23 @@
       border: none;
     }
 
+    .yt-video-caption {
+      display: block;
+      padding: 6px 8px 8px;
+      font-size: 0.72rem;
+      line-height: 1.35;
+      color: var(--text);
+      text-decoration: none;
+      background: #fff;
+      border-top: 1px solid var(--border);
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .yt-video-caption:hover { color: var(--accent); }
+
     .yt-video-placeholder {
       aspect-ratio: 16 / 9;
       display: flex;
@@ -665,6 +682,6 @@
     </p>
   </div>
 
-  <script src="js/hub.js"></script>
+  <script src="js/hub.js?v=3"></script>
 </body>
 </html>

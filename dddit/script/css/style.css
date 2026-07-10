@@ -741,6 +741,57 @@ body[data-workflow-page="4"] .dock-inner {
   font-weight: 700;
 }
 
+.team-brief-callout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--brand-light);
+  border-radius: var(--radius);
+  background: var(--brand-soft);
+}
+
+.team-brief-callout .hint {
+  margin: 0.25rem 0 0;
+}
+
+.team-brief-panel {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface2);
+}
+
+.team-brief-panel summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.brief-source-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--brand-hover);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-light);
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.lineup-flex-toggle {
+  display: block;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
 .brief-section {
   margin: 1rem 0;
   padding: 0.85rem 1rem;

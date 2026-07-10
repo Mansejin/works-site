@@ -1,0 +1,12 @@
+{
+  "snapshots": [
+    { "label": "6주전", "total": 918, "organic": 412 },
+    { "label": "5주전", "total": 1464, "organic": 418 },
+    { "label": "4주전", "total": 2159, "organic": 425 },
+    { "label": "3주전", "total": 2537, "organic": 431 },
+    { "label": "2주전", "total": 2842, "organic": 445 },
+    { "label": "1주전", "total": 3405, "organic": 462 },
+    { "label": "최신", "total": 3829, "organic": 478 }
+  ],
+  "viewsTrend7d": [1383, 1341, 1283, 1153, 1184, 1309, 1427]
+}
