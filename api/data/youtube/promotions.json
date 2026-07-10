@@ -4,6 +4,51 @@
   ],
   "promotions": [
     {
+      "id": "redmi-pad2-subs",
+      "title": "레드미 패드 2 9.7 (구독)",
+      "videoTitle": "20만 원대 태블릿이 이 정도라고? 레드미 패드 2 9.7 리뷰",
+      "videoId": "",
+      "status": "진행중",
+      "goal": "시청자층 성장",
+      "cost": 91158,
+      "impressions": 62245,
+      "views": 642,
+      "subscribers": 334,
+      "followOnViews": 1,
+      "source": "manual",
+      "notes": ["Studio 캡처 2026-07-10", "활성 캠페인"]
+    },
+    {
+      "id": "dreame-mf10-subs",
+      "title": "드리미 MF10 (구독)",
+      "videoTitle": "다이슨이 긴장해야 할까? 드리미 MF10 직접 써봤습니다",
+      "videoId": "",
+      "status": "진행중",
+      "goal": "시청자층 성장",
+      "cost": 46054,
+      "impressions": 21416,
+      "views": 317,
+      "subscribers": 129,
+      "followOnViews": 0,
+      "source": "manual",
+      "notes": ["Studio 캡처 2026-07-10", "활성 캠페인"]
+    },
+    {
+      "id": "dreame-mf10-views",
+      "title": "드리미 MF10 (조회수)",
+      "videoTitle": "다이슨이 긴장해야 할까? 드리미 MF10 직접 써봤습니다",
+      "videoId": "",
+      "status": "진행중",
+      "goal": "동영상 조회수",
+      "cost": 23948,
+      "impressions": 8634,
+      "views": 810,
+      "subscribers": 0,
+      "followOnViews": 0,
+      "source": "manual",
+      "notes": ["Studio 캡처 2026-07-10", "동일 영상 · 조회수 목표 캠페인"]
+    },
+    {
       "id": "shokz-openfit-views",
       "title": "샥즈 오픈핏 프로 조회수",
       "videoTitle": "샥즈 오픈핏 프로",
@@ -42,6 +87,36 @@
         "남녀 모두 타겟",
         "10대부터 30대 타겟 설정"
       ]
+    },
+    {
+      "id": "logitech-mobifold-subs",
+      "title": "로지텍 모비폴드 (구독)",
+      "videoTitle": "마우스를 왜 접냐고요? 써보니 이유가 있네요",
+      "videoId": "",
+      "status": "완료",
+      "goal": "시청자층 성장",
+      "cost": 169799,
+      "impressions": 109236,
+      "views": 1492,
+      "subscribers": 602,
+      "followOnViews": 21,
+      "source": "manual",
+      "notes": ["Studio 캡처 2026-07-10", "2024-07-06 종료"]
+    },
+    {
+      "id": "lyfen-p3-t1-pro-subs",
+      "title": "라이픈 P3 Pro & T1 Pro (구독)",
+      "videoTitle": "애플이 면도기를 만들었다고? 라이픈 P3 Pro & T1 Pro 리뷰",
+      "videoId": "",
+      "status": "완료",
+      "goal": "시청자층 성장",
+      "cost": 169868,
+      "impressions": 70589,
+      "views": 1319,
+      "subscribers": 568,
+      "followOnViews": 11,
+      "source": "manual",
+      "notes": ["Studio 캡처 2026-07-10", "2024-06-26 종료"]
     }
   ]
 }
