@@ -207,26 +207,56 @@
 
   function renderRecentVideosChart(rows) {
     const ctx = document.getElementById("chart-recent-videos");
-    if (!ctx) return;
+    if (!ctx || !rows?.length) return;
     charts.recent = new Chart(ctx, {
       type: "bar",
       data: {
-        labels: rows.map((r) => r.title),
+        labels: rows.map((row) => row.shortLabel || row.title),
         datasets: [
           {
-            label: "조회수",
-            data: rows.map((r) => r.views),
-            backgroundColor: "rgba(220, 38, 38, 0.75)",
-            borderRadius: 6,
+            label: "자연 조회",
+            data: rows.map((row) => row.organicViews ?? row.views ?? 0),
+            backgroundColor: "rgba(148, 163, 184, 0.88)",
+            borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 },
+            stack: "views",
+          },
+          {
+            label: "광고 조회",
+            data: rows.map((row) => row.adViews ?? 0),
+            backgroundColor: "rgba(220, 38, 38, 0.88)",
+            borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+            stack: "views",
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 10 } } },
+          tooltip: {
+            callbacks: {
+              title(items) {
+                const row = rows[items[0]?.dataIndex];
+                return row?.title || items[0]?.label || "";
+              },
+              footer(items) {
+                const row = rows[items[0]?.dataIndex];
+                return row ? `합계 ${formatNum(row.views)}` : "";
+              },
+            },
+          },
+        },
         scales: {
-          y: { beginAtZero: true, ticks: { callback: (v) => formatNum(v) } },
+          x: {
+            stacked: true,
+            ticks: { maxRotation: 35, minRotation: 0, font: { size: 10 } },
+          },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            ticks: { callback: (value) => formatNum(value) },
+          },
         },
       },
     });

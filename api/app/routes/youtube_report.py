@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -259,6 +260,74 @@ def _analytics_status_note(analytics: dict[str, Any] | None) -> str:
     )
 
 
+def _normalize_match_text(value: str) -> str:
+    return " ".join(str(value or "").lower().split())
+
+
+def _promo_matches_video(title: str, video_id: str, promo: dict[str, Any]) -> bool:
+    promo_vid = str(promo.get("videoId") or "").strip()
+    if video_id and promo_vid and promo_vid == video_id:
+        return True
+    title_norm = _normalize_match_text(title)
+    video_title = _normalize_match_text(promo.get("videoTitle"))
+    if not video_title:
+        return False
+    if video_title in title_norm or title_norm in video_title:
+        return True
+    return len(video_title) >= 8 and video_title[:24] in title_norm
+
+
+def _ad_views_for_video(title: str, video_id: str, promotions: list[dict[str, Any]]) -> int:
+    return sum(
+        _parse_int(promo.get("views"))
+        for promo in promotions
+        if _promo_matches_video(title, video_id, promo)
+    )
+
+
+def _short_video_label(title: str, video_id: str, promotions: list[dict[str, Any]]) -> str:
+    for promo in promotions:
+        if _promo_matches_video(title, video_id, promo):
+            short = re.sub(r"\s*\([^)]*\)\s*$", "", str(promo.get("title") or "")).strip()
+            if short:
+                return short[:18]
+    if "?" in title:
+        tail = title.split("?", 1)[1].strip()
+        tail = re.sub(
+            r"\s*(리뷰|사용기|직접 써봤습니다|써봤습니다|개봉기).*$",
+            "",
+            tail,
+        ).strip()
+        if tail:
+            return tail[:18]
+    compact = title.strip()
+    return compact[:14] + "…" if len(compact) > 14 else compact
+
+
+def _build_recent_videos_bar(
+    videos: list[dict[str, Any]],
+    promotions: list[dict[str, Any]],
+    *,
+    limit: int = 6,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for video in videos[:limit]:
+        title = str(video.get("title") or "")
+        video_id = str(video.get("id") or "")
+        views = _parse_int(video.get("views"))
+        ad_views = min(views, _ad_views_for_video(title, video_id, promotions))
+        rows.append(
+            {
+                "title": title,
+                "shortLabel": _short_video_label(title, video_id, promotions),
+                "views": views,
+                "adViews": ad_views,
+                "organicViews": max(0, views - ad_views),
+            }
+        )
+    return rows
+
+
 def _build_subscriber_trend(
     snapshots_data: dict[str, Any],
     live_subscribers: int | None,
@@ -429,9 +498,7 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
                 "recentAvgViews": f"~{int(recent_avg):,}" if recent_avg else "—",
                 "recentAvgViewsRaw": int(recent_avg),
             },
-            "recentVideosBar": [
-                {"title": (v.get("title") or "")[:18], "views": v.get("views", 0)} for v in recent_six
-            ],
+            "recentVideosBar": _build_recent_videos_bar(videos, promotions),
             "viewsTrend7d": snapshots_data.get("viewsTrend7d") or [],
             "viewsTrendNote": views_trend_note,
             "subscriberTrend": _build_subscriber_trend(
