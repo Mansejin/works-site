@@ -513,8 +513,41 @@ textarea.prose-draft {
 .chapter-item-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
+}
+
+.chapter-item-head .btn-chapter-remove {
+  margin-left: auto;
+}
+
+.chapter-drag-handle {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.chapter-drag-handle:active {
+  cursor: grabbing;
+}
+
+.chapter-item.is-dragging {
+  opacity: 0.55;
+  border-color: #93c5fd;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.12);
+}
+
+.chapter-item.is-drag-over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .chapter-item-num {

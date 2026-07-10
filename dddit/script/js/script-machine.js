@@ -319,6 +319,56 @@ function renderSpecFields() {
   });
 }
 
+function reorderChapters(fromId, toId) {
+  const fromIdx = state.chapters.findIndex((c) => c.id === fromId);
+  const toIdx = state.chapters.findIndex((c) => c.id === toId);
+  if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+  const next = [...state.chapters];
+  const [moved] = next.splice(fromIdx, 1);
+  next.splice(toIdx, 0, moved);
+  state.chapters = next;
+  renderChapters();
+  saveProject();
+}
+
+function bindChapterDragDrop(list) {
+  let dragId = null;
+
+  list.querySelectorAll('.chapter-drag-handle').forEach((handle) => {
+    handle.addEventListener('dragstart', (e) => {
+      const item = handle.closest('.chapter-item');
+      dragId = item?.dataset.id || '';
+      if (!dragId) return;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', dragId);
+      item.classList.add('is-dragging');
+    });
+    handle.addEventListener('dragend', () => {
+      dragId = null;
+      list.querySelectorAll('.chapter-item').forEach((el) => {
+        el.classList.remove('is-dragging', 'is-drag-over');
+      });
+    });
+  });
+
+  list.querySelectorAll('.chapter-item').forEach((item) => {
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      item.classList.add('is-drag-over');
+    });
+    item.addEventListener('dragleave', (e) => {
+      if (!item.contains(e.relatedTarget)) item.classList.remove('is-drag-over');
+    });
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      item.classList.remove('is-drag-over');
+      const fromId = e.dataTransfer.getData('text/plain') || dragId;
+      reorderChapters(fromId, item.dataset.id);
+    });
+  });
+}
+
 function renderChapters() {
   const list = $('#chapter-list');
   if (!list) return;
@@ -329,6 +379,7 @@ function renderChapters() {
   list.innerHTML = state.chapters.map((ch, i) => `
     <div class="chapter-item" data-id="${esc(ch.id)}">
       <div class="chapter-item-head">
+        <button type="button" class="chapter-drag-handle" draggable="true" title="드래그하여 순서 변경" aria-label="챕터 순서 변경">⋮⋮</button>
         <span class="chapter-item-num">챕터 ${i + 1}</span>
         <button type="button" class="btn btn-ghost btn-sm btn-chapter-remove">삭제</button>
       </div>
@@ -356,6 +407,7 @@ function renderChapters() {
       saveProject();
     });
   });
+  bindChapterDragDrop(list);
 }
 
 function addChapter() {
