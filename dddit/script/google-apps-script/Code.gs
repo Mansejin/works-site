@@ -15,6 +15,7 @@ var CONTI_TAB = '콘티';
 
 var PROJECT_LABELS = {
   xenics: '디디딧 콘티 · Xenics',
+  vendict: '디디딧 콘티 · 벤딕트',
   default: '디디딧 콘티',
 };
 
@@ -347,4 +348,5 @@ function jsonOut_(obj, status) {
 function setupDdditProjects() {
   ensureProject_('default');
   ensureProject_('xenics');
+  ensureProject_('vendict');
 }

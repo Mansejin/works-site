@@ -1,0 +1,863 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="description" content="디디딧 협찬 제품 리스트" />
+  <link rel="canonical" href="https://works.mansejin.com/dddit/vendict/productlist/" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <title>협찬 제품 리스트 · 디디딧</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --header-bg: #0f172a;
+      --row-hover: #f8fafc;
+      --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      background: linear-gradient(160deg, #eef2ff 0%, var(--bg) 45%, #f8fafc 100%);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      padding: 40px 20px 56px;
+    }
+
+    .page {
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    .hub-nav {
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .hub-nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .hub-nav a:hover {
+      color: var(--accent);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 28px 32px 24px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid #bfdbfe;
+      border-radius: 999px;
+      padding: 4px 10px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px 24px;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px dashed var(--border);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .meta strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .table-wrap {
+      padding: 8px 0 0;
+      overflow: hidden;
+      overscroll-behavior-x: contain;
+    }
+
+    .product-table-body {
+      touch-action: pan-y;
+    }
+
+    .row-content {
+      touch-action: pan-y;
+    }
+
+    .row-shell.is-dragging .row-content {
+      touch-action: none;
+    }
+
+    .product-table {
+      width: 100%;
+      font-size: 14px;
+    }
+
+    .product-table-head,
+    .product-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.5fr) minmax(88px, 0.8fr) 72px minmax(160px, 1.2fr);
+      align-items: center;
+    }
+
+    .product-table-head {
+      background: var(--header-bg);
+      color: #f8fafc;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 14px 0;
+    }
+
+    .product-table-head > div {
+      padding: 0 20px;
+      white-space: nowrap;
+    }
+
+    .product-table-head > div:first-child { padding-left: 32px; }
+    .product-table-head > div:last-child { padding-right: 32px; }
+
+    .row-shell {
+      position: relative;
+      overflow: hidden;
+      border-bottom: 1px solid var(--border);
+      max-height: 120px;
+      transition: max-height 0.28s ease, opacity 0.22s ease, margin 0.28s ease;
+    }
+
+    .row-shell:last-child { border-bottom: none; }
+
+    .row-shell.is-removing {
+      max-height: 0;
+      opacity: 0;
+      margin: 0;
+      border-bottom-width: 0;
+      pointer-events: none;
+    }
+
+    .row-delete-area {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 72px;
+      z-index: 1;
+      transform: translateX(100%);
+      transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .row-delete-btn {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #ef4444;
+      color: #fff;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .row-delete-btn:hover,
+    .row-delete-area:hover .row-delete-btn {
+      background: #dc2626;
+    }
+
+    .row-edge-zone {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 22px;
+      z-index: 3;
+      cursor: default;
+      display: none;
+    }
+
+    .row-content {
+      position: relative;
+      z-index: 2;
+      background: var(--surface);
+      transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: transform;
+    }
+
+    .row-shell.is-revealed .row-content { transform: translateX(-72px); }
+    .row-shell.is-revealed .row-delete-area {
+      transform: translateX(0);
+      z-index: 4;
+    }
+    .row-shell.is-revealed .row-edge-zone { pointer-events: none; }
+    .row-shell.is-dragging .row-content { transition: none; }
+
+    .product-row:hover { background: var(--row-hover); }
+
+    .product-row .cell {
+      padding: 16px 20px;
+      min-width: 0;
+    }
+
+    .product-row .cell-name {
+      padding-left: 32px;
+      font-weight: 500;
+    }
+
+    .product-row .cell-link { padding-right: 32px; }
+
+    .product-row .cell-qty {
+      text-align: center;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .product-row .color-cell { color: var(--text-muted); }
+
+    [contenteditable="true"] {
+      font-family: inherit;
+      font-size: inherit;
+      font-weight: inherit;
+      font-style: normal;
+      color: inherit;
+      line-height: inherit;
+      letter-spacing: inherit;
+      text-decoration: none;
+      background: transparent;
+    }
+
+    .product-row .cell-name[contenteditable="true"] { font-weight: 500; }
+
+    [contenteditable="true"] * {
+      font: inherit !important;
+      color: inherit !important;
+      background: transparent !important;
+      text-decoration: none !important;
+    }
+
+    [contenteditable][data-placeholder]:empty::before {
+      content: attr(data-placeholder);
+      color: #94a3b8;
+      font-style: italic;
+      pointer-events: none;
+    }
+
+    .qty {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 36px;
+      height: 32px;
+      padding: 0 10px;
+      border: 1px dashed var(--border-strong);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text-muted);
+      outline: none;
+    }
+
+    .qty:focus,
+    .cell[contenteditable="true"]:focus,
+    .link-placeholder:focus {
+      outline: none;
+    }
+
+    .cell[contenteditable="true"]:focus,
+    .qty:focus,
+    .link-placeholder:focus {
+      border-radius: 6px;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .qty:focus { border-color: var(--accent); }
+
+    .link-cell a,
+    .link-placeholder {
+      display: inline-block;
+      max-width: 100%;
+      font-size: 13px;
+      word-break: break-all;
+      outline: none;
+    }
+
+    .link-cell a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .link-cell a:hover { color: #1d4ed8; }
+
+    .link-placeholder {
+      min-width: 120px;
+      min-height: 1.2em;
+    }
+
+    .table-actions {
+      padding: 16px 32px 24px;
+      border-top: 1px solid var(--border);
+      background: #fafbfc;
+    }
+
+    .btn-add {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px dashed var(--border-strong);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn-add:hover {
+      background: var(--accent-soft);
+      border-color: #93c5fd;
+    }
+
+    @media print {
+      .save-bar,
+      .table-actions,
+      .row-delete-area,
+      .row-delete-btn,
+      .row-edge-zone { display: none !important; }
+
+      body { background: #fff; padding: 0; }
+      .card { box-shadow: none; border: none; }
+      .row-shell.is-revealed .row-content { transform: none; }
+      .product-row:hover { background: transparent; }
+    }
+
+    @media (max-width: 640px) {
+      .card-header { padding-left: 20px; padding-right: 20px; }
+
+      .product-table-head > div:first-child,
+      .product-row .cell-name { padding-left: 20px; }
+
+      .product-table-head > div:last-child,
+      .product-row .cell-link { padding-right: 20px; }
+
+      .product-table-head,
+      .product-row {
+        grid-template-columns: minmax(140px, 1.4fr) minmax(72px, 0.7fr) 56px minmax(120px, 1fr);
+      }
+
+      .row-delete-area { width: 68px; }
+      .row-shell.is-revealed .row-content { transform: translateX(-68px); }
+      h1 { font-size: 20px; }
+      .table-actions { padding-left: 20px; padding-right: 20px; }
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .row-edge-zone { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <nav class="hub-nav">
+      <a href="../">← 벤딕트 프로젝트</a>
+    </nav>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="badge">디디딧</span>
+        <h1>협찬 제품 · 링크</h1>
+        <p class="subtitle">벤딕트 실버라이닝 퓨어 PRO · 상세페이지·구매 링크</p>
+        <div class="meta">
+          <span><strong>채널</strong> 디디딧</span>
+          <span><strong>브랜드</strong> 벤딕트 (Vendict)</span>
+          <span><strong>배송</strong> 롯데택배 411259947770</span>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="product-table">
+          <div class="product-table-head">
+            <div>제품명</div>
+            <div>색상</div>
+            <div>수량</div>
+            <div>링크</div>
+          </div>
+          <div id="product-tbody" class="product-table-body"></div>
+        </div>
+      </div>
+
+      <div class="table-actions">
+        <button type="button" class="btn-add" id="btn-add-row">+ 제품 추가</button>
+      </div>
+    </div>
+  </div>
+
+  <script id="product-data" type="application/json">
+[
+  {
+    "name": "벤딕트 실버라이닝 퓨어 PRO (차량용 청소기)",
+    "color": "",
+    "qty": "1",
+    "link": "https://brand.naver.com/vendict/products/11200977471"
+  },
+  {
+    "name": "구매 링크 (본문·고정댓글용)",
+    "color": "",
+    "qty": "",
+    "link": "https://wlo.kr/mkDqFW"
+  }
+]
+  </script>
+
+  <script>
+    const STORAGE_KEY = "works/dddit/vendict/productlist";
+    const LEGACY_STORAGE_KEYS = [
+      "works/dddit/productlist/vendict",
+      "works/dddit/productlist",
+    ];
+
+    const tbody = document.getElementById("product-tbody");
+    const btnAddRow = document.getElementById("btn-add-row");
+
+    const PLACEHOLDERS = {
+      name: "제품명 입력",
+      color: "색상 입력",
+      link: "제품 링크 입력",
+    };
+
+    const EMPTY_ROW = { name: "", color: "", qty: "1", link: "" };
+    const SWIPE = { openAt: 44 };
+
+    let saveTimer = null;
+    let linkClickTimer = null;
+    let swipeState = null;
+
+    function isUrl(value) {
+      return /^https?:\/\/\S+$/i.test(normalizeUrl(value));
+    }
+
+    function normalizeUrl(value) {
+      let text = (value || "").trim().replace(/\s+/g, "");
+      if (!text) return "";
+      if (/^www\./i.test(text)) text = "https://" + text;
+      return text;
+    }
+
+    function normalizeRow(row) {
+      const legacyNames = new Set(["제품명 입력", "제품명입력"]);
+      const legacyLinks = new Set(["제품 링크 입력", "제품링크입력", "제품 링크입력"]);
+      const legacyColors = new Set(["색상 입력", "색상입력"]);
+      const name = (row.name || "").trim();
+      const color = (row.color || "").trim();
+      const link = (row.link || "").trim();
+      return {
+        name: legacyNames.has(name) ? "" : name,
+        color: legacyColors.has(color) ? "" : color,
+        qty: (row.qty || "1").trim() || "1",
+        link: legacyLinks.has(link) ? "" : link,
+      };
+    }
+
+    function readCellText(element) {
+      return (element?.textContent || "").trim();
+    }
+
+    function normalizePlaceholder(element) {
+      if (!element?.hasAttribute("data-placeholder")) return;
+      if (!readCellText(element)) element.innerHTML = "";
+    }
+
+    function insertPlainText(element, text) {
+      element.focus();
+      const selection = window.getSelection();
+      if (!selection) return;
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        if (element.contains(range.commonAncestorContainer)) {
+          range.deleteContents();
+          range.insertNode(document.createTextNode(text));
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          return;
+        }
+      }
+      element.textContent = text;
+    }
+
+    function stripRichText(element) {
+      if (element.childElementCount > 0) {
+        element.textContent = element.innerText.replace(/\u00a0/g, " ");
+      }
+    }
+
+    function convertLinkCell(cell) {
+      const placeholder = cell.querySelector(".link-placeholder");
+      if (!placeholder) return false;
+      const value = normalizeUrl(readCellText(placeholder));
+      if (!isUrl(value)) return false;
+      const safe = escapeHtml(value);
+      cell.innerHTML = `<a href="${safe}" target="_blank" rel="noopener noreferrer">${safe}</a>`;
+      return true;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function renderEditableCell(value) {
+      const text = (value || "").trim();
+      return text ? escapeHtml(text) : "";
+    }
+
+    function renderLinkCell(link) {
+      const trimmed = normalizeUrl(link) || (link || "").trim();
+      if (isUrl(trimmed)) {
+        const safe = escapeHtml(trimmed);
+        return `<a href="${safe}" target="_blank" rel="noopener noreferrer">${safe}</a>`;
+      }
+      return `<span class="link-placeholder" contenteditable="true" data-placeholder="${PLACEHOLDERS.link}"></span>`;
+    }
+
+    function createRowHtml(row) {
+      const data = normalizeRow(row);
+      return `
+        <div class="row-shell">
+          <div class="row-delete-area">
+            <button type="button" class="row-delete-btn" aria-label="제품 삭제">삭제</button>
+          </div>
+          <div class="row-edge-zone" aria-hidden="true"></div>
+          <div class="product-row row-content">
+            <div class="cell cell-name" contenteditable="true" data-placeholder="${PLACEHOLDERS.name}">${renderEditableCell(data.name)}</div>
+            <div class="cell cell-color color-cell" contenteditable="true" data-placeholder="${PLACEHOLDERS.color}">${renderEditableCell(data.color)}</div>
+            <div class="cell cell-qty"><span class="qty" contenteditable="true">${escapeHtml(data.qty)}</span></div>
+            <div class="cell cell-link link-cell">${renderLinkCell(data.link)}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function getDeleteWidth(shell) {
+      const area = shell?.querySelector(".row-delete-area");
+      return area ? area.offsetWidth : 72;
+    }
+
+    function revealRow(shell) {
+      shell.classList.add("is-revealed");
+      const content = shell.querySelector(".row-content");
+      if (content) content.style.transform = "";
+    }
+
+    function closeRow(shell) {
+      shell.classList.remove("is-revealed", "is-dragging");
+      const content = shell.querySelector(".row-content");
+      if (content) content.style.transform = "";
+    }
+
+    function closeAllRevealedRows(except) {
+      tbody.querySelectorAll(".row-shell.is-revealed").forEach((shell) => {
+        if (shell !== except) closeRow(shell);
+      });
+    }
+
+    function deleteRow(shell) {
+      if (!shell || shell.classList.contains("is-removing")) return;
+      shell.style.maxHeight = `${shell.offsetHeight}px`;
+      shell.classList.add("is-removing");
+      requestAnimationFrame(() => { shell.style.maxHeight = "0px"; });
+      shell.addEventListener("transitionend", () => {
+        shell.remove();
+        scheduleSave();
+      }, { once: true });
+    }
+
+    function renderRows(rows) {
+      closeAllRevealedRows();
+      tbody.innerHTML = rows.map((row) => createRowHtml(row)).join("");
+    }
+
+    function addRow() {
+      tbody.insertAdjacentHTML("beforeend", createRowHtml({ ...EMPTY_ROW }));
+      tbody.lastElementChild.querySelector(".cell-name").focus();
+      scheduleSave();
+    }
+
+    function readEmbeddedRows() {
+      return JSON.parse(document.getElementById("product-data").textContent.trim());
+    }
+
+    function collectRows() {
+      return Array.from(tbody.querySelectorAll(".row-shell")).map((shell) => {
+        const row = shell.querySelector(".product-row");
+        const name = readCellText(row.querySelector(".cell-name"));
+        const color = readCellText(row.querySelector(".cell-color"));
+        const qty = readCellText(row.querySelector(".qty")) || "1";
+        const linkAnchor = row.querySelector(".link-cell a");
+        const linkPlaceholder = row.querySelector(".link-cell .link-placeholder");
+        const link = linkAnchor
+          ? normalizeUrl(linkAnchor.getAttribute("href") || readCellText(linkAnchor))
+          : normalizeUrl(readCellText(linkPlaceholder));
+        return normalizeRow({ name, color, qty, link });
+      });
+    }
+
+    function saveToLocalStorage(rows) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ updatedAt: Date.now(), rows }));
+    }
+
+    function loadFromLocalStorage() {
+      try {
+        let raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          for (const legacyKey of LEGACY_STORAGE_KEYS) {
+            raw = localStorage.getItem(legacyKey);
+            if (raw) {
+              localStorage.setItem(STORAGE_KEY, raw);
+              break;
+            }
+          }
+        }
+        if (!raw) return null;
+        return JSON.parse(raw).rows || null;
+      } catch {
+        return null;
+      }
+    }
+
+    function persistRows() {
+      saveToLocalStorage(collectRows());
+    }
+
+    function scheduleSave() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(persistRows, 400);
+    }
+
+    function isTouchUi() {
+      return window.matchMedia("(hover: none), (pointer: coarse)").matches;
+    }
+
+    function bindRowActions() {
+      tbody.addEventListener("click", (event) => {
+        const deleteTarget = event.target.closest(".row-delete-area, .row-delete-btn");
+        if (deleteTarget) {
+          event.preventDefault();
+          deleteRow(deleteTarget.closest(".row-shell"));
+          return;
+        }
+        if (!event.target.closest(".row-shell")) closeAllRevealedRows();
+      });
+
+      tbody.addEventListener("mouseenter", (event) => {
+        if (isTouchUi()) return;
+        const zone = event.target.closest(".row-edge-zone");
+        if (!zone) return;
+        const shell = zone.closest(".row-shell");
+        closeAllRevealedRows(shell);
+        revealRow(shell);
+      }, true);
+
+      tbody.addEventListener("mouseleave", (event) => {
+        if (isTouchUi()) return;
+        const shell = event.target.closest(".row-shell");
+        if (!shell) return;
+        const next = event.relatedTarget;
+        if (next && shell.contains(next)) return;
+        closeRow(shell);
+      }, true);
+
+      tbody.addEventListener("touchstart", (event) => {
+        if (!isTouchUi()) return;
+        const content = event.target.closest(".row-content");
+        if (!content || event.target.closest(".row-delete-area")) return;
+        const shell = content.closest(".row-shell");
+        const deleteWidth = getDeleteWidth(shell);
+        closeAllRevealedRows(shell);
+        swipeState = {
+          shell,
+          content,
+          startX: event.touches[0].clientX,
+          startY: event.touches[0].clientY,
+          offset: shell.classList.contains("is-revealed") ? -deleteWidth : 0,
+          locked: false,
+          deleteWidth,
+        };
+      }, { passive: true });
+
+      tbody.addEventListener("touchmove", (event) => {
+        if (!swipeState) return;
+        const dx = event.touches[0].clientX - swipeState.startX;
+        const dy = event.touches[0].clientY - swipeState.startY;
+        if (!swipeState.locked) {
+          if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+          swipeState.locked = Math.abs(dx) > Math.abs(dy);
+          if (!swipeState.locked) { swipeState = null; return; }
+          swipeState.shell.classList.add("is-dragging");
+        }
+        event.preventDefault();
+        const next = Math.min(0, Math.max(-swipeState.deleteWidth, swipeState.offset + dx));
+        swipeState.content.style.transform = `translateX(${next}px)`;
+      }, { passive: false });
+
+      const endSwipe = (event) => {
+        if (!swipeState) return;
+        const { shell, content, deleteWidth } = swipeState;
+        const point = event.changedTouches?.[0];
+        const dx = point ? point.clientX - swipeState.startX : 0;
+        const finalOffset = Math.min(0, Math.max(-deleteWidth, swipeState.offset + dx));
+        shell.classList.remove("is-dragging");
+        content.style.transform = "";
+        if (finalOffset <= -deleteWidth * 0.92) deleteRow(shell);
+        else if (finalOffset <= -SWIPE.openAt) revealRow(shell);
+        else closeRow(shell);
+        swipeState = null;
+      };
+
+      tbody.addEventListener("touchend", endSwipe, { passive: true });
+      tbody.addEventListener("touchcancel", endSwipe, { passive: true });
+    }
+
+    function bindEditEvents() {
+      tbody.addEventListener("focusin", (event) => {
+        const editable = event.target.closest("[data-placeholder][contenteditable='true']");
+        if (editable && !readCellText(editable)) editable.innerHTML = "";
+      });
+
+      tbody.addEventListener("paste", (event) => {
+        const editable = event.target.closest("[contenteditable='true']");
+        if (!editable) return;
+        event.preventDefault();
+        insertPlainText(editable, (event.clipboardData || window.clipboardData).getData("text/plain"));
+        const cell = editable.closest(".link-cell");
+        if (cell) convertLinkCell(cell);
+        scheduleSave();
+      });
+
+      tbody.addEventListener("input", (event) => {
+        const editable = event.target.closest("[contenteditable='true']");
+        if (editable) stripRichText(editable);
+        scheduleSave();
+      });
+
+      tbody.addEventListener("focusout", (event) => {
+        const editable = event.target.closest("[data-placeholder][contenteditable='true']");
+        if (editable) normalizePlaceholder(editable);
+        const cell = event.target.closest(".link-cell");
+        if (cell) {
+          if (convertLinkCell(cell)) { scheduleSave(); return; }
+          const placeholder = cell.querySelector(".link-placeholder");
+          if (placeholder) normalizePlaceholder(placeholder);
+        }
+        scheduleSave();
+      });
+
+      tbody.addEventListener("keydown", (event) => {
+        const editable = event.target.closest("[contenteditable='true']");
+        if (!editable || event.key !== "Enter") return;
+        event.preventDefault();
+        const cell = editable.closest(".link-cell");
+        if (cell && convertLinkCell(cell)) scheduleSave();
+        editable.blur();
+      });
+
+      tbody.addEventListener("click", (event) => {
+        const link = event.target.closest(".link-cell a");
+        if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        if (event.detail > 1) return;
+        event.preventDefault();
+        clearTimeout(linkClickTimer);
+        linkClickTimer = setTimeout(() => {
+          window.open(link.href, "_blank", "noopener,noreferrer");
+        }, 220);
+      });
+
+      tbody.addEventListener("dblclick", (event) => {
+        const link = event.target.closest(".link-cell a");
+        if (!link) return;
+        clearTimeout(linkClickTimer);
+        const cell = link.closest(".link-cell");
+        const href = link.getAttribute("href") || link.innerText.trim();
+        cell.innerHTML = `<span class="link-placeholder" contenteditable="true" data-placeholder="${PLACEHOLDERS.link}">${escapeHtml(href)}</span>`;
+        const placeholder = cell.querySelector(".link-placeholder");
+        placeholder.focus();
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(placeholder);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      });
+    }
+
+    function init() {
+      const embeddedRows = readEmbeddedRows().map(normalizeRow);
+      const storedRows = loadFromLocalStorage();
+      renderRows((storedRows || embeddedRows).map(normalizeRow));
+      bindEditEvents();
+      bindRowActions();
+
+      btnAddRow.addEventListener("click", addRow);
+      window.addEventListener("beforeunload", () => {
+        clearTimeout(saveTimer);
+        saveToLocalStorage(collectRows());
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="canonical" href="https://works.mansejin.com/dddit/vendict/conti/" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <title>완성 콘티 · Vendict · 디디딧</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --accent: #2563eb;
+      --header-bg: #0f172a;
+      --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      background: linear-gradient(160deg, #eef2ff 0%, var(--bg) 45%, #f8fafc 100%);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 32px 20px 48px;
+    }
+
+    .page { max-width: 1100px; margin: 0 auto; }
+
+    .hub-nav { margin-bottom: 16px; }
+    .hub-nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    .hub-nav a:hover { color: var(--accent); }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      background: var(--header-bg);
+      color: #f8fafc;
+      padding: 22px 24px;
+    }
+
+    .card-header h1 { font-size: 1.35rem; font-weight: 700; }
+    .card-header p { color: #cbd5e1; font-size: 0.88rem; margin-top: 6px; }
+
+    .status-bar {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      background: #fafbfc;
+    }
+
+    .status-bar.error {
+      background: #fef2f2;
+      color: #b91c1c;
+      border-color: #fecaca;
+    }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    td.col-script, td.col-scene, td.col-caption, td.col-note { white-space: pre-wrap; }
+    td.col-size { width: 72px; text-align: center; }
+    td.col-note { color: var(--text-muted); }
+
+    .empty {
+      padding: 48px 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 20px 12px 36px; }
+      th, td { padding: 8px; font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <nav class="hub-nav"><a href="../">← 벤딕트 프로젝트</a></nav>
+
+    <div class="card">
+      <div class="card-header">
+        <h1 id="page-title">완성 콘티</h1>
+        <p>대본 · 장면 · 사이즈 · 자막 · 코멘트 (읽기 전용)</p>
+      </div>
+      <div id="status-bar" class="status-bar">불러오는 중…</div>
+      <div class="table-wrap">
+        <table id="conti-table" hidden>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>대본</th>
+              <th>장면</th>
+              <th>사이즈</th>
+              <th>자막</th>
+              <th>코멘트</th>
+            </tr>
+          </thead>
+          <tbody id="conti-body"></tbody>
+        </table>
+        <div id="conti-empty" class="empty" hidden>등록된 콘티가 없습니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../js/conti-api.js"></script>
+  <script>
+    (function () {
+      const api = window.DdditContiApi;
+      const PROJECT = "vendict";
+
+      const pageTitle = document.getElementById("page-title");
+      const statusBar = document.getElementById("status-bar");
+      const table = document.getElementById("conti-table");
+      const tbody = document.getElementById("conti-body");
+      const emptyEl = document.getElementById("conti-empty");
+
+      function esc(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function renderRows(rows) {
+        if (!rows.length) {
+          table.hidden = true;
+          emptyEl.hidden = false;
+          return;
+        }
+
+        tbody.innerHTML = rows
+          .map(
+            (row, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td class="col-script">${esc(row.대본)}</td>
+            <td class="col-scene">${esc(row.장면)}</td>
+            <td class="col-size">${esc(row.사이즈)}</td>
+            <td class="col-caption">${esc(row.자막)}</td>
+            <td class="col-note">${esc(row.코멘트)}</td>
+          </tr>
+        `
+          )
+          .join("");
+
+        table.hidden = false;
+        emptyEl.hidden = true;
+      }
+
+      async function load() {
+        try {
+          const data = await api.load(PROJECT);
+          const label = data.title || "완성 콘티";
+          pageTitle.textContent = label;
+          statusBar.textContent = `${data.rows.length}행 · 읽기 전용`;
+          renderRows(data.rows);
+        } catch {
+          statusBar.textContent = "콘티를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+          statusBar.classList.add("error");
+        }
+      }
+
+      load();
+    })();
+  </script>
+</body>
+</html>

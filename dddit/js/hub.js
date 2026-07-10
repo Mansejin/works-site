@@ -14,6 +14,15 @@
       summary: "데스크 세팅 콘텐츠 · 협찬 제품 리스트",
       contiPath: "conti/?project=xenics",
     },
+    {
+      id: "vendict",
+      name: "벤딕트 실버라이닝 퓨어 PRO",
+      path: "vendict/",
+      brand: "벤딕트",
+      status: "진행 중",
+      summary: "차량용 청소기 협찬 · 업로드 8/2",
+      contiPath: "conti/?project=vendict",
+    },
   ];
 
   const CHANNEL_TOOLS = [
@@ -49,6 +58,16 @@
         status: "진행 중",
         note: "",
       },
+      {
+        id: uid(),
+        title: "벤딕트 퓨어 PRO 리뷰 업로드",
+        type: "업로드",
+        date: "2026-08-02",
+        assignee: "",
+        project: "vendict",
+        status: "예정",
+        note: "브랜드 제안 기한 · 일정 조정 가능",
+      },
     ],
     sponsorships: [
       {
@@ -60,6 +79,16 @@
         deadline: "",
         project: "xenics",
         note: "데스크테리어 협찬",
+      },
+      {
+        id: uid(),
+        brand: "벤딕트 (Vendict)",
+        kind: "협찬",
+        status: "진행 중",
+        contact: "김정범",
+        deadline: "2026-08-02",
+        project: "vendict",
+        note: "실버라이닝 퓨어 PRO · 구독자 이벤트 3회 · 롯데 411259947770",
       },
     ],
     notices: [

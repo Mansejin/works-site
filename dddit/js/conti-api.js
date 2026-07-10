@@ -9,6 +9,7 @@ window.DdditContiApi = (function () {
 
   const BRAND_VIEW_PATHS = {
     xenics: "/dddit/xenics/conti/",
+    vendict: "/dddit/vendict/conti/",
   };
 
   function baseUrl() {

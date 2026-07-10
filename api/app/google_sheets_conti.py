@@ -20,6 +20,7 @@ _DRIVE_QUERY = (
 
 PROJECT_LABELS = {
     "xenics": "디디딧 콘티 · Xenics",
+    "vendict": "디디딧 콘티 · 벤딕트",
     "default": "디디딧 콘티",
 }
 

@@ -7,6 +7,8 @@
 - 시나리오 머신: https://works.mansejin.com/dddit/script/
 - Xenics 프로젝트: https://works.mansejin.com/dddit/xenics/
 - Xenics 콘티: https://works.mansejin.com/dddit/script/?project=xenics
+- 벤딕트 프로젝트: https://works.mansejin.com/dddit/vendict/
+- 벤딕트 시나리오: https://works.mansejin.com/dddit/script/?project=vendict
 - 로지텍G 납품 일정: https://works.mansejin.com/logitechG/schedule/
 
 ## 경로 구조
@@ -24,6 +26,11 @@ works.mansejin.com/
         ├── plan/
         ├── storyboard/               → conti/ 리다이렉트
         ├── conti/                    # 완성 콘티 읽기 전용
+        └── productlist/
+    └── vendict/                      # 벤딕트 차량용 청소기 협찬
+        ├── index.html
+        ├── plan/
+        ├── conti/
         └── productlist/
 ```
 

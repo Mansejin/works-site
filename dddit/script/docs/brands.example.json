@@ -3,6 +3,12 @@
     "name": "Xenics",
     "brand": "제닉스",
     "sheetProject": "xenics",
-    "publicScriptPath": "/dddit/xenics/script/"
+    "publicScriptPath": "/dddit/script/?project=xenics"
+  },
+  "vendict": {
+    "name": "벤딕트 실버라이닝 퓨어 PRO",
+    "brand": "벤딕트",
+    "sheetProject": "vendict",
+    "publicScriptPath": "/dddit/script/?project=vendict"
   }
 }

@@ -7,6 +7,7 @@ window.DdditSheetSync = (function () {
 
   const PROJECT_LABELS = {
     xenics: 'Xenics',
+    vendict: '벤딕트',
     default: '기본',
   };
 
