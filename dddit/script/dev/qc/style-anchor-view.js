@@ -1,8 +1,11 @@
 /**
  * 스타일 앵커 컨펌 페이지 — 대표님 검토용
+ * 수정 하이라이트 + 섹션별 우측 메모
  */
 (function () {
-  const STORAGE_KEY = 'dididit-style-anchor-confirm-v1';
+  const STORAGE_CHECK = 'dididit-style-anchor-confirm-v1';
+  const STORAGE_EDITS = 'dididit-style-anchor-edits-v1';
+  const STORAGE_NOTES = 'dididit-style-anchor-notes-v1';
 
   const GROUPS = [
     { id: 'common', label: '공통' },
@@ -32,18 +35,28 @@
   };
 
   let sections = [];
-  let checked = loadChecked();
+  let checked = loadJson(STORAGE_CHECK, {});
+  let edits = loadJson(STORAGE_EDITS, {});
+  let notes = loadJson(STORAGE_NOTES, {});
 
-  function loadChecked() {
+  function loadJson(key, fallback) {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      return JSON.parse(localStorage.getItem(key) || 'null') || fallback;
     } catch {
-      return {};
+      return fallback;
     }
   }
 
   function saveChecked() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(checked));
+    localStorage.setItem(STORAGE_CHECK, JSON.stringify(checked));
+  }
+
+  function saveEdits() {
+    localStorage.setItem(STORAGE_EDITS, JSON.stringify(edits));
+  }
+
+  function saveNotes() {
+    localStorage.setItem(STORAGE_NOTES, JSON.stringify(notes));
   }
 
   function parseStyleAnchor(text) {
@@ -54,7 +67,8 @@
 
     function flush() {
       if (!current) return;
-      result.push({ title: current, body: body.join('\n').trim() });
+      const content = body.join('\n').trim();
+      result.push({ title: current, originalBody: content, body: content });
       body = [];
     }
 
@@ -71,14 +85,54 @@
     return result;
   }
 
-  function renderTable(md) {
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function sectionId(title) {
+    return title.replace(/\s+/g, '-');
+  }
+
+  function getBody(s) {
+    const id = sectionId(s.title);
+    return edits[id] !== undefined ? edits[id] : s.originalBody;
+  }
+
+  function isEdited(s) {
+    return getBody(s) !== s.originalBody;
+  }
+
+  function hasNote(s) {
+    const n = notes[sectionId(s.title)];
+    return Boolean(n && n.trim());
+  }
+
+  function renderDiffHtml(original, edited) {
+    if (original === edited) return '';
+    const oLines = original.split('\n');
+    const eLines = edited.split('\n');
+    const max = Math.max(oLines.length, eLines.length);
+    const parts = [];
+    for (let i = 0; i < max; i++) {
+      const o = oLines[i] ?? '';
+      const e = eLines[i] ?? '';
+      if (o === e) {
+        if (e) parts.push(`<div class="diff-line diff-same">${escapeHtml(e)}</div>`);
+      } else {
+        if (o) parts.push(`<div class="diff-line diff-del">${escapeHtml(o)}</div>`);
+        if (e) parts.push(`<div class="diff-line diff-ins">${escapeHtml(e)}</div>`);
+      }
+    }
+    return parts.join('');
+  }
+
+  function renderTablePreview(md) {
     const rows = md.split('\n').filter((l) => l.trim().startsWith('|'));
-    if (rows.length < 2) return `<pre>${escapeHtml(md)}</pre>`;
-    const parseRow = (r) =>
-      r
-        .split('|')
-        .slice(1, -1)
-        .map((c) => c.trim());
+    if (rows.length < 2) return '';
+    const parseRow = (r) => r.split('|').slice(1, -1).map((c) => c.trim());
     const header = parseRow(rows[0]);
     const data = rows.slice(2).map(parseRow);
     let html = '<table><thead><tr>';
@@ -93,17 +147,6 @@
     return html;
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
-
-  function sectionId(title) {
-    return title.replace(/\s+/g, '-');
-  }
-
   function renderNav() {
     const nav = document.getElementById('nav');
     let html = '<h2>목차</h2>';
@@ -113,12 +156,90 @@
       html += `<div style="margin:10px 0 4px;font-weight:600;font-size:.75rem;color:#94a3b8">${g.label}</div>`;
       items.forEach((s) => {
         const id = sectionId(s.title);
-        const ok = checked[id] ? ' ✓' : '';
-        html += `<a href="#${id}" data-id="${id}">${s.title}${ok}</a>`;
+        const flags = [];
+        if (checked[id]) flags.push('✓');
+        if (isEdited(s)) flags.push('✎');
+        if (hasNote(s)) flags.push('💬');
+        const flagStr = flags.length ? `<span class="flags">${flags.join('')}</span>` : '';
+        html += `<a href="#${id}" data-id="${id}">${escapeHtml(s.title)}${flagStr}</a>`;
       });
     });
-    html += `<div style="margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0"><a href="#roundup-note" id="roundup-note">라운드업 안내</a></div>`;
+    html += '<div style="margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0"><a href="#roundup-note">라운드업 안내</a></div>';
     nav.innerHTML = html;
+  }
+
+  function bindSectionEvents(article, s) {
+    const id = sectionId(s.title);
+    const editor = article.querySelector('.section-editor');
+    const diffBox = article.querySelector('.diff-box');
+    const diffLines = article.querySelector('.diff-lines');
+    const memo = article.querySelector('.memo-input');
+    const btnRevert = article.querySelector('.btn-revert');
+    const checkbox = article.querySelector('input[type=checkbox]');
+
+    function refreshSectionUi() {
+      const body = getBody(s);
+      const edited = isEdited(s);
+      const note = hasNote(s);
+      article.classList.toggle('edited', edited);
+      article.classList.toggle('has-memo', note);
+      article.classList.toggle('ok', checked[id]);
+      const badge = article.querySelector('.badge-edit');
+      if (badge) badge.hidden = !edited;
+
+      const diffHtml = renderDiffHtml(s.originalBody, body);
+      if (diffHtml) {
+        diffBox.hidden = false;
+        diffLines.innerHTML = diffHtml;
+      } else {
+        diffBox.hidden = true;
+        diffLines.innerHTML = '';
+      }
+      btnRevert.hidden = !edited;
+
+      const tablePreview = article.querySelector('.table-preview');
+      if (tablePreview && SECTION_META[s.title]?.isTable) {
+        tablePreview.innerHTML = renderTablePreview(body);
+      }
+    }
+
+    editor.addEventListener('input', () => {
+      const val = editor.value;
+      if (val === s.originalBody) {
+        delete edits[id];
+      } else {
+        edits[id] = val;
+      }
+      saveEdits();
+      refreshSectionUi();
+      renderNav();
+    });
+
+    memo.addEventListener('input', () => {
+      const val = memo.value.trim();
+      if (val) notes[id] = memo.value;
+      else delete notes[id];
+      saveNotes();
+      refreshSectionUi();
+      renderNav();
+    });
+
+    btnRevert.addEventListener('click', () => {
+      if (!confirm('이 섹션을 원문으로 되돌릴까요?')) return;
+      delete edits[id];
+      editor.value = s.originalBody;
+      saveEdits();
+      refreshSectionUi();
+      renderNav();
+    });
+
+    checkbox.addEventListener('change', () => {
+      checked[id] = checkbox.checked;
+      saveChecked();
+      updateProgress();
+      refreshSectionUi();
+      renderNav();
+    });
   }
 
   function renderSections() {
@@ -134,52 +255,92 @@
         lastGroup = g.label;
       }
       const id = sectionId(s.title);
-      const isOk = checked[id];
-      const bodyHtml = meta.isTable ? renderTable(s.body) : `<pre>${escapeHtml(s.body)}</pre>`;
+      const body = getBody(s);
+      const edited = isEdited(s);
+      const note = notes[id] || '';
+      const diffHtml = renderDiffHtml(s.originalBody, body);
+      const classes = ['section'];
+      if (checked[id]) classes.push('ok');
+      if (edited) classes.push('edited');
+      if (note.trim()) classes.push('has-memo');
+
       html += `
-        <article class="section${isOk ? ' ok' : ''}" id="${id}">
-          <label class="section-head">
-            <input type="checkbox" data-id="${id}" ${isOk ? 'checked' : ''} />
+        <article class="${classes.join(' ')}" id="${id}" data-id="${id}">
+          <div class="section-head">
+            <input type="checkbox" data-id="${id}" ${checked[id] ? 'checked' : ''} />
             <span class="meta">
               <h3>${escapeHtml(s.title)}</h3>
               ${meta.tag ? `<span class="tag">${escapeHtml(meta.tag)}</span>` : ''}
+              <span class="badge-edit" ${edited ? '' : 'hidden'}>수정됨</span>
             </span>
-          </label>
-          <div class="section-body">${bodyHtml}</div>
+          </div>
+          <div class="section-grid">
+            <div class="section-main">
+              <div class="diff-box" ${diffHtml ? '' : 'hidden'}>
+                <div class="diff-box-head">변경된 부분</div>
+                <div class="diff-lines">${diffHtml}</div>
+              </div>
+              ${meta.isTable ? `<div class="table-preview section-body">${renderTablePreview(body)}</div>` : ''}
+              <textarea class="section-editor" data-id="${id}" spellcheck="false">${escapeHtml(body)}</textarea>
+              <div class="section-toolbar">
+                <button type="button" class="btn-revert small" ${edited ? '' : 'hidden'}>원문 복원</button>
+                <span class="hint">본문을 수정하면 위에 변경 줄이 표시됩니다</span>
+              </div>
+            </div>
+            <aside class="section-memo">
+              <label for="memo-${id}">메모</label>
+              <textarea id="memo-${id}" class="memo-input" data-id="${id}" placeholder="수정 의견·컨펌 코멘트…">${escapeHtml(note)}</textarea>
+            </aside>
+          </div>
         </article>`;
     });
 
     html += `
       <h2 class="group-title" id="roundup-note">라운드업 (별도 포맷)</h2>
       <article class="section">
-        <div class="section-body" style="padding:16px">
-          <p class="rules">N개 아이템 영상(다이소·쿠팡·무인양품 등)은 이 스타일 앵커와 <strong>별도</strong>입니다.</p>
-          <ul style="font-size:.88rem;color:#475569;padding-left:18px">
-            <li>구조: 오프닝 → <code>[제품명]</code> 블록 반복 → 라운드업 클로징</li>
-            <li>감지: <code>N가지</code>·<code>꿀템 N</code>·<code>베스트 N</code> 등 개수 신호 필요</li>
-            <li>브랜드만으로는 단일 제품 리뷰로 처리</li>
-          </ul>
+        <div class="section-grid">
+          <div class="section-main" style="border-right:0;padding-left:16px">
+            <p style="font-size:.88rem;color:#475569;margin-bottom:8px">N개 아이템 영상은 이 스타일 앵커와 <strong>별도</strong>입니다.</p>
+            <ul style="font-size:.88rem;color:#475569;padding-left:18px">
+              <li>구조: 오프닝 → <code>[제품명]</code> 블록 반복 → 라운드업 클로징</li>
+              <li>감지: <code>N가지</code>·<code>꿀템 N</code>·<code>베스트 N</code> 등 개수 신호 필요</li>
+            </ul>
+          </div>
+          <aside class="section-memo">
+            <label>메모</label>
+            <textarea class="memo-input" id="memo-roundup" placeholder="라운드업 관련 의견…">${escapeHtml(notes['roundup-note'] || '')}</textarea>
+          </aside>
         </div>
       </article>`;
 
     box.innerHTML = html;
 
-    box.querySelectorAll('input[type=checkbox]').forEach((inp) => {
-      inp.addEventListener('change', () => {
-        checked[inp.dataset.id] = inp.checked;
-        saveChecked();
-        updateProgress();
-        inp.closest('.section').classList.toggle('ok', inp.checked);
-        renderNav();
-      });
+    sections.forEach((s) => {
+      const article = document.getElementById(sectionId(s.title));
+      if (article) bindSectionEvents(article, s);
     });
+
+    const roundupMemo = document.getElementById('memo-roundup');
+    if (roundupMemo) {
+      roundupMemo.addEventListener('input', () => {
+        const val = roundupMemo.value.trim();
+        if (val) notes['roundup-note'] = roundupMemo.value;
+        else delete notes['roundup-note'];
+        saveNotes();
+      });
+    }
   }
 
   function updateProgress() {
     const total = sections.length;
     const done = sections.filter((s) => checked[sectionId(s.title)]).length;
+    const editedCount = sections.filter((s) => isEdited(s)).length;
+    const noteCount = sections.filter((s) => hasNote(s)).length + (notes['roundup-note']?.trim() ? 1 : 0);
     const pct = total ? Math.round((done / total) * 100) : 0;
-    document.getElementById('progress-text').textContent = `${done} / ${total} 확인 (${pct}%)`;
+    document.getElementById('progress-text').textContent =
+      `${done} / ${total} 확인 (${pct}%)` +
+      (editedCount ? ` · 수정 ${editedCount}` : '') +
+      (noteCount ? ` · 메모 ${noteCount}` : '');
     document.getElementById('progress-bar').style.width = `${pct}%`;
     document.getElementById('done-banner').classList.toggle('show', done === total && total > 0);
   }
@@ -188,17 +349,42 @@
     const lines = ['[디디딧 스타일 앵커 컨펌]', `일시: ${new Date().toLocaleString('ko-KR')}`, ''];
     sections.forEach((s) => {
       const id = sectionId(s.title);
-      lines.push(`${checked[id] ? '✅' : '⬜'} ${s.title}`);
+      const flags = [];
+      if (checked[id]) flags.push('확인');
+      if (isEdited(s)) flags.push('수정');
+      if (hasNote(s)) flags.push('메모');
+      lines.push(`${flags.length ? `[${flags.join(',')}]` : '[ ]'} ${s.title}`);
+      if (hasNote(s)) lines.push(`  메모: ${notes[id].trim()}`);
+      if (isEdited(s)) {
+        lines.push('  --- 수정본 ---');
+        lines.push(getBody(s).split('\n').map((l) => `  ${l}`).join('\n'));
+      }
     });
+    if (notes['roundup-note']?.trim()) {
+      lines.push('', '[메모] 라운드업', notes['roundup-note'].trim());
+    }
     const done = sections.every((s) => checked[sectionId(s.title)]);
     lines.push('', done ? '상태: 전체 컨펌 완료' : '상태: 검토 중');
     navigator.clipboard.writeText(lines.join('\n'));
-    alert('컨펌 요약을 클립보드에 복사했습니다.');
+    alert('컨펌 요약(메모·수정 포함)을 클립보드에 복사했습니다.');
+  }
+
+  function resetAll() {
+    if (!confirm('확인 체크·수정·메모를 모두 초기화할까요?')) return;
+    checked = {};
+    edits = {};
+    notes = {};
+    saveChecked();
+    saveEdits();
+    saveNotes();
+    renderSections();
+    renderNav();
+    updateProgress();
   }
 
   async function init() {
     const res = await fetch('../../prompts/style-anchor.txt');
-    if (!res.ok) throw new Error('style-anchor.txt 로드 실패 — 로컬 서버에서 열어주세요.');
+    if (!res.ok) throw new Error('style-anchor.txt 로드 실패');
     const text = await res.text();
     sections = parseStyleAnchor(text);
     renderNav();
@@ -213,15 +399,7 @@
       updateProgress();
     });
 
-    document.getElementById('btn-reset').addEventListener('click', () => {
-      if (!confirm('확인 체크를 모두 초기화할까요?')) return;
-      checked = {};
-      saveChecked();
-      renderSections();
-      renderNav();
-      updateProgress();
-    });
-
+    document.getElementById('btn-reset').addEventListener('click', resetAll);
     document.getElementById('btn-copy').addEventListener('click', copySummary);
 
     document.getElementById('nav').addEventListener('click', (e) => {
@@ -233,6 +411,6 @@
   }
 
   init().catch((e) => {
-    document.body.innerHTML = `<p style="padding:32px;color:#b91c1c;font-family:sans-serif">로드 실패: ${e.message}<br><br>works-site 루트에서 HTTP 서버 실행 후<br><code>dddit/script/dev/qc/style-anchor.html</code> 을 열어주세요.</p>`;
+    document.body.innerHTML = `<p style="padding:32px;color:#b91c1c;font-family:sans-serif">로드 실패: ${e.message}</p>`;
   });
 })();

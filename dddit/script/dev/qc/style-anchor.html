@@ -19,7 +19,10 @@
       --ok-soft: #dcfce7;
       --warn: #b45309;
       --warn-soft: #fef3c7;
+      --diff-ins: #fef08a;
+      --diff-del: #fecaca;
       --group: #f1f5f9;
+      --memo-bg: #fffbeb;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -33,7 +36,7 @@
       color: #fff;
       padding: 28px 24px 32px;
     }
-    .top .wrap { max-width: 1080px; margin: 0 auto; }
+    .top .wrap { max-width: 1200px; margin: 0 auto; }
     .top .badge {
       display: inline-block;
       font-size: .75rem;
@@ -44,19 +47,20 @@
       margin-bottom: 10px;
     }
     .top h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
-    .top p { font-size: .92rem; opacity: .92; max-width: 640px; }
+    .top p { font-size: .92rem; opacity: .92; max-width: 720px; }
     .layout {
-      max-width: 1080px;
+      max-width: 1200px;
       margin: 0 auto;
       padding: 24px;
       display: grid;
-      grid-template-columns: 220px 1fr;
+      grid-template-columns: 200px 1fr;
       gap: 24px;
       align-items: start;
     }
-    @media (max-width: 800px) {
+    @media (max-width: 900px) {
       .layout { grid-template-columns: 1fr; }
       .nav { position: static !important; }
+      .section-grid { grid-template-columns: 1fr !important; }
     }
     .nav {
       position: sticky;
@@ -78,6 +82,7 @@
     }
     .nav a:hover { background: var(--group); }
     .nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    .nav .flags { font-size: .7rem; color: var(--warn); margin-left: 2px; }
     .summary {
       background: var(--warn-soft);
       border: 1px solid #fcd34d;
@@ -119,7 +124,7 @@
       cursor: pointer;
     }
     button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-    button.ok { background: var(--ok); color: #fff; border-color: var(--ok); }
+    button.small { padding: 4px 10px; font-size: .78rem; }
     .group-title {
       font-size: .78rem;
       font-weight: 700;
@@ -139,15 +144,16 @@
       overflow: hidden;
     }
     .section.ok { border-color: #86efac; }
+    .section.edited { border-color: #fcd34d; box-shadow: 0 0 0 1px #fef08a; }
+    .section.has-memo { border-right: 3px solid #fbbf24; }
     .section-head {
       display: flex;
       align-items: flex-start;
       gap: 12px;
       padding: 14px 16px;
-      cursor: pointer;
       user-select: none;
+      border-bottom: 1px solid var(--border);
     }
-    .section-head:hover { background: #fafbfc; }
     .section-head input { margin-top: 4px; width: 18px; height: 18px; flex-shrink: 0; cursor: pointer; }
     .section-head .meta { flex: 1; }
     .section-head h3 { font-size: .95rem; font-weight: 600; }
@@ -159,31 +165,116 @@
       padding: 2px 8px;
       border-radius: 4px;
       margin-top: 4px;
+      margin-right: 4px;
     }
-    .section-body {
-      padding: 0 16px 16px 46px;
-      border-top: 1px solid var(--border);
+    .section-head .badge-edit {
+      font-size: .7rem;
+      color: var(--warn);
+      background: var(--warn-soft);
+      padding: 2px 8px;
+      border-radius: 4px;
     }
-    .section-body pre {
-      font-family: Pretendard, sans-serif;
+    .section-grid {
+      display: grid;
+      grid-template-columns: 1fr 220px;
+      gap: 0;
+      align-items: stretch;
+    }
+    .section-main {
+      padding: 14px 16px 16px 46px;
+      border-right: 1px solid var(--border);
+    }
+    .section-memo {
+      padding: 14px 12px 16px;
+      background: var(--memo-bg);
+    }
+    .section-memo label {
+      display: block;
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--warn);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 8px;
+    }
+    .diff-box {
+      margin-bottom: 10px;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .diff-box-head {
+      font-size: .72rem;
+      font-weight: 600;
+      color: var(--warn);
+      padding: 6px 10px;
+      background: var(--warn-soft);
+      border-bottom: 1px solid #fcd34d;
+    }
+    .diff-lines { font-size: .86rem; line-height: 1.7; }
+    .diff-line { padding: 2px 10px; white-space: pre-wrap; word-break: break-word; }
+    .diff-line.diff-same { color: #334155; }
+    .diff-line.diff-del {
+      background: var(--diff-del);
+      color: #991b1b;
+      text-decoration: line-through;
+      opacity: .85;
+    }
+    .diff-line.diff-ins {
+      background: var(--diff-ins);
+      color: #713f12;
+      font-weight: 500;
+    }
+    .section-editor {
+      width: 100%;
+      min-height: 120px;
+      font: inherit;
       font-size: .88rem;
       line-height: 1.75;
-      white-space: pre-wrap;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      resize: vertical;
       color: #334155;
       background: var(--group);
-      padding: 14px 16px;
+    }
+    .section-editor:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: #fff;
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .section-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      align-items: center;
+    }
+    .section-toolbar .hint { font-size: .75rem; color: var(--muted); }
+    .memo-input {
+      width: 100%;
+      min-height: 100px;
+      font: inherit;
+      font-size: .82rem;
+      line-height: 1.55;
+      padding: 10px;
+      border: 1px solid #fcd34d;
       border-radius: 8px;
+      resize: vertical;
+      background: #fff;
+      color: #334155;
     }
-    .section-body .rules {
-      font-size: .85rem;
-      color: var(--muted);
-      margin-bottom: 10px;
+    .memo-input:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(251,191,36,.25);
     }
+    .memo-input::placeholder { color: #a8a29e; }
     .section-body table {
       width: 100%;
       border-collapse: collapse;
       font-size: .85rem;
-      margin-bottom: 4px;
+      margin-bottom: 8px;
     }
     .section-body th, .section-body td {
       border: 1px solid var(--border);
@@ -210,6 +301,25 @@
       font-weight: 600;
     }
     .done-banner.show { display: block; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: .78rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid rgba(0,0,0,.08);
+    }
+    .legend .lg-ins { background: var(--diff-ins); }
+    .legend .lg-del { background: var(--diff-del); }
+    .legend .lg-memo { background: var(--memo-bg); border-color: #fcd34d; }
   </style>
 </head>
 <body>
@@ -217,7 +327,7 @@
     <div class="wrap">
       <span class="badge">컨펌 요청 · 2026-07</span>
       <h1>디디딧 대본 스타일 앵커</h1>
-      <p>콘티 작성기 AI가 참고하는 톤·호흡 기준입니다. 각 섹션을 검토하시고 체크해 주세요. 예시 문장은 제품별 복사가 아니라 말투·리듬 참고용입니다.</p>
+      <p>본문을 직접 수정하면 변경 줄이 노란색으로 표시됩니다. 우측 메모란에 의견을 남겨 주세요. 체크·메모·수정은 브라우저에 저장됩니다.</p>
     </div>
   </header>
 
@@ -226,7 +336,13 @@
 
     <main>
       <div class="summary">
-        <strong>확인 부탁드립니다.</strong> 아래 톤 가이드가 디디딧 채널 방향과 맞는지 검토해 주세요. 전 항목 체크 후 «컨펌 완료»를 누르시면 됩니다. 수정 의견은 섹션별로 메모해 주셔도 됩니다.
+        <strong>확인 부탁드립니다.</strong> 톤 가이드 검토 후 체크해 주세요. 문장 수정이 필요하면 왼쪽 본문을 편집하고, 우측에 메모를 남겨 주세요.
+      </div>
+
+      <div class="legend">
+        <span><i class="lg-ins"></i> 추가·변경된 줄</span>
+        <span><i class="lg-del"></i> 삭제된 줄</span>
+        <span><i class="lg-memo"></i> 메모 있음</span>
       </div>
 
       <div class="done-banner" id="done-banner">전체 섹션 컨펌 완료 — 감사합니다.</div>
@@ -247,7 +363,7 @@
 
       <p class="footer-note">
         라운드업(N개 아이템) 포맷은 별도: <a href="style-anchor.html#roundup-note">하단 참고</a> ·
-        <a href="index.html">대본 QC 도구</a> · 개발 전용 (콘티 작성기 UI 미노출)
+        <a href="index.html">대본 QC 도구</a>
       </p>
     </main>
   </div>
