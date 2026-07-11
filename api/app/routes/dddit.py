@@ -16,6 +16,13 @@ from app.google_sheets_conti import (
     sheets_native_configured,
 )
 
+from app.team_gate import (
+    issue_team_token,
+    team_gate_enabled,
+    verify_team_passcode,
+    verify_team_token,
+)
+
 router = APIRouter(prefix="/api/dddit", tags=["dddit"])
 
 SHEET_TIMEOUT = 60.0
@@ -25,6 +32,35 @@ GEMINI_TIMEOUT = 180.0
 class SheetRowsBody(BaseModel):
     project: str = "default"
     rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class TeamGateLoginBody(BaseModel):
+    passcode: str = ""
+
+
+@router.get("/team-gate/status")
+def team_gate_status() -> dict[str, Any]:
+    return {"ok": True, "enabled": team_gate_enabled()}
+
+
+@router.post("/team-gate/login")
+def team_gate_login(body: TeamGateLoginBody) -> dict[str, Any]:
+    if not team_gate_enabled():
+        return {"ok": True, "enabled": False, "bypass": True}
+    if not verify_team_passcode(body.passcode):
+        raise HTTPException(status_code=401, detail="Invalid passcode")
+    token, expires_at = issue_team_token()
+    return {"ok": True, "enabled": True, "token": token, "expiresAt": expires_at}
+
+
+@router.get("/team-gate/verify")
+def team_gate_verify(request: Request) -> dict[str, Any]:
+    if not team_gate_enabled():
+        return {"ok": True, "enabled": False, "bypass": True}
+    token = request.headers.get("X-Dddit-Team-Token", "").strip()
+    if not verify_team_token(token):
+        raise HTTPException(status_code=401, detail="Invalid or expired team token")
+    return {"ok": True, "enabled": True}
 
 
 def _sheet_backend() -> str:

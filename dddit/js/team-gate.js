@@ -1,0 +1,100 @@
+/**
+ * 디디딧 내부 페이지 팀 게이트 (works.mansejin.com)
+ * 브랜드 공유 페이지(plan/conti/productlist)는 제외.
+ * NAS DDDIT_TEAM_GATE_PASSCODE 설정 시에만 활성화됩니다.
+ */
+(function () {
+  "use strict";
+
+  const TOKEN_KEY = "works/dddit/team-gate-token";
+  const BYPASS_KEY = "works/dddit/team-gate-bypass";
+  const INTERNAL_TOP = new Set([
+    "script",
+    "conti",
+    "report",
+    "productlist",
+    "js",
+    "_template",
+    "docs",
+    "scripts",
+    "gate.html",
+  ]);
+
+  const IS_PROD =
+    location.protocol === "https:" && /^works\.mansejin\.com$/i.test(location.hostname);
+
+  const API_BASE = IS_PROD ? "https://works-api.mansejin.com" : "http://localhost:8788";
+
+  function gateUrl() {
+    const returnTo = location.pathname + location.search + location.hash;
+    return `/dddit/gate.html?return=${encodeURIComponent(returnTo)}`;
+  }
+
+  function isGatePage() {
+    return /\/dddit\/gate\.html$/i.test(location.pathname);
+  }
+
+  function isPublicBrandSharePath() {
+    const path = location.pathname.replace(/\/+$/, "");
+    const match = path.match(/\/dddit\/([^/]+)\/(productlist|plan|conti)$/);
+    if (!match) return false;
+    return !INTERNAL_TOP.has(match[1]);
+  }
+
+  function revealPage() {
+    document.documentElement.classList.remove("team-gate-pending");
+  }
+
+  function blockPage() {
+    document.documentElement.classList.add("team-gate-pending");
+  }
+
+  async function fetchGateEnabled() {
+    try {
+      const res = await fetch(`${API_BASE}/api/dddit/team-gate/status`);
+      if (!res.ok) return false;
+      const data = await res.json();
+      return !!data.enabled;
+    } catch {
+      return false;
+    }
+  }
+
+  async function verifyToken(token) {
+    const res = await fetch(`${API_BASE}/api/dddit/team-gate/verify`, {
+      headers: { "X-Dddit-Team-Token": token },
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return !!data.ok;
+  }
+
+  async function bootProtectedPage() {
+    if (!IS_PROD || isGatePage() || isPublicBrandSharePath()) return;
+    if (sessionStorage.getItem(BYPASS_KEY) === "1") return;
+
+    const enabled = await fetchGateEnabled();
+    if (!enabled) return;
+
+    const token = sessionStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      location.replace(gateUrl());
+      return;
+    }
+
+    blockPage();
+    try {
+      const ok = await verifyToken(token);
+      if (!ok) {
+        sessionStorage.removeItem(TOKEN_KEY);
+        location.replace(gateUrl());
+        return;
+      }
+      revealPage();
+    } catch {
+      location.replace(gateUrl());
+    }
+  }
+
+  bootProtectedPage();
+})();

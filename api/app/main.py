@@ -19,7 +19,7 @@ def create_app() -> FastAPI:
         allow_origins=allowed_origins(),
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "X-Dddit-Team-Token"],
     )
     app.include_router(dddit_router)
     app.include_router(conti_router)
