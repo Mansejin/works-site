@@ -282,6 +282,7 @@
               <span>협업 ${sponsorCount}</span>
             </div>
           </a>
+          <button type="button" class="project-pill project-share" data-share="${escapeHtml(`${location.origin}/dddit/${project.id}/productlist/`)}">담당자 공유 링크</button>
         </div>
       `;
     }).join("");
@@ -662,10 +663,32 @@
     });
   }
 
+  function bindShareLinks() {
+    document.body.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".project-share");
+      if (!btn) return;
+      const url = btn.dataset.share || "";
+      if (!url) return;
+      try {
+        await navigator.clipboard.writeText(url);
+        const prev = btn.textContent;
+        btn.textContent = "복사됨 ✓";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = prev;
+          btn.classList.remove("copied");
+        }, 2000);
+      } catch {
+        window.prompt("담당자에게 보낼 링크", url);
+      }
+    });
+  }
+
   async function init() {
     await load();
     bindOverview();
     bindTables();
+    bindShareLinks();
     initTabs();
     renderAll();
     await persist();
