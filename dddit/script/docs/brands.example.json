@@ -11,5 +11,11 @@
     "brand": "벤딕트",
     "sheetProject": "vendict",
     "portalLinks": ["plan/", "conti/", "productlist/"]
+  },
+  "inic": {
+    "name": "아이닉 미네랄스톤 음식물 처리기",
+    "brand": "아이닉",
+    "sheetProject": "inic",
+    "portalLinks": ["plan/", "conti/", "productlist/"]
   }
 }

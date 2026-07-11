@@ -24,6 +24,15 @@
       summary: "차량용 청소기 협찬 · 업로드 8/2",
       contiPath: "conti/?project=vendict",
     },
+    {
+      id: "inic",
+      name: "아이닉 미네랄스톤 음식물 처리기",
+      path: "inic/",
+      brand: "아이닉",
+      status: "진행 중",
+      summary: "iFD01 2026 업그레이드 · 인스타 릴스 협업",
+      contiPath: "conti/?project=inic",
+    },
   ];
 
   const CHANNEL_TOOLS = [
@@ -69,6 +78,16 @@
         status: "예정",
         note: "브랜드 제안 기한 · 일정 조정 가능",
       },
+      {
+        id: uid(),
+        title: "아이닉 음식물 처리기 릴스 촬영",
+        type: "촬영",
+        date: "",
+        assignee: "",
+        project: "inic",
+        status: "예정",
+        note: "콘셉트 5종 중 1택 · 필수 장면 준수",
+      },
     ],
     sponsorships: [
       {
@@ -90,6 +109,16 @@
         deadline: "2026-08-02",
         project: "vendict",
         note: "실버라이닝 퓨어 PRO · 댓글 이벤트(제품 3명 증정) · 롯데 411259947770",
+      },
+      {
+        id: uid(),
+        brand: "아이닉 (inic)",
+        kind: "협찬",
+        status: "진행 중",
+        contact: "mktsse@i-nic.co.kr",
+        deadline: "",
+        project: "inic",
+        note: "미네랄스톤 음식물 처리기 iFD01 · 업로드 전 검수 필수",
       },
     ],
     notices: [

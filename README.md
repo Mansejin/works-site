@@ -8,6 +8,7 @@
 - Xenics 프로젝트: https://works.mansejin.com/dddit/xenics/
 - Xenics 콘티: https://works.mansejin.com/dddit/script/?project=xenics
 - 벤딕트 프로젝트: https://works.mansejin.com/dddit/vendict/
+- 아이닉 프로젝트: https://works.mansejin.com/dddit/inic/
 - (내부) 벤딕트 시나리오: https://works.mansejin.com/dddit/script/?project=vendict — **허브에서만** 접근, 브랜드 페이지에 링크 금지
 - 로지텍G 납품 일정: https://works.mansejin.com/logitechG/schedule/
 

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="canonical" href="https://works.mansejin.com/dddit/inic/plan/" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <title>기획안 · inic · 디디딧</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --header-bg: #0f172a;
+      --review-bg: #fffbeb;
+      --review-border: #fcd34d;
+      --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      background: linear-gradient(160deg, #eef2ff 0%, var(--bg) 45%, #f8fafc 100%);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      padding: 32px 20px 56px;
+    }
+
+    .page { max-width: 920px; margin: 0 auto; }
+
+    .hub-nav { margin-bottom: 16px; }
+    .hub-nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    .hub-nav a:hover { color: var(--accent); }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .card-header {
+      background: var(--header-bg);
+      color: #f8fafc;
+      padding: 24px 28px;
+    }
+
+    .card-header h1 { font-size: 1.4rem; font-weight: 700; }
+    .card-header p { color: #cbd5e1; font-size: 0.9rem; margin-top: 6px; }
+
+    .card-body { padding: 22px 28px 26px; }
+
+    .section-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .field { margin-bottom: 16px; }
+    .field:last-child { margin-bottom: 0; }
+
+    .field label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .field-hint {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    input[type="text"],
+    input[type="date"] {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font: inherit;
+      font-size: 0.9rem;
+    }
+
+    input:focus { outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+    .field-text {
+      min-height: 48px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      line-height: 1.65;
+      outline: none;
+      white-space: pre-wrap;
+    }
+
+    .field-text:focus {
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .field-text:empty::before {
+      content: attr(data-placeholder);
+      color: var(--text-muted);
+    }
+
+    .field-text.tall { min-height: 120px; }
+
+    .schedule-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .schedule-grid .field { margin-bottom: 0; }
+
+    .review-section {
+      background: var(--review-bg);
+      border: 1px solid var(--review-border);
+      border-radius: var(--radius);
+      padding: 20px 22px 22px;
+      margin-bottom: 14px;
+    }
+
+    .review-section .section-title {
+      color: #92400e;
+      border-bottom-color: var(--review-border);
+    }
+
+    .review-section .field-text {
+      background: #fff;
+      border-color: #fde68a;
+      min-height: 200px;
+    }
+
+    .help-note {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      border: 1px solid #bfdbfe;
+      font-size: 0.78rem;
+      color: #1e40af;
+    }
+
+    .sync-banner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      background: var(--accent-soft);
+      font-size: 0.82rem;
+    }
+    .sync-banner.is-new { border-color: #fcd34d; background: #fffbeb; }
+    .sync-banner p { color: var(--text-muted); margin-top: 4px; }
+    .sync-banner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .sync-link, .sync-btn {
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .sync-link { color: var(--accent); border: 1px solid #bfdbfe; background: #fff; }
+    .sync-btn { border: none; background: var(--accent); color: #fff; }
+
+    @media (max-width: 640px) {
+      body { padding: 20px 14px 40px; }
+      .card-body { padding: 18px 16px 20px; }
+      .card-header { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <nav class="hub-nav"><a href="../">← 아이닉 프로젝트</a></nav>
+
+    <div class="card">
+      <div class="card-header">
+        <h1>기획안</h1>
+        <p>아이닉 미네랄스톤 음식물 처리기 iFD01 · 릴스 협업</p>
+      </div>
+      <div class="card-body">
+        <div class="section-title">기본 정보</div>
+        <div class="field">
+          <label for="f-title">콘텐츠 제목 (가제)</label>
+          <input type="text" id="f-title" placeholder="영상 제목 초안" />
+        </div>
+        <div class="schedule-grid">
+          <div class="field">
+            <label for="f-upload-date">업로드 예정일</label>
+            <input type="date" id="f-upload-date" />
+          </div>
+          <div class="field">
+            <label for="f-target-length">목표 러닝타임</label>
+            <input type="text" id="f-target-length" placeholder="예: 15~20분" />
+          </div>
+        </div>
+        <div class="field" style="margin-top:16px">
+          <label>한 줄 요약</label>
+          <div id="f-summary" class="field-text" contenteditable="true" data-placeholder="이 영상이 무엇인지 한 줄로"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title">콘셉트</div>
+        <div class="field">
+          <label>콘텐츠 방향</label>
+          <div id="f-concept" class="field-text tall" contenteditable="true" data-placeholder="촬영·편집 방향, 무엇을 보여줄지"></div>
+        </div>
+        <div class="field">
+          <label>핵심 메시지</label>
+          <div id="f-key-message" class="field-text" contenteditable="true" data-placeholder="시청자가 기억했으면 하는 한 가지"></div>
+        </div>
+        <div class="field">
+          <label>타겟 시청자</label>
+          <div id="f-target-audience" class="field-text" contenteditable="true" data-placeholder="누구를 위한 영상인지"></div>
+        </div>
+        <div class="field">
+          <label>톤앤매너</label>
+          <div id="f-tone" class="field-text" contenteditable="true" data-placeholder="말투·분위기·편집 스타일"></div>
+        </div>
+        <div class="field">
+          <label>영상 구성</label>
+          <div id="f-structure" class="field-text tall" contenteditable="true" data-placeholder="파트별 흐름 (인트로 → … → 마무리)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title">일정</div>
+        <div class="schedule-grid">
+          <div class="field">
+            <label for="f-schedule-plan">기획 확정</label>
+            <input type="date" id="f-schedule-plan" />
+          </div>
+          <div class="field">
+            <label for="f-schedule-shoot">촬영</label>
+            <input type="date" id="f-schedule-shoot" />
+          </div>
+          <div class="field">
+            <label for="f-schedule-edit">편집</label>
+            <input type="date" id="f-schedule-edit" />
+          </div>
+          <div class="field">
+            <label for="f-schedule-upload">업로드</label>
+            <input type="date" id="f-schedule-upload" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title">협찬 · 브랜드</div>
+        <div class="field">
+          <label>필수 언급 · 준수 사항</label>
+          <div id="f-brand-must" class="field-text" contenteditable="true" data-placeholder="브랜드명 표기, 협찬 고지 등"></div>
+        </div>
+        <div class="field">
+          <label>지양 사항</label>
+          <div id="f-brand-avoid" class="field-text" contenteditable="true" data-placeholder="비교·비방, 과장 표현 등"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="review-section">
+      <div class="section-title">리뷰 가이드</div>
+      <div class="field">
+        <label>촬영 · 멘트 · 노출 가이드</label>
+        <p class="field-hint">협찬 리뷰 시 제품 노출, 멘트, 고지 방식을 팀·브랜드와 맞춰 적어 둡니다.</p>
+        <div id="f-review-guide" class="field-text tall" contenteditable="true" data-placeholder="촬영 앵글, 멘트 톤, 필수 고지, 장단점 표현 방식 등"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title">촬영 · 업로드</div>
+        <div class="field">
+          <label>촬영 체크리스트</label>
+          <div id="f-shoot-checklist" class="field-text tall" contenteditable="true" data-placeholder="필수 촬영 컷 목록"></div>
+        </div>
+        <div class="field">
+          <label>태그 · 해시태그</label>
+          <div id="f-tags" class="field-text" contenteditable="true" data-placeholder="#태그"></div>
+        </div>
+        <div class="field">
+          <label>설명란 초안</label>
+          <div id="f-description-draft" class="field-text tall" contenteditable="true" data-placeholder="유튜브 설명란 초안"></div>
+        </div>
+        <div class="field">
+          <label>비고</label>
+          <div id="f-notes" class="field-text" contenteditable="true" data-placeholder="기타 메모"></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="help-note">변경 사항은 브라우저에 자동 저장됩니다.</p>
+  </div>
+
+  <script src="../js/plan.js"></script>
+</body>
+</html>
