@@ -12,8 +12,6 @@
       brand: "제닉스",
       status: "진행 중",
       summary: "데스크 세팅 콘텐츠 · 협찬 제품 리스트",
-      contiPath: "conti/?project=xenics",
-      // script machine: hub CHANNEL_TOOLS only — never on brand portal pages
     },
     {
       id: "vendict",
@@ -22,7 +20,6 @@
       brand: "벤딕트",
       status: "진행 중",
       summary: "차량용 청소기 협찬 · 업로드 8/2",
-      contiPath: "conti/?project=vendict",
     },
     {
       id: "inic",
@@ -31,7 +28,6 @@
       brand: "아이닉",
       status: "진행 중",
       summary: "iFD01 2026 업그레이드 · 인스타 릴스 협업",
-      contiPath: "conti/?project=inic",
     },
   ];
 
@@ -40,13 +36,6 @@
       name: "콘티 작성기",
       path: "script/",
       summary: "기획안 · 줄글 · 5열 변환 · Google 시트 전송",
-      status: "사용 가능",
-      ready: true,
-    },
-    {
-      name: "콘티 편집",
-      path: "conti/",
-      summary: "프로젝트별 시트 콘티 수동 편집 · 브랜드 공유",
       status: "사용 가능",
       ready: true,
     },
@@ -279,7 +268,6 @@
     els.projectGrid.innerHTML = PROJECTS.map((project) => {
       const scheduleCount = state.schedule.filter((s) => s.project === project.id).length;
       const sponsorCount = state.sponsorships.filter((s) => s.project === project.id).length;
-      const contiHref = project.contiPath || `conti/?project=${project.id}`;
       return `
         <div class="project-wrap">
           <a class="link-card is-ready" href="${escapeHtml(project.path)}">
@@ -294,7 +282,6 @@
               <span>협업 ${sponsorCount}</span>
             </div>
           </a>
-          <a class="project-pill" href="${escapeHtml(contiHref)}">콘티 작성 →</a>
         </div>
       `;
     }).join("");
