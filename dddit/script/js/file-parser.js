@@ -91,32 +91,9 @@
 ${blocks.join('\n\n')}`.trim();
   }
 
-  function buildAdGuideContext(guides) {
-    if (!guides.length) return '';
-    let total = 0;
-    const blocks = [];
-
-    for (const s of guides) {
-      if (total >= MAX_TOTAL) break;
-      const budget = Math.min(MAX_PER_FILE, MAX_TOTAL - total);
-      const body = s.text.length > budget ? truncate(s.text, budget) : s.text;
-      total += body.length;
-      blocks.push(`## ${s.name}\n${body}`);
-    }
-
-    return `
-# 본사 리뷰 가이드 (광고·협찬 — 최우선 준수)
-- 아래는 브랜드/본사에서 제공한 공식 리뷰 가이드입니다. 강조 포인트·필수 멘트·금지 표현을 반드시 따르세요.
-- 가이드와 사실이 충돌하면 사실을 우선하되, 표현은 가이드 톤에 맞게 조정하세요.
-- 가이드에 없는 비방·허위 장점은 추가하지 마세요.
-
-${blocks.join('\n\n')}`.trim();
-  }
-
   window.DIDIDIT_REF = {
     parseReferenceFile,
     buildReferenceContext,
-    buildAdGuideContext,
     MAX_PER_FILE,
     MAX_TOTAL,
   };

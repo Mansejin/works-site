@@ -28,16 +28,16 @@
 
   const CHANNEL_TOOLS = [
     {
-      name: "콘티 작성",
-      path: "conti/",
-      summary: "프로젝트별 콘티 작성 · NAS 저장 · 브랜드 공유",
+      name: "콘티 작성기",
+      path: "script/",
+      summary: "기획안 · 줄글 · 5열 변환 · Google 시트 전송",
       status: "사용 가능",
       ready: true,
     },
     {
-      name: "시나리오 머신",
-      path: "script/",
-      summary: "서치 · 브리프 · 파트 대본 · Google 시트보내기",
+      name: "콘티 편집",
+      path: "conti/",
+      summary: "프로젝트별 시트 콘티 수동 편집 · 브랜드 공유",
       status: "사용 가능",
       ready: true,
     },

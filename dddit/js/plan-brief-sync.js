@@ -1,6 +1,6 @@
 /**
- * 기획안(plan) → 시나리오 머신 런타임 변환
- * 기획안이 SSOT. 시나리오 머신은 읽기만 함 (양방향 동기화 없음).
+ * 기획안(plan) → 콘티 작성기 런타임 변환
+ * 기획안이 SSOT. 콘티 작성기는 읽기만 함 (양방향 동기화 없음).
  */
 window.DdditPlanBriefSync = (function () {
   const PROJECT_META = {

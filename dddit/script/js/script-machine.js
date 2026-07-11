@@ -10,25 +10,15 @@ let REF = null;
 let LOG = null;
 let BRIEF = null;
 let PIPE = null;
+let SESSION = null;
 
 const state = {
   apiKey: '',
   modelPro: 'gemini-3.1-pro-preview',
-  productName: '',
-  contentDirection: '',
-  productNotes: '',
   productSpecs: {},
-  reviewBrief: { thesis: '', targetScenario: '', mustHighlight: '', carefulPoints: '', compareWith: '' },
   priceInfo: '',
   categoryId: 'other',
   referenceScripts: [],
-  adMode: false,
-  adBrand: '',
-  adToneLevel: 'balanced',
-  adDisclosure: true,
-  adGuides: [],
-  teamBriefNotes: '',
-  briefSource: '',
   chapters: [],
   proseDraft: '',
   allRows: [],
@@ -68,10 +58,12 @@ function bindModules() {
   LOG = window.DIDIDIT_LOG;
   BRIEF = window.DIDIDIT_BRIEF;
   PIPE = window.DIDIDIT_PIPELINE;
-  if (!PM || !REF || !BRIEF || !PIPE) throw new Error('스크립트 모듈 로드 실패');
+  SESSION = window.DIDIDIT_SESSION;
+  if (!PM || !REF || !BRIEF || !PIPE || !SESSION) throw new Error('스크립트 모듈 로드 실패');
 }
 
-function getSystemRules() {
+function getSystemRules(stage) {
+  if (stage && PM.getSystemRulesForStage) return PM.getSystemRulesForStage(stage);
   return PM.getActiveSystemRules();
 }
 
@@ -103,7 +95,6 @@ function getEffectiveState() {
     priceInfo: state.priceInfo,
     categoryId: state.categoryId,
     referenceScripts: state.referenceScripts,
-    adGuides: state.adGuides,
     chapters,
   };
 }
@@ -116,8 +107,7 @@ function hasPlanTitle() {
 function buildProductContext() {
   const effective = getEffectiveState();
   const refBlock = REF?.buildReferenceContext?.(state.referenceScripts) || '';
-  const adBlock = effective.adMode ? (REF?.buildAdGuideContext?.(state.adGuides) || '') : '';
-  return BRIEF.buildPromptContext(effective, getCategory(effective.categoryId), refBlock, adBlock);
+  return BRIEF.buildPromptContext(effective, getCategory(effective.categoryId), refBlock);
 }
 
 function esc(s) {
@@ -146,13 +136,20 @@ function setLoading(on, text) {
   if (text) $('#loading-text').textContent = text;
 }
 
-async function callGeminiText(userPrompt, temperature = 0.75) {
+async function callGeminiTextSession(userPrompt, temperature = 0.75, stage = 'prose') {
+  SESSION.push('user', userPrompt);
   const model = state.modelPro;
   const body = {
-    systemInstruction: { parts: [{ text: getSystemRules() }] },
-    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+    systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
+    contents: SESSION.getContents(),
     generationConfig: { temperature },
   };
+  const text = await postGeminiAndExtractText(model, body);
+  SESSION.push('model', text);
+  return text;
+}
+
+async function postGeminiAndExtractText(model, body) {
   let data;
   if (window.DdditWorksApi?.isBackendMode?.()) {
     data = await window.DdditWorksApi.postGemini(model, body, state.apiKey);
@@ -167,10 +164,10 @@ async function callGeminiText(userPrompt, temperature = 0.75) {
   return text.trim();
 }
 
-async function callGeminiJson(userPrompt, temperature = 0.4) {
+async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') {
   const model = state.modelPro;
   const body = {
-    systemInstruction: { parts: [{ text: getSystemRules() }] },
+    systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
     generationConfig: {
       temperature,
@@ -478,6 +475,7 @@ function updatePipelineUI() {
   $('#btn-add-scenes')?.toggleAttribute('disabled', !isApiReady() || !state.allRows.length);
   $('#btn-add-captions')?.toggleAttribute('disabled', !isApiReady() || !state.allRows.length);
   if (state.pipelineStep === 1) renderPlanSummary();
+  updateProjectChrome();
 }
 
 async function runProseDraft() {
@@ -487,21 +485,48 @@ async function runProseDraft() {
   syncChaptersFromDOM();
   const effective = getEffectiveState();
   const ctx = buildProductContext();
+  const styleAnchor = await PM.getStyleAnchorBlock?.();
+  const isRoundup = PM.isRoundupFormat ? PM.isRoundupFormat(ctx) : window.DIDIDIT_CONFIG?.isRoundupFormat?.(ctx);
+  const formatAnchor = isRoundup ? await PM.getFormatAnchorBlock?.() : '';
+  const ctxWithStyle = [ctx, styleAnchor, formatAnchor].filter(Boolean).join('\n\n');
+  const existingProse = ($('#prose-draft')?.value || state.proseDraft || '').trim();
+  const continueFromEdit = existingProse && confirm(
+    '기존 줄글을 스타일 기준으로 이어 쓸까요?\n\n확인 = 다듬은 톤 유지 · 취소 = 처음부터 새로 생성',
+  );
+
+  SESSION.reset();
+  if (continueFromEdit) {
+    SESSION.seedApprovedProse(
+      existingProse,
+      `${ctxWithStyle}\n\n[승인된 줄글] 작성자가 다듬은 줄글입니다. 이 톤·호흡·리듬을 그대로 유지하세요.`,
+    );
+  }
+
   setLoading(true, '줄글 초안 작성 중…');
   try {
-    let prose = '';
+    let prose = continueFromEdit ? existingProse : '';
     const chapters = state.chapters.length ? state.chapters : [{ title: '전체', notes: effective.contentDirection }];
-    for (let i = 0; i < chapters.length; i++) {
-      setLoading(true, `줄글 작성 중… (${i + 1}/${chapters.length})`);
-      const prompt = PIPE.buildProsePrompt(ctx, chapters[i], i, chapters.length) +
-        (prose ? `\n\n## 지금까지 작성된 줄글\n${prose.slice(-12000)}` : '');
-      const chunk = await callGeminiText(prompt, 0.75);
-      prose = prose ? `${prose}\n\n## ${chapters[i].title}\n${chunk}` : chunk;
+    const startIndex = prose ? chapters.findIndex((ch) => !prose.includes(`## ${ch.title}`)) : 0;
+    const from = startIndex < 0 ? chapters.length : Math.max(0, startIndex);
+    if (from >= chapters.length) {
+      showToast('이미 모든 챕터가 작성되어 있습니다.');
+      return;
+    }
+
+    for (let i = from; i < chapters.length; i++) {
+      setLoading(true, `줄글 작성 중… (${i + 1}/${chapters.length}, 대화 ${SESSION.turnCount()}턴)`);
+      const prompt = PIPE.buildProsePrompt(ctxWithStyle, chapters[i], i, chapters.length, {
+        includeContext: i === from && !SESSION.hasHistory(),
+        hasSession: SESSION.turnCount() > 0,
+      });
+      const chunk = await callGeminiTextSession(prompt, 0.72, 'prose');
+      prose = prose ? `${prose}\n\n## ${chapters[i].title}\n${chunk}` : `## ${chapters[i].title}\n${chunk}`;
     }
     state.proseDraft = prose;
     $('#prose-draft').value = prose;
+    SESSION.save(getSheetSlug());
     saveProject();
-    showToast('줄글 초안이 완성되었습니다.');
+    showToast(`줄글 완성 (대화 ${SESSION.turnCount()}턴 — 스타일 맥락 유지)`);
     navigatePipeline(3);
   } catch (e) {
     reportError('runProseDraft', e);
@@ -523,7 +548,21 @@ async function runConvertToSheet() {
     let rows = [];
     for (let i = 0; i < chunks.length; i++) {
       setLoading(true, `변환 중… (${i + 1}/${chunks.length})`);
-      const part = await callGeminiJson(PIPE.buildConvertPrompt(ctx, chunks[i]), 0.35);
+      let part = [];
+      let retryHint = '';
+      for (let attempt = 0; attempt < 3; attempt++) {
+        part = await callGeminiJson(
+          PIPE.buildConvertPrompt(ctx, chunks[i], retryHint),
+          attempt > 0 ? 0.25 : 0.35,
+          'convert',
+        );
+        const issues = PIPE.validateScriptRows(part);
+        if (!issues.length) break;
+        retryHint = PIPE.buildConvertRetryHint(issues);
+        if (attempt === 2) {
+          reportError('runConvertToSheet.validate', new Error(issues.join('; ')), { chunk: i + 1 }, { silent: true });
+        }
+      }
       rows = rows.concat(part);
     }
     state.allRows = PIPE.normalizeRows(rows);
@@ -543,7 +582,7 @@ async function runAddScenes() {
   if (!requireApiReady() || !state.allRows.length) return;
   setLoading(true, '장면·사이즈 추가 중…');
   try {
-    state.allRows = await callGeminiJson(PIPE.buildScenePrompt(buildProductContext(), state.allRows), 0.4);
+    state.allRows = await callGeminiJson(PIPE.buildScenePrompt(buildProductContext(), state.allRows), 0.4, 'scene');
     renderTable();
     showToast('장면·사이즈를 반영했습니다.');
     navigatePipeline(5);
@@ -559,7 +598,7 @@ async function runAddCaptions() {
   if (!requireApiReady() || !state.allRows.length) return;
   setLoading(true, '자막·코멘트 추가 중…');
   try {
-    state.allRows = await callGeminiJson(PIPE.buildCaptionPrompt(buildProductContext(), state.allRows), 0.4);
+    state.allRows = await callGeminiJson(PIPE.buildCaptionPrompt(buildProductContext(), state.allRows), 0.4, 'caption');
     renderTable();
     showToast('자막·코멘트를 반영했습니다.');
   } catch (e) {
@@ -658,13 +697,19 @@ async function pullFromSheet() {
   }
 }
 
-async function initSheetIntegration() {
+function updateProjectChrome() {
+  const effective = getEffectiveState();
   const project = getSheetSlug();
   const badge = $('#workspace-project-badge');
   if (badge && project !== 'default') {
-    badge.textContent = `프로젝트: ${project}`;
+    badge.textContent = window.DdditPlanBriefSync?.projectLabel?.(project) || project;
     badge.classList.remove('hidden');
   }
+  $('#ad-mode-badge')?.classList.toggle('hidden', !effective.adMode);
+}
+
+async function initSheetIntegration() {
+  const project = getSheetSlug();
   try {
     const store = JSON.parse(localStorage.getItem(SHEET_SETTINGS_KEY) || '{}');
     const savedUrl = store.projects?.[project]?.url;
@@ -674,18 +719,7 @@ async function initSheetIntegration() {
     $('#backend-settings-note')?.removeAttribute('hidden');
     await window.DdditWorksApi.loadConfig().catch(() => null);
   }
-}
-
-/* ── Ad / ref UI (minimal) ── */
-function updateAdModeUI() {
-  $('#ad-mode').checked = state.adMode;
-  const fields = $('#ad-mode-fields');
-  fields?.classList.toggle('hidden', !state.adMode);
-  if (state.adMode) document.querySelector('#ad-mode-panel')?.setAttribute('open', '');
-  $('#ad-mode-badge')?.classList.toggle('hidden', !state.adMode);
-  $('#ad-brand').value = state.adBrand || '';
-  $('#ad-tone-level').value = state.adToneLevel || 'balanced';
-  $('#ad-disclosure').checked = state.adDisclosure !== false;
+  updateProjectChrome();
 }
 
 function renderReferenceList() {
@@ -695,17 +729,6 @@ function renderReferenceList() {
     ? state.referenceScripts.map((s) => `<li>${esc(s.name)} (${s.text.length}자)</li>`).join('')
     : '<li class="muted">없음</li>';
   $('#ref-stats').textContent = `${state.referenceScripts.length}개`;
-}
-
-function renderAdGuideList() {
-  const list = $('#ad-guide-list');
-  if (!list) return;
-  list.innerHTML = state.adGuides.length
-    ? state.adGuides.map((g) => `<li>${esc(g.name)}</li>`).join('')
-    : '<li class="muted">없음</li>';
-  const totalChars = state.adGuides.reduce((n, s) => n + (s.text?.length || 0), 0);
-  const stats = $('#ad-guide-stats');
-  if (stats) stats.textContent = state.adGuides.length ? `${state.adGuides.length}개 · ${totalChars.toLocaleString()}자` : '0개';
 }
 
 function syncModelSelect() {
@@ -754,34 +777,6 @@ function clearReferences() {
   saveProject();
 }
 
-async function addAdGuideFromPaste() {
-  const text = $('#ad-guide-paste')?.value.trim();
-  if (!text) return showToast('가이드를 붙여넣으세요.', true);
-  state.adGuides.push({ id: `ad-${Date.now()}`, name: '붙여넣기', source: 'paste', text, chars: text.length });
-  $('#ad-guide-paste').value = '';
-  renderAdGuideList();
-  saveProject();
-}
-
-async function addAdGuideFiles(fileList) {
-  if (!fileList?.length || !REF) return;
-  for (const file of fileList) {
-    try {
-      state.adGuides.push(await REF.parseReferenceFile(file));
-    } catch (e) {
-      showToast(e.message, true);
-    }
-  }
-  renderAdGuideList();
-  saveProject();
-}
-
-function clearAdGuides() {
-  state.adGuides = [];
-  renderAdGuideList();
-  saveProject();
-}
-
 function bindDrawerPanels() {
   $('#toggle-settings')?.addEventListener('click', () => togglePanel('#settings-panel', '#toggle-settings'));
   $('#toggle-prompt')?.addEventListener('click', () => togglePanel('#prompt-panel', '#toggle-prompt'));
@@ -816,6 +811,25 @@ function bindDrawerPanels() {
     await PM?.loadDefaultPromptFile?.();
     $('#prompt-editor').value = PM?.getActiveSystemRules?.() || '';
   });
+  $('#btn-prompt-export')?.addEventListener('click', () => {
+    const text = $('#prompt-editor')?.value || '';
+    if (!text.trim()) return showToast('프롬프트 내용이 비어 있습니다.', true);
+    const filename = $('#prompt-filename')?.value || `dididit-prompt-v${PM.PROMPT_VERSION}.txt`;
+    PM?.downloadPromptTxt?.(text, filename);
+  });
+  $('#prompt-file-input')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      $('#prompt-editor').value = text;
+      $('#prompt-filename').value = file.name;
+      showToast(`${file.name} 불러옴 — [적용]으로 반영하세요.`);
+    } catch (err) {
+      showToast(err.message || '파일 읽기 실패', true);
+    }
+    e.target.value = '';
+  });
 }
 
 function renderCategoryOptions() {
@@ -838,15 +852,12 @@ function bindEvents() {
   $('#btn-add-captions')?.addEventListener('click', runAddCaptions);
   $('#btn-add-chapter')?.addEventListener('click', addChapter);
   $('#btn-sheet-push')?.addEventListener('click', pushToSheet);
-  $('#btn-sheet-push-inline')?.addEventListener('click', pushToSheet);
   $('#btn-sheet-pull')?.addEventListener('click', pullFromSheet);
-  $('#btn-sheet-pull-inline')?.addEventListener('click', pullFromSheet);
   $('#btn-pipeline-next-brief')?.addEventListener('click', () => navigatePipeline(2));
   document.querySelectorAll('[data-goto]').forEach((btn) => {
     btn.addEventListener('click', () => navigatePipeline(Number(btn.dataset.goto)));
   });
   $('#btn-sheet-open')?.addEventListener('click', openSheetUrl);
-  $('#btn-sheet-open-inline')?.addEventListener('click', openSheetUrl);
   $('#prose-draft')?.addEventListener('input', (e) => { state.proseDraft = e.target.value; saveProject(); updatePipelineUI(); });
   $('#price-info')?.addEventListener('input', (e) => { state.priceInfo = e.target.value; saveProject(); });
   $('#category')?.addEventListener('change', (e) => { state.categoryId = e.target.value; renderSpecFields(); saveProject(); });
@@ -865,6 +876,10 @@ function openSheetUrl() {
 
 async function initPromptOnBoot() {
   if (!PM.loadPromptState()?.text) await PM.loadDefaultPromptFile();
+  else if (String(PM.getActivePromptSource?.() || '').includes('v1.0.0')) {
+    await PM.loadDefaultPromptFile();
+    showToast('프롬프트 v1.1.0으로 갱신했습니다. (단계별 규칙 분리)');
+  }
   $('#prompt-editor').value = PM.getActiveSystemRules();
   $('#active-prompt-label').textContent = PM.getActivePromptSource?.() || '';
 }

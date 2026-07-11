@@ -1,0 +1,46 @@
+{
+  "id": "item-roundup",
+  "label": "N개 아이템 라운드업 (짧게)",
+  "description": "오프닝 → [제품명] 블록 반복 → 클로징. 소스는 카테고리로 구분 (다이소·쿠팡·테무·데스크테리어·무인양품 등).",
+  "roundupCategoryIds": [
+    "roundup-daiso",
+    "roundup-coupang",
+    "roundup-temu",
+    "roundup-deskterior",
+    "roundup-muji"
+  ],
+  "openingPattern": {
+    "rows": 6,
+    "mustInclude": [
+      "안녕하세요, 디디딧입니다",
+      "시즌·상황 공감 또는 전환",
+      "콘셉트 한 줄 (소스·테마·N가지)",
+      "바로 살펴볼까요"
+    ]
+  },
+  "itemBlockPattern": {
+    "header": "[제품명]",
+    "rowsPerItem": { "min": 4, "max": 10, "target": 6 },
+    "structure": [
+      "한 줄 정의 (이 제품은 …입니다)",
+      "특징·사용법 2~4호흡",
+      "구매 팁·주의 한 줄 (선택)"
+    ]
+  },
+  "closingPattern": {
+    "mustInclude": [
+      "오늘 소개해드린 [콘셉트] 어떠셨나요?",
+      "댓글로 마음껏 공유해 주세요",
+      "구독과 좋아요",
+      "제품의 정보를 정리해드리며",
+      "감사합니다"
+    ],
+    "notes": "단일 제품 클로징(장단점·평점)과 다름"
+  },
+  "proseHints": [
+    "제품명 행은 반드시 [대괄호] 단독 행",
+    "호흡 짧고 밀도 있게 — 심층 리뷰보다 속도감",
+    "소스 카테고리(다이소·쿠팡 등)에 맞는 구매 팁·맥락",
+    "장면·코멘트는 촬영 메모용 — 대본 톤 QC와 별도"
+  ]
+}

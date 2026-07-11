@@ -62,31 +62,6 @@
     ],
   };
 
-  const AIR_PURIFIER_EXAMPLE = {
-    productName: '삼성 비스포크 공기청정기 (예시)',
-    categoryId: 'air',
-    contentDirection: '1인 원룸 거실 기준 체감 성능과 필터 유지비 중심',
-    priceInfo: '출고 89만원대, 동급 LG·다이슨 대비 중간 가격',
-    reviewBrief: {
-      thesis: '좁은 원룸에서 실제로 공기가 달라지는지, 소음과 필터 비용까지 솔직하게',
-      targetScenario: '퇴근 후 문 닫고 혼자 쓰는 10평 거실, 반려동물 없음',
-      mustHighlight: 'CADR 대비 실제 체감, 취침 모드 소음, 필터 교체 주기·비용',
-      carefulPoints: '대형 평수 과장 광고, 필터 추가 구매 항목',
-      compareWith: 'LG 퓨리케어 동급, 다이슨 쿨기능 없는 라인',
-    },
-    productSpecs: {
-      model: 'AX90T7080WD (예시)',
-      cadr: '350 ㎥/h',
-      coverage: '33㎡ (10평)',
-      filter: 'HEPA13 + 탈취, 6개월 교체, 1년 약 10만원',
-      noise: '강풍 48dB / 취침 22dB',
-      power: '45W',
-      size: '250×400×650mm, 7.2kg',
-      smart: 'SmartThings, PM1.0 표시, 자동·취침 모드',
-    },
-    productNotes: '예시 데이터 — 실제 촬영 제품으로 교체하세요.',
-  };
-
   function getSpecFields(categoryId, deviceId) {
     if (deviceId && SPEC_FIELDS_BY_DEVICE[deviceId]) return SPEC_FIELDS_BY_DEVICE[deviceId];
     return SPEC_FIELDS_BY_CATEGORY[categoryId] || SPEC_FIELDS_BY_CATEGORY.default;
@@ -134,7 +109,7 @@
     return lines.length ? lines.join('\n') : '(리뷰 방향 미입력)';
   }
 
-  function buildPromptContext(state, category, refBlock, adBlock) {
+  function buildPromptContext(state, category, refBlock) {
     const cat = category || {};
     const specsBlock = formatSpecsBlock(state.productSpecs, state.categoryId);
     const briefBlock = formatReviewBriefBlock(state.reviewBrief);
@@ -159,18 +134,7 @@ ${specsBlock}
 ${extraNotes ? `\n## 추가 메모\n${extraNotes}` : ''}
 
 ## 리뷰 방향 (콘티·대본에 반영)
-${briefBlock}
-
-## 작성 파이프라인
-- 1단계: 파트별 내레이션 원문(prose) — 행·글자 수 제한 없이 자연스러운 호흡으로
-- 2단계: 원문을 스프레드시트 5열로 변환 — 대본 | 장면 | 사이즈 | 자막 | 코멘트
-- 제원·수치는 대본에 자연스럽게 녹이고, 스펙 나열형 낭독은 지양
-- 리뷰 방향의 mustHighlight는 빠뜨리지 말 것, carefulPoints는 디디딧 톤으로 솔직히
-${adBlock ? `\n${adBlock}\n` : ''}${refBlock ? `\n${refBlock}` : ''}`.trim();
-  }
-
-  function getAirPurifierExample() {
-    return JSON.parse(JSON.stringify(AIR_PURIFIER_EXAMPLE));
+${briefBlock}${refBlock ? `\n${refBlock}` : ''}`.trim();
   }
 
   window.DIDIDIT_BRIEF = {
@@ -180,7 +144,5 @@ ${adBlock ? `\n${adBlock}\n` : ''}${refBlock ? `\n${refBlock}` : ''}`.trim();
     formatSpecsBlock,
     formatReviewBriefBlock,
     buildPromptContext,
-    getAirPurifierExample,
-    RESEARCH_PHASE: 2,
   };
 })();

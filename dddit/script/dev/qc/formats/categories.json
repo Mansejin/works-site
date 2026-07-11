@@ -1,0 +1,63 @@
+{
+  "_comment": "카테고리 → 큰 챕터 구성 (톤과 무관). sponsored-review = 단일 제품, roundup-* = N개 아이템.",
+  "floor-care": {
+    "format": "sponsored-review",
+    "suggestedChapters": ["프롤로그", "디자인", "성능", "실사용", "관리", "단점", "가격", "총평"],
+    "notes": "흡입력·좁은 공간·먼지통"
+  },
+  "air": {
+    "format": "sponsored-review",
+    "suggestedChapters": ["프롤로그", "디자인", "성능", "실사용", "관리", "가격", "총평"],
+    "notes": "CADR·소음·필터 비용"
+  },
+  "it-device": {
+    "format": "sponsored-review",
+    "suggestedChapters": ["프롤로그", "디자인", "성능", "실사용", "편의성", "단점", "가격", "총평"],
+    "notes": "배터리·휴대성·1인 사용"
+  },
+  "climate": {
+    "format": "sponsored-review",
+    "suggestedChapters": ["프롤로그", "디자인", "실사용", "소음", "가격", "총평"],
+    "notes": "원룸 배치·전력"
+  },
+  "kitchen": {
+    "format": "sponsored-review",
+    "suggestedChapters": ["프롤로그", "디자인", "실사용", "관리", "가격", "총평"],
+    "notes": "1인 조리·세척"
+  },
+  "roundup-daiso": {
+    "format": "item-roundup",
+    "label": "다이소",
+    "suggestedChapters": ["오프닝", "아이템×N", "클로징"],
+    "conceptHints": ["가성비", "1000~5000원", "품절·재입고"],
+    "openingExample": "다이소 가성비 여름 꿀템 N가지"
+  },
+  "roundup-coupang": {
+    "format": "item-roundup",
+    "label": "쿠팡",
+    "suggestedChapters": ["오프닝", "아이템×N", "클로징"],
+    "conceptHints": ["로켓배송", "가격 변동", "리뷰 수"],
+    "openingExample": "쿠팡에서 찾은 ○○ 꿀템 N가지"
+  },
+  "roundup-temu": {
+    "format": "item-roundup",
+    "label": "테무",
+    "suggestedChapters": ["오프닝", "아이템×N", "클로징"],
+    "conceptHints": ["초저가", "배송 기간", "실물 차이 주의"],
+    "openingExample": "테무에서 살 만한 ○○ N가지"
+  },
+  "roundup-deskterior": {
+    "format": "item-roundup",
+    "label": "데스크테리어",
+    "suggestedChapters": ["오프닝", "아이템×N", "클로징"],
+    "conceptHints": ["책상·모니터", "1인 workspace", "수납·선 정리"],
+    "openingExample": "책상을 바꿔 줄 데스크테리어 N가지"
+  },
+  "roundup-muji": {
+    "format": "item-roundup",
+    "label": "무인양품·MUJI",
+    "suggestedChapters": ["오프닝", "아이템×N", "클로징"],
+    "conceptHints": ["미니멀", "베스트 N", "매장 품절"],
+    "openingExample": "무인양품 베스트 ○○ N가지"
+  }
+}

@@ -1,6 +1,6 @@
-# 디디딧 시나리오 머신
+# 디디딧 콘티 작성기
 
-브리프 → 줄글 초안 → 5열 변환 → 장면·사이즈 → 자막·시트 공유
+기획안 → 줄글 초안 → 5열 변환 → 장면·사이즈 → 자막·시트 공유
 
 - **시트가 원본(SSOT)**: 최종 편집은 Google 스프레드시트
 - **프로젝트**: `?project=vendict` 등
@@ -19,8 +19,6 @@ git pull origin main
 
 또는 `dddit\script\start-local.bat` 더블클릭.
 
-> `tmux` / `start-local.sh` 는 Linux·Mac·클라우드 전용입니다. Windows에서는 위 PowerShell 스크립트를 쓰세요.
-
 ### Mac / Linux
 
 ```bash
@@ -29,25 +27,14 @@ git pull origin main
 
 ### 주의
 
-- 서버는 **저장소 루트**(`works-site`)에서 띄워야 합니다. `dddit/script` 폴더만 서빙하면 경로가 어긋납니다.
-- `열기.bat` / `file://` 는 시드 JSON·시트 연동에 제한이 있습니다.
+- 서버는 **저장소 루트**(`works-site`)에서 띄워야 합니다.
+- `file://` 는 시트 연동에 제한이 있습니다.
 
-## 최신 UI 확인
+## UI
 
-pull 후 상단이 아래처럼 보이면 성공:
-
-- 로고 없음 · `← 워크스페이스` + **시나리오 머신**
-- 단계: **1 브리프 · 2 줄글 · 3 변환 · 4 장면 · 5 공유** (서치 없음)
-
-`git log -1 --oneline` → `aa2d61d` 이후 커밋이면 최신.
+- `← 워크스페이스` + **콘티 작성기**
+- 단계: **1 기획안 · 2 줄글 · 3 변환 · 4 장면 · 5 공유**
 
 ## works-api
 
-- **works.mansejin.com** / localhost(기본): NAS works-api 자동 연동 (API 키 불필요)
-- 직접 Gemini: URL에 `?api=direct`
-
-## main.js 빌드
-
-```bash
-cd dddit/script/js && node bundle.js
-```
+배포 URL(`works.mansejin.com`)에서는 NAS `works-api`가 Gemini·시트 키를 대신합니다.

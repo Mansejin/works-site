@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
-  <meta name="description" content="디디딧 시나리오 머신 — 브리프 · 줄글 초안 · Google 시트" />
+  <meta name="description" content="디디딧 콘티 작성기 — 기획안 · 줄글 · Google 시트" />
   <link rel="canonical" href="https://works.mansejin.com/dddit/script/" />
-  <title>시나리오 머신 · 디디딧</title>
+  <title>콘티 작성기 · 디디딧</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="css/style.css?v=5" />
+  <link rel="stylesheet" href="css/style.css?v=6" />
   <script>
     window.__earlyErrors = window.__earlyErrors || [];
     window.addEventListener('error', function (e) {
@@ -33,13 +33,12 @@
     <header class="app-header">
       <div class="app-brand">
         <a class="back-link" href="../">← 워크스페이스</a>
-        <h1>시나리오 머신</h1>
-        <p id="header-subtitle"><span id="pipeline-stage-label">브리프</span><span id="header-product" class="header-product hidden"></span></p>
+        <h1>콘티 작성기</h1>
+        <p id="header-subtitle"><span id="pipeline-stage-label">기획안</span><span id="header-product" class="header-product hidden"></span></p>
       </div>
       <div class="header-tools">
         <span id="workspace-project-badge" class="project-pill hidden"></span>
         <span id="ad-mode-badge" class="pill pill-warn hidden">광고</span>
-        <span id="prompt-version-badge" class="tool-chip hidden" title="프롬프트">default-v1.0.0.txt</span>
         <button id="toggle-error-log" class="tool-btn" type="button">로그<span id="error-log-badge" class="badge-dot hidden"></span></button>
         <button id="toggle-prompt" class="tool-btn" type="button">프롬프트</button>
         <button id="toggle-settings" class="tool-btn" type="button">설정</button>
@@ -100,7 +99,7 @@
         <span id="active-prompt-label" class="muted"></span>
       </div>
       <div class="block-body">
-        <label class="field">파일명<input id="prompt-filename" type="text" value="default-v1.0.0.txt" /></label>
+        <label class="field">파일명<input id="prompt-filename" type="text" value="default-v1.1.0.txt" /></label>
         <div class="btn-row">
           <label class="btn btn-secondary file-btn">불러오기<input id="prompt-file-input" type="file" accept=".txt" hidden /></label>
           <button id="btn-prompt-export" class="btn btn-secondary" type="button">저장</button>
@@ -116,7 +115,6 @@
 
     <div class="layout-grid app-shell" data-page="1">
       <div class="work-column">
-        <!-- 1 기획안 (읽기 전용) -->
         <section class="block step-section step-active page-visible" data-step="1" id="step-brief">
           <div class="block-head">
             <h2><span class="step-num-badge">1</span> 기획안</h2>
@@ -150,25 +148,9 @@
               </div>
               <ul id="ref-file-list" class="file-list"></ul>
             </details>
-
-            <!-- plan-brief-sync / legacy hooks (hidden) -->
-            <input type="hidden" id="product-name" />
-            <textarea id="team-brief-notes" hidden></textarea>
-            <input type="hidden" id="content-direction" />
-            <textarea id="product-notes" hidden></textarea>
-            <textarea id="brief-thesis" hidden></textarea>
-            <textarea id="brief-scenario" hidden></textarea>
-            <textarea id="brief-must" hidden></textarea>
-            <textarea id="brief-careful" hidden></textarea>
-            <input type="hidden" id="brief-compare" />
-            <input type="checkbox" id="ad-mode" hidden checked />
-            <input type="hidden" id="ad-brand" />
-            <select id="ad-tone-level" hidden><option value="balanced" selected></option></select>
-            <input type="checkbox" id="ad-disclosure" hidden checked />
           </div>
         </section>
 
-        <!-- 2 줄글 -->
         <section class="block step-section step-collapsed" data-step="2" id="step-prose">
           <div class="block-head">
             <h2><span class="step-num-badge">2</span> 줄글 초안</h2>
@@ -177,7 +159,7 @@
             </div>
           </div>
           <div class="block-body form-stack">
-            <p class="hint">파트 구성 없이 자유 챕터로 줄글을 먼저 씁니다. 직접 수정도 가능합니다.</p>
+            <p class="hint">챕터별로 <strong>대화 맥락이 이어져</strong> 스타일이 수렴됩니다. 직접 수정한 뒤 재생성하면 다듬은 톤을 기준으로 이어 씁니다.</p>
 
             <details class="fold">
               <summary>챕터 나누기 (선택) · 드래그로 순서 변경</summary>
@@ -193,7 +175,6 @@
           </div>
         </section>
 
-        <!-- 3 변환 -->
         <section class="block step-section step-collapsed" data-step="3" id="step-convert">
           <div class="block-head">
             <h2><span class="step-num-badge">3</span> 5열 변환</h2>
@@ -207,7 +188,6 @@
           </div>
         </section>
 
-        <!-- 4 장면 -->
         <section class="block step-section step-collapsed" data-step="4" id="step-scenes">
           <div class="block-head">
             <h2><span class="step-num-badge">4</span> 장면 · 사이즈</h2>
@@ -220,21 +200,15 @@
           </div>
         </section>
 
-        <!-- 5 공유 -->
         <section class="block step-section step-collapsed" data-step="5" id="step-share">
           <div class="block-head">
             <h2><span class="step-num-badge">5</span> 자막 · 공유</h2>
             <div class="block-head-actions">
               <button id="btn-add-captions" class="btn btn-secondary btn-sm" type="button">자막·코멘트</button>
-              <button id="btn-sheet-push-inline" class="btn btn-primary btn-sm" type="button">시트로 보내기</button>
             </div>
           </div>
           <div class="block-body">
-            <p class="hint">자막·코멘트 추가 후 시트 전송 → 시트에서 최종 수정 → 브랜드 페이지에 <strong>대본만</strong> 공유</p>
-            <div class="btn-row">
-              <button id="btn-sheet-open-inline" class="btn btn-secondary btn-sm" type="button">시트 열기</button>
-              <button id="btn-sheet-pull-inline" class="btn btn-secondary btn-sm" type="button">시트에서 불러오기</button>
-            </div>
+            <p class="hint">자막·코멘트 추가 후 오른쪽 미리보기에서 <strong>시트 전송</strong> → 시트에서 최종 수정</p>
           </div>
         </section>
       </div>
@@ -272,7 +246,7 @@
 
     <footer class="step-toolbar">
       <button id="btn-pipeline-prev" class="btn btn-ghost btn-sm" type="button" disabled>← 이전</button>
-      <span class="toolbar-stage" id="toolbar-stage-hint">브리프 입력 후 줄글 단계로</span>
+      <span class="toolbar-stage" id="toolbar-stage-hint">기획안 확인 후 줄글 단계로</span>
       <button id="btn-pipeline-next" class="btn btn-secondary btn-sm" type="button">다음 →</button>
     </footer>
   </div>
@@ -281,6 +255,6 @@
   <script src="../js/plan-brief-sync.js"></script>
   <script src="js/works-api.js"></script>
   <script src="js/sheet-sync.js"></script>
-  <script src="js/main.js?v=24"></script>
+  <script src="js/main.js?v=27"></script>
 </body>
 </html>

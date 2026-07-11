@@ -4,7 +4,7 @@
 
 - 루트: https://works.mansejin.com (비공개, 목록 없음)
 - 디디딧 워크스페이스: https://works.mansejin.com/dddit/
-- 시나리오 머신: https://works.mansejin.com/dddit/script/
+- 콘티 작성기: https://works.mansejin.com/dddit/script/
 - Xenics 프로젝트: https://works.mansejin.com/dddit/xenics/
 - Xenics 콘티: https://works.mansejin.com/dddit/script/?project=xenics
 - 벤딕트 프로젝트: https://works.mansejin.com/dddit/vendict/
@@ -18,7 +18,7 @@ works.mansejin.com/
 └── dddit/
     ├── index.html                  # 채널 워크스페이스
     ├── js/hub.js
-    ├── script/                     # 시나리오 머신 + Google 시트 연동
+    ├── script/                     # 콘티 작성기 + Google 시트 연동
     │   ├── google-apps-script/     # Apps Script 배포용
     │   └── js/sheet-sync.js
     └── xenics/
@@ -35,7 +35,7 @@ works.mansejin.com/
 ```
 
 추후 다른 프로젝트는 `/dddit/프로젝트명/` 형태로 추가합니다.  
-**브랜드 포털**(`dddit/{slug}/`)에는 기획안·콘티·제품 링크만 두고, **시나리오 머신은 허브**(`dddit/`) 채널 도구에서만 접근합니다.  
+**브랜드 포털**(`dddit/{slug}/`)에는 기획안·콘티·제품 링크만 두고, **콘티 작성기는 허브**(`dddit/`) 채널 도구에서만 접근합니다.  
 새 브랜드 추가 시 `dddit/_template/brand/` 복사 · `node dddit/scripts/check-brand-portals.mjs` 로 검증.
 
 예: `/dddit/다른브랜드/`, `/dddit/script/`

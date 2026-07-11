@@ -1,7 +1,9 @@
-/** 프롬프트 — txt 파일 기반 관리 */
+/** 프롬프트 — txt 파일 기반 관리 (단계별 시스템 규칙 분리) */
 (function () {
-  const PROMPT_VERSION = '1.0.0';
+  const PROMPT_VERSION = '1.1.0';
   const DEFAULT_PROMPT_FILE = `prompts/default-v${PROMPT_VERSION}.txt`;
+  const STYLE_ANCHOR_FILE = 'prompts/style-anchor.txt';
+  const FORMAT_ITEM_ROUNDUP_FILE = 'prompts/format-item-roundup.txt';
   const PROMPT_STORAGE_KEY = 'dididit-prompt-file-v2';
 
   const MANDATORY_OPENING = [
@@ -13,55 +15,116 @@
 
   const MANDATORY_CLOSING = [
     '오늘 준비한 리뷰는 여기까지입니다.',
-    '혹시 영상 보시고 궁금한 점이나 여러분이 직접 써보신 후기가 있다면 댓글로 마음껏 공유해 주세요.',
+    '혹시 영상 보시고 궁금한 점이나 여러분이 직접 써보신 후기가 있다면',
+    '댓글로 마음껏 공유해 주세요.',
     '구독과 좋아요는 다음 리뷰 제작에 큰 힘이 됩니다.',
-    '그럼 오늘 소개해드린 제품의 장단점과 평점을 정리해드리며 다음 영상에서 뵙겠습니다.',
+    '그럼 오늘 소개해드린 제품의 장단점과 평점을 정리해드리며',
+    '다음 영상에서 뵙겠습니다.',
   ];
 
-  function buildDefaultSystemRules() {
-    return `# System Context
+  /** N개 아이템 라운드업 (다이소·무인양품 베스트 N 등) */
+  const MANDATORY_CLOSING_ROUNDUP = [
+    '오늘 소개해드린 [콘셉트·제품군명] 어떠셨나요?',
+    '혹시 궁금한 점이나 여러분이 직접 써본 후기가 있다면',
+    '댓글로 마음껏 공유해 주세요.',
+    '구독과 좋아요는 다음 리뷰 제작에 큰 힘이 됩니다.',
+    '그럼 오늘 소개해드린 제품의 정보를 정리해드리며,',
+    '다음 영상에서 뵙겠습니다.',
+    '감사합니다!',
+  ];
+
+  function isRoundupFormat(text) {
+    if (window.DIDIDIT_CONFIG?.isRoundupFormat) return window.DIDIDIT_CONFIG.isRoundupFormat(text);
+    return /꿀템\s*\d+|\d+\s*가지|라운드업|베스트\s*\d+|일레븐|\d+\s*개\s*(꿀템|아이템|제품|소품)/i.test(
+      String(text || ''),
+    );
+  }
+
+  function buildRoundupCategoryHint(text) {
+    return window.DIDIDIT_CONFIG?.buildRoundupCategoryHint?.(text) ?? '';
+  }
+
+  function formatClosingBlock(roundup = false) {
+    const lines = roundup ? MANDATORY_CLOSING_ROUNDUP : MANDATORY_CLOSING;
+    const label = roundup ? 'N개 아이템 라운드업' : '단일 제품';
+    return `[클로징 — ${label}]\n${lines.map((l) => `- ${l}`).join('\n')}`;
+  }
+
+  /** 단계별 출력 규칙 — 시스템 프롬프트에만 주입 (기본 프롬프트와 충돌 방지) */
+  const STAGE_RULES = {
+    prose: `# 현재 작업 단계: 줄글 작성 (최우선)
+- 성우 내레이션 **줄글(연속 텍스트)** 만 작성합니다.
+- 행 분할·글자 수·바이트·표·JSON·장면·사이즈·자막·코멘트 규칙은 **이 단계에서 적용하지 않습니다**.
+- 스펙·수치는 문장 속에 자연스럽게 녹이고, 나열형 낭독은 피합니다.
+- 브리프·기획안의 mustHighlight는 빠뜨리지 말고, carefulPoints는 솔직히 다룹니다.
+- 첫 챕터(프롤로그)에는 [오프닝] 고정 멘트를 포함합니다.
+- 마지막 챕터: **단일 제품**은 [클로징—단일], **N개 아이템 라운드업**은 [클로징—라운드업] 고정 멘트.
+- 출력: 마크다운·JSON·표 없이 줄글 본문만`,
+
+    convert: `# 현재 작업 단계: 줄글 → 대본 열 변환 (최우선)
+- 줄글을 JSON \`rows\` 배열로 변환합니다. **대본 열만** 채우고 장면·사이즈·자막·코멘트는 빈 문자열.
+- 1행 = 성우 한 호흡. 행당 공백 포함 **25~45자** (50자 초과 금지).
+- 마침표마다 무조건 분리 X. 호흡이 바뀔 때 새 행. 15자 내외 초단문 연속 나열 금지.
+- 대본에 제품을 '이 녀석'이라 지칭하지 말 것.
+- 출력: 유효한 JSON만. {"rows":[{"대본":"...","장면":"","사이즈":"","자막":"","코멘트":""}]}`,
+
+    scene: `# 현재 작업 단계: 장면·사이즈 추가 (최우선)
+- 대본 열은 **한 글자도 수정하지 않습니다**.
+- 장면: 모델 행동·카메라 구도. 연속 호흡은 '컷 유지'.
+- 사이즈: 와이드/미디엄/클로즈업/탑뷰 등.
+- 자막·코멘트는 빈 문자열 유지.
+- 언박싱·고가 비교 세팅·작위적 감정 연기 장면 금지.
+- 출력: JSON rows 전체`,
+
+    caption: `# 현재 작업 단계: 자막·코멘트 추가 (최우선)
+- 대본·장면·사이즈는 **수정하지 않습니다**.
+- 자막: 대본에 수치·스펙이 나올 때만 요약 (예: "무게 406g").
+- 코멘트: 준비물·앱 세팅 등 촬영 메모가 필요할 때만.
+- 출력: JSON rows 전체`,
+  };
+
+  function buildBaseSystemRules() {
+    return `# 디디딧 시스템 프롬프트 (기본)
+
+## 역할·톤
 Role: IT 리뷰 채널 '디디딧' 메인 작가
 Target Audience: 퇴근 후 혼자만의 시간을 즐기는 1인 가구 직장인
 Content Format: 모델 실사용 연기(화면) + 성우 내레이션(음성)
-Tone & Manner: 솔직 담백, 과장 없는 팩트 폭격, 실생활 밀착형 공감 화법
-Output: JSON 배열 (각 행: 대본, 장면, 사이즈, 자막, 코멘트)
+Tone & Manner: 솔직 담백, 과장 없는 팩트, 실생활 밀착형 공감 화법
 
-# Strict Formatting & Volume Rule
-- 호흡마다 행 분할. 1행 = 한 호흡, **25~45자** (50자 초과 금지). 장문 한 행에 합치기 금지.
-- 마침표마다 무조건 분리 X. 15자 내외 초단문 연속 나열도 금지.
-- 일반 파트: 14~22행, 1,600~2,000 Byte.
-- [예외] 프롤로그만 8행 이하.
-- 연속된 호흡의 대본인 경우 억지로 장면을 나누지 말고 장면 열에 '컷 유지'라고 표기할 것.
-- 대본 작성 시 제품을 '이 녀석'이라고 지칭하지 말 것.
-- '자막' 열: 대본에 제품의 수치나 스펙이 나올 때만 요약해서 작성.
-- '코멘트' 열: 챙겨야 할 준비물이나 앱 세팅 등이 필요한 경우에만 작성.
-- '사이즈' 열: 카메라 구도 (예: 미디엄샷, 클로즈업, 탑뷰 등).
+## 콘텐츠 원칙
+- 스펙·기능 설명 시 기본 구성품과 별매품을 구분합니다.
+- 제품 지칭: '이 녀석' 사용 금지.
+- 사실 왜곡·허위 장점 금지. 리뷰 가이드·브리프 우선 반영.
+- 진행자 등장 배제. 모델의 담백한 행동 묘사 중심.
 
-# Production Constraints
-- 한정된 렌탈 스튜디오 환경과 최소 장비 세팅 고려. 고가 비교 제품 세팅 배제.
-- 복잡한 서류/엑셀 더미 세팅 대신 디디딧 유튜브 시청, 단순 웹서핑, 게임 등 직관적 화면.
-- 모델의 작위적 감정 연기 지양. 제품 조작 등 단순하고 자연스러운 행동.
-- 진행자 등장 배제. 모델의 담백한 행동 묘사와 구체적 카메라 구도를 장면 열에 명시.
+## 촬영 제약
+- 렌탈 스튜디오·최소 장비 기준. 고가 비교 제품 세팅 배제.
+- 언박싱 장면 금지 (촬영 불가).
+- 복잡한 더미 세팅 대신 웹서핑·게임 등 직관적 화면.
+- 작위적·어색한 감정 연기 지양.
 
-# Reference Scripts (when provided)
-- 타 유튜버 리뷰 대본은 팩트 체크·누락 포인트 파악용으로만 활용할 것.
-- 문장·표현을 그대로 복사하지 말고 디디딧 톤으로 재작성할 것.
-- 콘텐츠 방향에 맞게 강조·축소할 파트를 우선 반영할 것.
+## 참고 대본 (제공 시)
+- 팩트 체크·누락 파악용. 문장·표현 복사 금지, 디디딧 톤으로 재작성.
 
-# Mandatory Phrases
-[오프닝 - 프롤로그 파트에만]
+## 고정 멘트
+[오프닝 — 프롤로그·첫 챕터에만]
 ${MANDATORY_OPENING.map((l) => `- ${l}`).join('\n')}
 
-[클로징 - 총평 파트에만]
+[클로징 — 단일 제품 · 총평·마지막 챕터]
 ${MANDATORY_CLOSING.map((l) => `- ${l}`).join('\n')}
 
-# Response Format (반드시 준수)
-유효한 JSON만 출력. 마크다운 코드블록 없이:
-{"rows":[{"대본":"...","장면":"...","사이즈":"...","자막":"","코멘트":""}]}
+[클로징 — N개 아이템 라운드업 · 마지막]
+${MANDATORY_CLOSING_ROUNDUP.map((l) => `- ${l}`).join('\n')}
 
-# Dynamic Structure
-- 필수 파트: 디자인, 실사용, 가격, 총평 반드시 포함.
-- 제품 특성에 맞게 파트 후보에서 유동 조합.`;
+## 파이프라인 안내
+줄글 → 대본 분할 → 장면·사이즈 → 자막·코멘트 순으로 작성합니다.
+**행 분할·JSON·표 형식 규칙은 요청 메시지 상단의 [현재 작업 단계] 지침만 따릅니다.**`;
+  }
+
+  /** 하위 호환: 편집기·내장값 표시용 */
+  function buildDefaultSystemRules() {
+    return buildBaseSystemRules();
   }
 
   function loadPromptState() {
@@ -79,7 +142,17 @@ ${MANDATORY_CLOSING.map((l) => `- ${l}`).join('\n')}
   function getActiveSystemRules() {
     const saved = loadPromptState();
     if (saved.text) return saved.text;
-    return buildDefaultSystemRules();
+    return buildBaseSystemRules();
+  }
+
+  /**
+   * API 호출용 — 기본 프롬프트 + 단계 규칙.
+   * 커스텀 프롬프트를 쓰더라도 단계 규칙이 최우선으로 앞에 붙어 패러독스를 방지합니다.
+   */
+  function getSystemRulesForStage(stage) {
+    const stageBlock = STAGE_RULES[stage];
+    if (!stageBlock) return getActiveSystemRules();
+    return `${stageBlock}\n\n---\n\n${getActiveSystemRules()}`;
   }
 
   function getActivePromptSource() {
@@ -107,13 +180,49 @@ ${MANDATORY_CLOSING.map((l) => `- ${l}`).join('\n')}
     return text;
   }
 
+  let styleAnchorCache = null;
+
+  let formatAnchorCache = undefined;
+
+  async function getFormatAnchorBlock() {
+    if (formatAnchorCache !== undefined) return formatAnchorCache;
+    try {
+      const text = await fetchPromptTxt(FORMAT_ITEM_ROUNDUP_FILE);
+      formatAnchorCache = `# 영상 포맷 (N개 아이템 라운드업 — QC 반영)\n${text.trim()}`;
+      return formatAnchorCache;
+    } catch {
+      formatAnchorCache = '';
+      return '';
+    }
+  }
+
+  function clearFormatAnchorCache() {
+    formatAnchorCache = undefined;
+  }
+
+  async function getStyleAnchorBlock() {
+    if (styleAnchorCache !== null) return styleAnchorCache;
+    try {
+      const text = await fetchPromptTxt(STYLE_ANCHOR_FILE);
+      styleAnchorCache = `# 디디딧 스타일 앵커 (문장 복사 금지 — 톤·호흡·리듬만 참고)\n${text.trim()}`;
+      return styleAnchorCache;
+    } catch {
+      styleAnchorCache = '';
+      return '';
+    }
+  }
+
+  function clearStyleAnchorCache() {
+    styleAnchorCache = null;
+  }
+
   async function loadDefaultPromptFile() {
     try {
       const text = await fetchPromptTxt(DEFAULT_PROMPT_FILE);
       setActivePrompt(text, DEFAULT_PROMPT_FILE);
       return { text, source: DEFAULT_PROMPT_FILE };
     } catch {
-      const text = buildDefaultSystemRules();
+      const text = buildBaseSystemRules();
       setActivePrompt(text, `${DEFAULT_PROMPT_FILE} (내장 fallback)`);
       return { text, source: `${DEFAULT_PROMPT_FILE} (내장 fallback)` };
     }
@@ -131,8 +240,21 @@ ${MANDATORY_CLOSING.map((l) => `- ${l}`).join('\n')}
   window.DIDIDIT_PROMPT = {
     PROMPT_VERSION,
     DEFAULT_PROMPT_FILE,
+    MANDATORY_CLOSING,
+    MANDATORY_CLOSING_ROUNDUP,
+    isRoundupFormat,
+    buildRoundupCategoryHint,
+    formatClosingBlock,
+    buildBaseSystemRules,
     buildDefaultSystemRules,
     getActiveSystemRules,
+    getSystemRulesForStage,
+    getStyleAnchorBlock,
+    clearStyleAnchorCache,
+    STYLE_ANCHOR_FILE,
+    getFormatAnchorBlock,
+    clearFormatAnchorCache,
+    FORMAT_ITEM_ROUNDUP_FILE,
     getActivePromptSource,
     setActivePrompt,
     clearActivePrompt,
@@ -143,263 +265,122 @@ ${MANDATORY_CLOSING.map((l) => `- ${l}`).join('\n')}
   };
 })();
 
-/** 디디딧 시나리오 머신 — 카테고리·파트 설정 */
+/** 디디딧 콘티 작성기 — 카테고리·모델·라운드업 설정 */
 
 const CATEGORIES = [
+  { id: 'floor-care', name: '청소·바닥케어', focusHints: '흡입력·배터리·먼지통·필터 청소·좁은 공간 주행' },
+  { id: 'air', name: '공기·환기', focusHints: 'CADR·소음·필터 교체 비용·1인 거실 체감' },
+  { id: 'climate', name: '냉난방·환경', focusHints: '풍량·소음·전력·좁은 원룸 배치' },
+  { id: 'kitchen', name: '주방가전', focusHints: '1인 식사 조리·세척·소음·카운터 공간' },
+  { id: 'laundry', name: '세탁·건조', focusHints: '1인 세탁량·소음·배수·좁은 발코니 설치' },
+  { id: 'personal-care', name: '개인케어·뷰티', focusHints: '출근 전 루틴·손목 피로·소음·거울 앞 사용' },
+  { id: 'it-device', name: 'IT·모바일', focusHints: '배터리·성능·화면·휴대성·출퇴근·퇴근 후 1인 사용' },
+  { id: 'smart-home', name: '스마트홈·IoT', focusHints: '앱 연동·지연·1인 가구 보안·설치 난이도' },
+  { id: 'other', name: '기타 가전', focusHints: '제품 특성에 맞게 챕터를 유동 구성' },
+];
+
+/** N개 아이템 라운드업 — 소스·콘셉트 카테고리 (단일 제품 카테고리와 별도 축) */
+const ROUNDUP_CATEGORIES = [
   {
-    id: 'floor-care',
-    name: '청소·바닥케어',
-    examples: '무선청소기, 로봇청소기, 스팀청소기, 물걸레',
-    keywords: ['청소', '로봇', '물걸레', '스팀', '배큠', 'vacuum', 'mop'],
-    suggestedParts: [
-      '프롤로그',
-      '디자인',
-      '구성품',
-      '성능',
-      '실사용',
-      '관리',
-      '단점',
-      '가격',
-      '총평',
-    ],
-    focusHints: '흡입력·배터리·먼지통·필터 청소·좁은 공간 주행',
+    id: 'roundup-daiso',
+    name: '다이소',
+    detect: /다이소/i,
+    conceptHints: ['가성비', '1000~5000원대', '품절·재입고', '매장 재고'],
+    openingExample: '다이소 가성비 여름 꿀템 N가지',
   },
   {
-    id: 'air',
-    name: '공기·환기',
-    examples: '공기청정기, 제습기, 가습기, 에어워셔',
-    keywords: ['공기청정', '제습', '가습', '환기', '필터', '미세먼지'],
-    suggestedParts: [
-      '프롤로그',
-      '디자인',
-      '성능',
-      '실사용',
-      '관리',
-      '편의성',
-      '단점',
-      '가격',
-      '총평',
-    ],
-    focusHints: 'CADR·소음·필터 교체 비용·1인 거실 체감',
+    id: 'roundup-coupang',
+    name: '쿠팡',
+    detect: /쿠팡/i,
+    conceptHints: ['로켓배송', '가격 변동', '리뷰 수·별점', '로켓와우'],
+    openingExample: '쿠팡에서 찾은 ○○ 꿀템 N가지',
   },
   {
-    id: 'climate',
-    name: '냉난방·환경',
-    examples: '선풍기, 에어컨, 온풍기, 전기장판',
-    keywords: ['선풍', '에어컨', '냉방', '난방', '온풍', '무풍'],
-    suggestedParts: [
-      '프롤로그',
-      '디자인',
-      '성능',
-      '실사용',
-      '편의성',
-      '단점',
-      '가격',
-      '총평',
-    ],
-    focusHints: '풍량·소음·전력·좁은 원룸 배치',
+    id: 'roundup-temu',
+    name: '테무',
+    detect: /테무|temu/i,
+    conceptHints: ['초저가', '배송 기간', '실물과 차이', '사이즈·재질 확인'],
+    openingExample: '테무에서 살 만한 ○○ N가지',
   },
   {
-    id: 'kitchen',
-    name: '주방가전',
-    examples: '에어프라이어, 블렌더, 전자레인지, 커피머신',
-    keywords: ['주방', '에어프라이', '블렌더', '커피', '전자레인지', '오븐'],
-    suggestedParts: [
-      '프롤로그',
-      '디자인',
-      '구성품',
-      '성능',
-      '실사용',
-      '관리',
-      '단점',
-      '가격',
-      '총평',
-    ],
-    focusHints: '1인 식사 조리·세척·소음·카운터 공간',
+    id: 'roundup-deskterior',
+    name: '데스크테리어',
+    detect: /데스크테리어|deskterior/i,
+    conceptHints: ['책상·모니터 주변', '1인 workspace', '수납·선 정리'],
+    openingExample: '책상을 바꿔 줄 데스크테리어 N가지',
   },
   {
-    id: 'laundry',
-    name: '세탁·건조',
-    examples: '세탁기, 건조기, 의류관리기',
-    keywords: ['세탁', '건조', '드럼', '통돌이', '스팀다리미'],
-    suggestedParts: [
-      '프롤로그',
-      '디자인',
-      '성능',
-      '실사용',
-      '관리',
-      '단점',
-      '가격',
-      '총평',
-    ],
-    focusHints: '1인 세탁량·소음·배수·좁은 발코니 설치',
-  },
-  {
-    id: 'personal-care',
-    name: '개인케어·뷰티',
-    examples: '헤어드라이어, 면도기, 칫솔, 마사지기',
-    keywords: ['드라이어', '면도', '칫솔', '뷰티', '헤어', '피부'],
-    suggestedParts: [
-      '프롤로그',
-      '디자인',
-      '구성품',
-      '성능',
-      '실사용',
-      '단점',
-      '가격',
-      '총평',
-    ],
-    focusHints: '출근 전 루틴·손목 피로·소음·거울 앞 사용',
-  },
-  {
-    id: 'it-device',
-    name: 'IT·모바일',
-    examples: '스마트폰, 태블릿, 노트북, 이어폰, 스마트워치',
-    keywords: [
-      '스마트폰', '휴대폰', '폰', '갤럭시', '아이폰', 'iphone', 'android',
-      '태블릿', 'ipad', '갤탭', 'tab', '노트북', '맥북', 'laptop', '울트라북',
-      '이어폰', '버즈', '에어팟', '워치', '스마트워치', '갤럭시북', 'surface',
-    ],
-    suggestedParts: [
-      '프롤로그',
-      '디자인',
-      '구성품',
-      '성능',
-      '실사용',
-      '편의성',
-      '단점',
-      '가격',
-      '총평',
-    ],
-    focusHints: '배터리·성능·화면·휴대성·출퇴근·퇴근 후 1인 사용 시나리오',
-  },
-  {
-    id: 'smart-home',
-    name: '스마트홈·IoT',
-    examples: '스마트 스피커, 도어락, CCTV, 허브',
-    keywords: ['스마트', 'IoT', '앱', '연동', '허브', '도어락'],
-    suggestedParts: [
-      '프롤로그',
-      '디자인',
-      '편의성',
-      '성능',
-      '실사용',
-      '단점',
-      '가격',
-      '총평',
-    ],
-    focusHints: '앱 연동·지연·1인 가구 보안·설치 난이도',
-  },
-  {
-    id: 'other',
-    name: '기타 가전',
-    examples: '분류가 애매한 제품',
-    keywords: [],
-    suggestedParts: [
-      '프롤로그',
-      '디자인',
-      '성능',
-      '실사용',
-      '단점',
-      '가격',
-      '총평',
-    ],
-    focusHints: '제품 특성에 맞게 파트를 유동 조합',
+    id: 'roundup-muji',
+    name: '무인양품·MUJI',
+    detect: /무인양품|muji|무지/i,
+    conceptHints: ['미니멀', '베스트 N', '실용 소품', '매장 품절'],
+    openingExample: '무인양품 베스트 ○○ N가지',
   },
 ];
 
-function detectCategory(productName, productNotes, contentDirection) {
-  const text = `${productName} ${productNotes} ${contentDirection || ''}`.toLowerCase();
-  let best = CATEGORIES.find((c) => c.id === 'other');
-  let bestScore = 0;
+/** N개 아이템 신호 — 브랜드 없이도 라운드업 (예: 꿀템 20, 베스트 11) */
+const ROUNDUP_QUANTITY_PATTERN =
+  /꿀템\s*\d+|\d+\s*꿀템|라운드업|\d+\s*가지|N\s*가지|베스트\s*\d+|베스트\s*일레븐|일레븐|top\s*\d+|\d+\s*개\s*(꿀템|아이템|제품|소품)|\d+\s*선/i;
 
-  for (const cat of CATEGORIES) {
-    if (cat.id === 'other') continue;
-    const score = cat.keywords.reduce((acc, kw) => {
-      return acc + (text.includes(kw.toLowerCase()) ? 1 : 0);
-    }, 0);
-    if (score > bestScore) {
-      bestScore = score;
-      best = cat;
-    }
+function hasRoundupQuantity(text) {
+  return ROUNDUP_QUANTITY_PATTERN.test(String(text || ''));
+}
+
+/**
+ * 라운드업 포맷 여부 — N가지·꿀템 N·베스트 N 등 **개수 신호** 필수.
+ * 브랜드(다이소·무인양품·쿠팡 등)만으로는 단일 제품 리뷰로 처리.
+ */
+function isRoundupFormat(text) {
+  return hasRoundupQuantity(text);
+}
+
+function detectRoundupCategory(text) {
+  const t = String(text || '');
+  if (!isRoundupFormat(t)) return null;
+  const found = ROUNDUP_CATEGORIES.find((c) => c.detect.test(t));
+  if (found) return found.id;
+  return 'roundup-generic';
+}
+
+function getRoundupCategory(id) {
+  return ROUNDUP_CATEGORIES.find((c) => c.id === id) || null;
+}
+
+function buildRoundupCategoryHint(text) {
+  const id = detectRoundupCategory(text);
+  if (!id) return '';
+  if (id === 'roundup-generic') {
+    return '- 라운드업 소스: 기획안 콘셉트(다이소·쿠팡·테무·데스크테리어·무인양품 등)에 맞게 오프닝·구매 팁을 조정.\n';
   }
-  return best;
+  const cat = getRoundupCategory(id);
+  if (!cat) return '';
+  return `- 라운드업 소스 **${cat.name}**: ${cat.conceptHints.join(', ')}. 오프닝 콘셉트 예: "${cat.openingExample}".\n`;
 }
 
-function utf8ByteLength(str) {
-  return new TextEncoder().encode(str).length;
-}
-
-/** @type {{ id: string, label: string, hint: string }[]} */
 const GEMINI_MODELS = [
-  {
-    id: 'gemini-3.1-flash-lite',
-    label: 'Gemini 3.1 Flash-Lite',
-    hint: '빠르고 저렴 — 대본 생성 추천',
-  },
-  {
-    id: 'gemini-3.5-flash',
-    label: 'Gemini 3.5 Flash',
-    hint: '최신 Flash — 코딩·에이전트 강화',
-  },
-  {
-    id: 'gemini-3.1-pro-preview',
-    label: 'Gemini 3.1 Pro',
-    hint: '고품질 — 복잡한 구성·팩트 체크',
-  },
-  {
-    id: 'gemini-3-flash-preview',
-    label: 'Gemini 3 Flash',
-    hint: '프리뷰 — 균형형',
-  },
+  { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite', hint: '빠르고 저렴' },
+  { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', hint: '최신 Flash' },
+  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', hint: '고품질 대본' },
+  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', hint: '균형형' },
 ];
 
-const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
-/** 파트 구성·프롤로그 */
-const LITE_GEMINI_MODEL = 'gemini-3.1-flash-lite';
-/** 프롤로그 이후 본문 대본 */
 const PRO_GEMINI_MODEL = 'gemini-3.1-pro-preview';
-
-const DEPRECATED_GEMINI_MODELS = new Set([
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-pro',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro-latest',
-  'gemini-1.5-flash-latest',
-]);
 
 function isSupportedGeminiModel(id) {
   return GEMINI_MODELS.some((m) => m.id === id);
 }
 
-const PART_NAME_POOL = [
-  '프롤로그',
-  '디자인',
-  '구성품',
-  '성능',
-  '실사용',
-  '편의성',
-  '관리',
-  '단점',
-  '가격',
-  '총평',
-];
-
 window.DIDIDIT_CONFIG = {
   CATEGORIES,
-  PART_NAME_POOL,
+  ROUNDUP_CATEGORIES,
   GEMINI_MODELS,
-  DEFAULT_GEMINI_MODEL,
-  LITE_GEMINI_MODEL,
   PRO_GEMINI_MODEL,
-  DEPRECATED_GEMINI_MODELS,
   isSupportedGeminiModel,
-  get SYSTEM_RULES() {
-    return window.DIDIDIT_PROMPT?.getActiveSystemRules() || '';
-  },
-  detectCategory,
-  utf8ByteLength,
+  isRoundupFormat,
+  hasRoundupQuantity,
+  detectRoundupCategory,
+  getRoundupCategory,
+  buildRoundupCategoryHint,
 };
 
 /** 참고 대본 파일 파싱 (txt, md, docx) */
@@ -495,32 +476,9 @@ window.DIDIDIT_CONFIG = {
 ${blocks.join('\n\n')}`.trim();
   }
 
-  function buildAdGuideContext(guides) {
-    if (!guides.length) return '';
-    let total = 0;
-    const blocks = [];
-
-    for (const s of guides) {
-      if (total >= MAX_TOTAL) break;
-      const budget = Math.min(MAX_PER_FILE, MAX_TOTAL - total);
-      const body = s.text.length > budget ? truncate(s.text, budget) : s.text;
-      total += body.length;
-      blocks.push(`## ${s.name}\n${body}`);
-    }
-
-    return `
-# 본사 리뷰 가이드 (광고·협찬 — 최우선 준수)
-- 아래는 브랜드/본사에서 제공한 공식 리뷰 가이드입니다. 강조 포인트·필수 멘트·금지 표현을 반드시 따르세요.
-- 가이드와 사실이 충돌하면 사실을 우선하되, 표현은 가이드 톤에 맞게 조정하세요.
-- 가이드에 없는 비방·허위 장점은 추가하지 마세요.
-
-${blocks.join('\n\n')}`.trim();
-  }
-
   window.DIDIDIT_REF = {
     parseReferenceFile,
     buildReferenceContext,
-    buildAdGuideContext,
     MAX_PER_FILE,
     MAX_TOTAL,
   };
@@ -755,31 +713,6 @@ ${blocks.join('\n\n')}`.trim();
     ],
   };
 
-  const AIR_PURIFIER_EXAMPLE = {
-    productName: '삼성 비스포크 공기청정기 (예시)',
-    categoryId: 'air',
-    contentDirection: '1인 원룸 거실 기준 체감 성능과 필터 유지비 중심',
-    priceInfo: '출고 89만원대, 동급 LG·다이슨 대비 중간 가격',
-    reviewBrief: {
-      thesis: '좁은 원룸에서 실제로 공기가 달라지는지, 소음과 필터 비용까지 솔직하게',
-      targetScenario: '퇴근 후 문 닫고 혼자 쓰는 10평 거실, 반려동물 없음',
-      mustHighlight: 'CADR 대비 실제 체감, 취침 모드 소음, 필터 교체 주기·비용',
-      carefulPoints: '대형 평수 과장 광고, 필터 추가 구매 항목',
-      compareWith: 'LG 퓨리케어 동급, 다이슨 쿨기능 없는 라인',
-    },
-    productSpecs: {
-      model: 'AX90T7080WD (예시)',
-      cadr: '350 ㎥/h',
-      coverage: '33㎡ (10평)',
-      filter: 'HEPA13 + 탈취, 6개월 교체, 1년 약 10만원',
-      noise: '강풍 48dB / 취침 22dB',
-      power: '45W',
-      size: '250×400×650mm, 7.2kg',
-      smart: 'SmartThings, PM1.0 표시, 자동·취침 모드',
-    },
-    productNotes: '예시 데이터 — 실제 촬영 제품으로 교체하세요.',
-  };
-
   function getSpecFields(categoryId, deviceId) {
     if (deviceId && SPEC_FIELDS_BY_DEVICE[deviceId]) return SPEC_FIELDS_BY_DEVICE[deviceId];
     return SPEC_FIELDS_BY_CATEGORY[categoryId] || SPEC_FIELDS_BY_CATEGORY.default;
@@ -827,7 +760,7 @@ ${blocks.join('\n\n')}`.trim();
     return lines.length ? lines.join('\n') : '(리뷰 방향 미입력)';
   }
 
-  function buildPromptContext(state, category, refBlock, adBlock) {
+  function buildPromptContext(state, category, refBlock) {
     const cat = category || {};
     const specsBlock = formatSpecsBlock(state.productSpecs, state.categoryId);
     const briefBlock = formatReviewBriefBlock(state.reviewBrief);
@@ -852,18 +785,7 @@ ${specsBlock}
 ${extraNotes ? `\n## 추가 메모\n${extraNotes}` : ''}
 
 ## 리뷰 방향 (콘티·대본에 반영)
-${briefBlock}
-
-## 작성 파이프라인
-- 1단계: 파트별 내레이션 원문(prose) — 행·글자 수 제한 없이 자연스러운 호흡으로
-- 2단계: 원문을 스프레드시트 5열로 변환 — 대본 | 장면 | 사이즈 | 자막 | 코멘트
-- 제원·수치는 대본에 자연스럽게 녹이고, 스펙 나열형 낭독은 지양
-- 리뷰 방향의 mustHighlight는 빠뜨리지 말 것, carefulPoints는 디디딧 톤으로 솔직히
-${adBlock ? `\n${adBlock}\n` : ''}${refBlock ? `\n${refBlock}` : ''}`.trim();
-  }
-
-  function getAirPurifierExample() {
-    return JSON.parse(JSON.stringify(AIR_PURIFIER_EXAMPLE));
+${briefBlock}${refBlock ? `\n${refBlock}` : ''}`.trim();
   }
 
   window.DIDIDIT_BRIEF = {
@@ -873,8 +795,6 @@ ${adBlock ? `\n${adBlock}\n` : ''}${refBlock ? `\n${refBlock}` : ''}`.trim();
     formatSpecsBlock,
     formatReviewBriefBlock,
     buildPromptContext,
-    getAirPurifierExample,
-    RESEARCH_PHASE: 2,
   };
 })();
 
@@ -883,6 +803,10 @@ ${adBlock ? `\n${adBlock}\n` : ''}${refBlock ? `\n${refBlock}` : ''}`.trim();
  */
 window.DIDIDIT_PIPELINE = (function () {
   const HEADERS = ['대본', '장면', '사이즈', '자막', '코멘트'];
+
+  const ROW_CHARS_MIN = 20;
+  const ROW_CHARS_TARGET_MAX = 45;
+  const ROW_CHARS_HARD_MAX = 50;
 
   const ROWS_SCHEMA = {
     type: 'object',
@@ -904,6 +828,63 @@ window.DIDIDIT_PIPELINE = (function () {
     },
     required: ['rows'],
   };
+
+  function isPrologueChapter(title) {
+    return /프롤로그|오프닝/i.test(title || '');
+  }
+
+  function isClosingChapter(title) {
+    return /총평|클로징|마무리/i.test(title || '');
+  }
+
+  function getNarrationRhythmBlock() {
+    return `
+# 대본 호흡·행 분할 (변환 단계 필수)
+- 1행 = 성우 한 호흡. 행당 공백 포함 **25~45자** (50자 초과 금지).
+- 호흡이 바뀔 때 새 행. 마침표마다 무조건 분리 X.
+- 15자 내외 초단문만 연속 나열 금지. 여러 문장을 한 행에 합치기 금지.
+- 좋은 예: 3문장을 호흡 단위로 3행 분할
+- 나쁜 예: 3문장을 1행에 합침 / 10자짜리 행만 10개 연속`;
+  }
+
+  function detectChoppyRhythm(rows) {
+    if (rows.length < 6) return null;
+    const shortRows = rows.filter((r) => r.대본.length < ROW_CHARS_MIN);
+    if (shortRows.length / rows.length > 0.35) {
+      return `${shortRows.length}행이 ${ROW_CHARS_MIN}자 미만 — 너무 잘게 쪼갬`;
+    }
+    return null;
+  }
+
+  function detectOverlongRows(rows) {
+    const longRows = rows.filter((r) => r.대본.length > ROW_CHARS_HARD_MAX);
+    if (longRows.length) {
+      return `${longRows.length}행이 ${ROW_CHARS_HARD_MAX}자 초과 — 호흡마다 분할 필요`;
+    }
+    const avg = rows.reduce((s, r) => s + r.대본.length, 0) / rows.length;
+    if (avg > 48) return `평균 ${Math.round(avg)}자/행 — 장문 합침`;
+    return null;
+  }
+
+  function validateScriptRows(rows) {
+    const issues = [];
+    if (!rows.length) issues.push('행이 없습니다');
+    rows.forEach((r, i) => {
+      if (!r.대본.trim()) issues.push(`${i + 1}행 대본 누락`);
+      const len = r.대본.length;
+      if (len > ROW_CHARS_HARD_MAX) issues.push(`${i + 1}행 ${len}자 (50자 초과)`);
+      else if (len < ROW_CHARS_MIN && rows.length >= 6) issues.push(`${i + 1}행 ${len}자 (너무 짧음)`);
+    });
+    const choppy = detectChoppyRhythm(rows);
+    if (choppy) issues.push(choppy);
+    const overlong = detectOverlongRows(rows);
+    if (overlong) issues.push(overlong);
+    return issues;
+  }
+
+  function buildConvertRetryHint(issues) {
+    return `\n\n[재시도] 이전 변환 문제: ${issues.slice(0, 4).join(' · ')}. 호흡마다 행 분할, 행당 25~45자, 50자 초과 금지.`;
+  }
 
   function normalizeRows(rows) {
     if (!Array.isArray(rows)) return [];
@@ -927,29 +908,81 @@ window.DIDIDIT_PIPELINE = (function () {
     return normalizeRows(data.rows || data);
   }
 
-  function buildProsePrompt(ctx, chapter, chapterIndex, chapterTotal) {
-    const chapterBlock = chapter
-      ? `\n## 이번에 작성할 챕터 (${chapterIndex + 1}/${chapterTotal})\n제목: ${chapter.title}\n메모: ${chapter.notes || '(없음)'}\n`
-      : '';
-    return `${ctx}
+  function buildProsePrompt(ctx, chapter, chapterIndex, chapterTotal, options = {}) {
+    const includeContext = options.includeContext !== false;
+    const title = chapter?.title || '전체';
+    const notes = chapter?.notes || '';
+    const roleHints = [];
+    const roundupCtx = `${ctx || ''}${notes}${title}`;
+    const isRoundup =
+      options.roundup ||
+      (window.DIDIDIT_CONFIG?.isRoundupFormat
+        ? window.DIDIDIT_CONFIG.isRoundupFormat(roundupCtx)
+        : window.DIDIDIT_PROMPT?.isRoundupFormat?.(roundupCtx) ?? false);
+    if (chapterIndex === 0 || isPrologueChapter(title)) {
+      roleHints.push('- 이 챕터에 [오프닝] 고정 멘트 4줄을 자연스럽게 포함하세요.');
+    }
+    if (chapterIndex === chapterTotal - 1 || isClosingChapter(title)) {
+      roleHints.push(
+        isRoundup
+          ? '- 이 챕터 마지막에 [클로징 — N개 아이템] 고정 멘트를 포함하세요. 첫 줄의 [콘셉트·제품군명]은 영상 주제에 맞게 채웁니다. (장단점·평점 아님 → 정보 정리)'
+          : '- 이 챕터 마지막에 [클로징 — 단일 제품] 고정 멘트를 포함하세요. (장단점·평점 정리)',
+      );
+    }
+    const roleBlock = roleHints.length ? `\n${roleHints.join('\n')}` : '';
+    const roundupCategoryHint =
+      isRoundup && window.DIDIDIT_CONFIG?.buildRoundupCategoryHint
+        ? window.DIDIDIT_CONFIG.buildRoundupCategoryHint(roundupCtx)
+        : isRoundup && window.DIDIDIT_PROMPT?.buildRoundupCategoryHint
+          ? window.DIDIDIT_PROMPT.buildRoundupCategoryHint(roundupCtx)
+          : '';
+    const roundup = isRoundup
+        ? `\n- **N개 아이템 라운드업**: 제품마다 \`[제품명]\` 단독 행 후 4~8호흡. 심층 리뷰보다 짧고 빠르게.\n${roundupCategoryHint}`
+        : '';
+    const specChapter =
+      /성능|제원|스펙|디스플레이/i.test(title) || /성능|제원|스펙/i.test(notes)
+        ? `\n- 성능·제원 챕터: 스펙을 화면/칩·저장/배터리 등 **덩어리로 묶어** 문장 속에 녹이세요. \`무게는 X, Y는 Z\` 식 나열 금지. 짧은 해석·판단 한 줄 포함.\n`
+        : '';
+    const designChapter =
+      /디자인|외관|첫인상/i.test(title) || /디자인|외관/i.test(notes)
+        ? `\n- 디자인 챕터: 형태·크기·재질·조작부 중심. 실사용 시나리오(빨래·퇴근 후 등) 반복 금지. 외관 vs 실용성 트레이드오프 한 줄.\n`
+        : '';
+    const prologueChapter =
+      chapterIndex === 0 || isPrologueChapter(title)
+        ? `\n- 프롤로그: \`안녕하세요, 디디딧입니다.\` + \`그럼 바로 리뷰 시작하겠습니다.\` 필수. 기획에 따라 **기본형**(짧은 훅) / **결론 선행형**(타겟·포지션) / **후속·비교형**(이전 제품 대비) 중 선택. 본문 내용 선행 반복 금지.\n`
+        : '';
+    const priceChapter =
+      (/^가격$|가성비/i.test(title.trim()) || /^가격$/i.test(notes.trim())) &&
+      !/총평|마무리/i.test(title)
+        ? `\n- 가격 단독 챕터: 모델·채널별 가격, 라인업 비교, 구매 전 주의사항(정발·구성품·기능 제한). 가격이 핵심일 때 타사·다른 라인업 비교.\n`
+        : '';
+    const closingChapter =
+      /총평|마무리|정리/i.test(title) || chapterIndex === chapterTotal - 1
+        ? `\n- 총평: 가격 적정성 판단 + 추천 대상 + 앞 챕터 단점 요약. 가격 중점이 낮으면 가격을 총평에 엮음. 가격이 핵심이면 타사·라인업 비교·솔직한 비추천 포함. \`적극 추천\`·\`확신\` 금지.\n`
+        : '';
+    const ctxBlock = includeContext && ctx ? `${ctx}\n\n` : '';
+    const continuity =
+      options.hasSession && chapterIndex > 0
+        ? '- 앞 챕터와 **같은 톤·호흡·문장 리듬**을 유지하세요. 이미 쓴 내용은 반복하지 마세요.\n'
+        : '- 이미 작성된 줄글이 있으면 톤·흐름을 맞춰 이어 쓰고, 반복하지 마세요.\n';
 
-# 작업: 줄글 대본 초안 (1단계)
-- 스프레드시트 행 분할·장면·자막 규칙은 **아직 적용하지 마세요**.
-- 성우 내레이션 중심의 **자연스러운 줄글**로 작성합니다.
-- 챕터가 있으면 \`## 챕터제목\` 으로 구분합니다.
-- 디디딧 톤: 솔직·담백·과장 없음. 고정 오프닝/클로징 멘트는 시스템 규칙을 따릅니다.
-${chapterBlock}
-이전에 작성된 줄글이 있으면 이어서 작성하고, 이미 쓴 내용은 반복하지 마세요.`;
+    return `${ctxBlock}# 작업: 줄글 대본 작성
+- 성우 내레이션 중심의 **자연스러운 줄글**만 작성합니다.
+- 표·행 분할·장면·자막·JSON은 넣지 않습니다.
+- 챕터 제목은 \`## ${title}\` 로 시작합니다.
+${notes ? `- 챕터 메모: ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${specChapter}${designChapter}${priceChapter}${closingChapter}
+${continuity}`;
   }
 
-  function buildConvertPrompt(ctx, prose) {
+  function buildConvertPrompt(ctx, prose, retryHint) {
     return `${ctx}
+${getNarrationRhythmBlock()}
 
-# 작업: 줄글 → 스프레드시트 5열 변환 (2단계)
+# 작업: 줄글 → 대본 열 변환
 아래 줄글을 JSON \`rows\` 배열로 변환하세요.
-- 열: 대본, 장면, 사이즈, 자막, 코멘트
-- **이 단계에서는 대본 열만 채우고**, 장면·사이즈·자막·코멘트는 빈 문자열로 둡니다.
-- 대본 분할 규칙: 1행=성우 한 호흡, 25~45자(50자 초과 금지), UTF-8 바이트·호흡 규칙은 시스템 규칙 준수.
+- **대본 열만** 채우고 장면·사이즈·자막·코멘트는 빈 문자열.
+- 줄글 문장을 삭제·왜곡하지 말고 호흡 단위로만 나눕니다.
+${retryHint || ''}
 
 ## 줄글 원문
 ${prose}`;
@@ -959,10 +992,11 @@ ${prose}`;
     const scriptOnly = rows.map((r) => r.대본).join('\n');
     return `${ctx}
 
-# 작업: 장면·사이즈 추가 (3단계)
-대본은 유지하고 **장면·사이즈** 열만 채우세요. 자막·코멘트는 빈 문자열.
-- 연속 호흡은 장면에 '컷 유지'
-- 사이즈: 와이드/미디엄/클로즈업 등
+# 작업: 장면·사이즈 추가
+대본은 **수정하지 마세요**. 장면·사이즈 열만 채우세요. 자막·코멘트는 빈 문자열.
+- 연속 호흡: 장면에 '컷 유지'
+- 사이즈: 와이드/미디엄/클로즈업/탑뷰 등
+- 언박싱·고가 비교 세팅·작위적 감정 연기 장면 금지
 
 ## 현재 대본 (행 순서)
 ${scriptOnly}
@@ -973,8 +1007,8 @@ JSON rows 전체를 반환 (대본·장면·사이즈·자막·코멘트 키 필
   function buildCaptionPrompt(ctx, rows) {
     return `${ctx}
 
-# 작업: 자막·코멘트 추가 (4단계)
-대본·장면·사이즈는 유지. **자막·코멘트**만 채우세요.
+# 작업: 자막·코멘트 추가
+대본·장면·사이즈는 **수정하지 마세요**. 자막·코멘트만 채우세요.
 - 자막: 대본에 수치·스펙이 나올 때만 요약
 - 코멘트: 준비물·앱 세팅 등 촬영 메모가 필요할 때만
 
@@ -1003,13 +1037,111 @@ JSON rows 전체를 반환.`;
   return {
     HEADERS,
     ROWS_SCHEMA,
+    ROW_CHARS_MIN,
+    ROW_CHARS_HARD_MAX,
     normalizeRows,
     parseRowsJson,
+    validateScriptRows,
+    buildConvertRetryHint,
     buildProsePrompt,
     buildConvertPrompt,
     buildScenePrompt,
     buildCaptionPrompt,
     splitProseChunks,
+    isPrologueChapter,
+    isClosingChapter,
+  };
+})();
+
+/**
+ * Gemini 멀티턴 세션 — 채팅처럼 이전 응답 맥락을 유지해 대본 스타일 수렴
+ */
+window.DIDIDIT_SESSION = (function () {
+  const MAX_TURNS = 24;
+  const MAX_CHARS = 96000;
+
+  let turns = [];
+
+  function reset() {
+    turns = [];
+  }
+
+  function charCount() {
+    return turns.reduce((n, t) => n + String(t.parts?.[0]?.text || '').length, 0);
+  }
+
+  function trim() {
+    while (turns.length > MAX_TURNS || charCount() > MAX_CHARS) {
+      if (turns.length <= 2) break;
+      turns.shift();
+      if (turns[0]?.role === 'model') turns.shift();
+    }
+  }
+
+  function push(role, text) {
+    const body = String(text || '').trim();
+    if (!body) return;
+    turns.push({ role, parts: [{ text: body }] });
+    trim();
+  }
+
+  function getContents() {
+    return turns.map((t) => ({ role: t.role, parts: t.parts }));
+  }
+
+  function hasHistory() {
+    return turns.length > 0;
+  }
+
+  /** 사용자가 다듬은 줄글을 '승인된 스타일'로 세션에 심기 */
+  function seedApprovedProse(prose, preamble) {
+    reset();
+    if (preamble) push('user', preamble);
+    push('model', prose);
+  }
+
+  function storageKey(project) {
+    return `dididit-session-v1-${String(project || 'default').toLowerCase()}`;
+  }
+
+  function save(project) {
+    try {
+      if (!turns.length) {
+        localStorage.removeItem(storageKey(project));
+        return;
+      }
+      localStorage.setItem(
+        storageKey(project),
+        JSON.stringify({ turns, savedAt: new Date().toISOString() }),
+      );
+    } catch {
+      /* quota */
+    }
+  }
+
+  function load(project) {
+    try {
+      const raw = localStorage.getItem(storageKey(project));
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed?.turns)) return false;
+      turns = parsed.turns.filter((t) => t?.role && t?.parts?.[0]?.text);
+      return turns.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  return {
+    reset,
+    push,
+    getContents,
+    hasHistory,
+    seedApprovedProse,
+    charCount,
+    turnCount: () => turns.length,
+    save,
+    load,
   };
 })();
 
@@ -1025,25 +1157,15 @@ let REF = null;
 let LOG = null;
 let BRIEF = null;
 let PIPE = null;
+let SESSION = null;
 
 const state = {
   apiKey: '',
   modelPro: 'gemini-3.1-pro-preview',
-  productName: '',
-  contentDirection: '',
-  productNotes: '',
   productSpecs: {},
-  reviewBrief: { thesis: '', targetScenario: '', mustHighlight: '', carefulPoints: '', compareWith: '' },
   priceInfo: '',
   categoryId: 'other',
   referenceScripts: [],
-  adMode: false,
-  adBrand: '',
-  adToneLevel: 'balanced',
-  adDisclosure: true,
-  adGuides: [],
-  teamBriefNotes: '',
-  briefSource: '',
   chapters: [],
   proseDraft: '',
   allRows: [],
@@ -1083,10 +1205,12 @@ function bindModules() {
   LOG = window.DIDIDIT_LOG;
   BRIEF = window.DIDIDIT_BRIEF;
   PIPE = window.DIDIDIT_PIPELINE;
-  if (!PM || !REF || !BRIEF || !PIPE) throw new Error('스크립트 모듈 로드 실패');
+  SESSION = window.DIDIDIT_SESSION;
+  if (!PM || !REF || !BRIEF || !PIPE || !SESSION) throw new Error('스크립트 모듈 로드 실패');
 }
 
-function getSystemRules() {
+function getSystemRules(stage) {
+  if (stage && PM.getSystemRulesForStage) return PM.getSystemRulesForStage(stage);
   return PM.getActiveSystemRules();
 }
 
@@ -1118,7 +1242,6 @@ function getEffectiveState() {
     priceInfo: state.priceInfo,
     categoryId: state.categoryId,
     referenceScripts: state.referenceScripts,
-    adGuides: state.adGuides,
     chapters,
   };
 }
@@ -1131,8 +1254,7 @@ function hasPlanTitle() {
 function buildProductContext() {
   const effective = getEffectiveState();
   const refBlock = REF?.buildReferenceContext?.(state.referenceScripts) || '';
-  const adBlock = effective.adMode ? (REF?.buildAdGuideContext?.(state.adGuides) || '') : '';
-  return BRIEF.buildPromptContext(effective, getCategory(effective.categoryId), refBlock, adBlock);
+  return BRIEF.buildPromptContext(effective, getCategory(effective.categoryId), refBlock);
 }
 
 function esc(s) {
@@ -1161,13 +1283,20 @@ function setLoading(on, text) {
   if (text) $('#loading-text').textContent = text;
 }
 
-async function callGeminiText(userPrompt, temperature = 0.75) {
+async function callGeminiTextSession(userPrompt, temperature = 0.75, stage = 'prose') {
+  SESSION.push('user', userPrompt);
   const model = state.modelPro;
   const body = {
-    systemInstruction: { parts: [{ text: getSystemRules() }] },
-    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+    systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
+    contents: SESSION.getContents(),
     generationConfig: { temperature },
   };
+  const text = await postGeminiAndExtractText(model, body);
+  SESSION.push('model', text);
+  return text;
+}
+
+async function postGeminiAndExtractText(model, body) {
   let data;
   if (window.DdditWorksApi?.isBackendMode?.()) {
     data = await window.DdditWorksApi.postGemini(model, body, state.apiKey);
@@ -1182,10 +1311,10 @@ async function callGeminiText(userPrompt, temperature = 0.75) {
   return text.trim();
 }
 
-async function callGeminiJson(userPrompt, temperature = 0.4) {
+async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') {
   const model = state.modelPro;
   const body = {
-    systemInstruction: { parts: [{ text: getSystemRules() }] },
+    systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
     generationConfig: {
       temperature,
@@ -1493,6 +1622,7 @@ function updatePipelineUI() {
   $('#btn-add-scenes')?.toggleAttribute('disabled', !isApiReady() || !state.allRows.length);
   $('#btn-add-captions')?.toggleAttribute('disabled', !isApiReady() || !state.allRows.length);
   if (state.pipelineStep === 1) renderPlanSummary();
+  updateProjectChrome();
 }
 
 async function runProseDraft() {
@@ -1502,21 +1632,48 @@ async function runProseDraft() {
   syncChaptersFromDOM();
   const effective = getEffectiveState();
   const ctx = buildProductContext();
+  const styleAnchor = await PM.getStyleAnchorBlock?.();
+  const isRoundup = PM.isRoundupFormat ? PM.isRoundupFormat(ctx) : window.DIDIDIT_CONFIG?.isRoundupFormat?.(ctx);
+  const formatAnchor = isRoundup ? await PM.getFormatAnchorBlock?.() : '';
+  const ctxWithStyle = [ctx, styleAnchor, formatAnchor].filter(Boolean).join('\n\n');
+  const existingProse = ($('#prose-draft')?.value || state.proseDraft || '').trim();
+  const continueFromEdit = existingProse && confirm(
+    '기존 줄글을 스타일 기준으로 이어 쓸까요?\n\n확인 = 다듬은 톤 유지 · 취소 = 처음부터 새로 생성',
+  );
+
+  SESSION.reset();
+  if (continueFromEdit) {
+    SESSION.seedApprovedProse(
+      existingProse,
+      `${ctxWithStyle}\n\n[승인된 줄글] 작성자가 다듬은 줄글입니다. 이 톤·호흡·리듬을 그대로 유지하세요.`,
+    );
+  }
+
   setLoading(true, '줄글 초안 작성 중…');
   try {
-    let prose = '';
+    let prose = continueFromEdit ? existingProse : '';
     const chapters = state.chapters.length ? state.chapters : [{ title: '전체', notes: effective.contentDirection }];
-    for (let i = 0; i < chapters.length; i++) {
-      setLoading(true, `줄글 작성 중… (${i + 1}/${chapters.length})`);
-      const prompt = PIPE.buildProsePrompt(ctx, chapters[i], i, chapters.length) +
-        (prose ? `\n\n## 지금까지 작성된 줄글\n${prose.slice(-12000)}` : '');
-      const chunk = await callGeminiText(prompt, 0.75);
-      prose = prose ? `${prose}\n\n## ${chapters[i].title}\n${chunk}` : chunk;
+    const startIndex = prose ? chapters.findIndex((ch) => !prose.includes(`## ${ch.title}`)) : 0;
+    const from = startIndex < 0 ? chapters.length : Math.max(0, startIndex);
+    if (from >= chapters.length) {
+      showToast('이미 모든 챕터가 작성되어 있습니다.');
+      return;
+    }
+
+    for (let i = from; i < chapters.length; i++) {
+      setLoading(true, `줄글 작성 중… (${i + 1}/${chapters.length}, 대화 ${SESSION.turnCount()}턴)`);
+      const prompt = PIPE.buildProsePrompt(ctxWithStyle, chapters[i], i, chapters.length, {
+        includeContext: i === from && !SESSION.hasHistory(),
+        hasSession: SESSION.turnCount() > 0,
+      });
+      const chunk = await callGeminiTextSession(prompt, 0.72, 'prose');
+      prose = prose ? `${prose}\n\n## ${chapters[i].title}\n${chunk}` : `## ${chapters[i].title}\n${chunk}`;
     }
     state.proseDraft = prose;
     $('#prose-draft').value = prose;
+    SESSION.save(getSheetSlug());
     saveProject();
-    showToast('줄글 초안이 완성되었습니다.');
+    showToast(`줄글 완성 (대화 ${SESSION.turnCount()}턴 — 스타일 맥락 유지)`);
     navigatePipeline(3);
   } catch (e) {
     reportError('runProseDraft', e);
@@ -1538,7 +1695,21 @@ async function runConvertToSheet() {
     let rows = [];
     for (let i = 0; i < chunks.length; i++) {
       setLoading(true, `변환 중… (${i + 1}/${chunks.length})`);
-      const part = await callGeminiJson(PIPE.buildConvertPrompt(ctx, chunks[i]), 0.35);
+      let part = [];
+      let retryHint = '';
+      for (let attempt = 0; attempt < 3; attempt++) {
+        part = await callGeminiJson(
+          PIPE.buildConvertPrompt(ctx, chunks[i], retryHint),
+          attempt > 0 ? 0.25 : 0.35,
+          'convert',
+        );
+        const issues = PIPE.validateScriptRows(part);
+        if (!issues.length) break;
+        retryHint = PIPE.buildConvertRetryHint(issues);
+        if (attempt === 2) {
+          reportError('runConvertToSheet.validate', new Error(issues.join('; ')), { chunk: i + 1 }, { silent: true });
+        }
+      }
       rows = rows.concat(part);
     }
     state.allRows = PIPE.normalizeRows(rows);
@@ -1558,7 +1729,7 @@ async function runAddScenes() {
   if (!requireApiReady() || !state.allRows.length) return;
   setLoading(true, '장면·사이즈 추가 중…');
   try {
-    state.allRows = await callGeminiJson(PIPE.buildScenePrompt(buildProductContext(), state.allRows), 0.4);
+    state.allRows = await callGeminiJson(PIPE.buildScenePrompt(buildProductContext(), state.allRows), 0.4, 'scene');
     renderTable();
     showToast('장면·사이즈를 반영했습니다.');
     navigatePipeline(5);
@@ -1574,7 +1745,7 @@ async function runAddCaptions() {
   if (!requireApiReady() || !state.allRows.length) return;
   setLoading(true, '자막·코멘트 추가 중…');
   try {
-    state.allRows = await callGeminiJson(PIPE.buildCaptionPrompt(buildProductContext(), state.allRows), 0.4);
+    state.allRows = await callGeminiJson(PIPE.buildCaptionPrompt(buildProductContext(), state.allRows), 0.4, 'caption');
     renderTable();
     showToast('자막·코멘트를 반영했습니다.');
   } catch (e) {
@@ -1673,13 +1844,19 @@ async function pullFromSheet() {
   }
 }
 
-async function initSheetIntegration() {
+function updateProjectChrome() {
+  const effective = getEffectiveState();
   const project = getSheetSlug();
   const badge = $('#workspace-project-badge');
   if (badge && project !== 'default') {
-    badge.textContent = `프로젝트: ${project}`;
+    badge.textContent = window.DdditPlanBriefSync?.projectLabel?.(project) || project;
     badge.classList.remove('hidden');
   }
+  $('#ad-mode-badge')?.classList.toggle('hidden', !effective.adMode);
+}
+
+async function initSheetIntegration() {
+  const project = getSheetSlug();
   try {
     const store = JSON.parse(localStorage.getItem(SHEET_SETTINGS_KEY) || '{}');
     const savedUrl = store.projects?.[project]?.url;
@@ -1689,18 +1866,7 @@ async function initSheetIntegration() {
     $('#backend-settings-note')?.removeAttribute('hidden');
     await window.DdditWorksApi.loadConfig().catch(() => null);
   }
-}
-
-/* ── Ad / ref UI (minimal) ── */
-function updateAdModeUI() {
-  $('#ad-mode').checked = state.adMode;
-  const fields = $('#ad-mode-fields');
-  fields?.classList.toggle('hidden', !state.adMode);
-  if (state.adMode) document.querySelector('#ad-mode-panel')?.setAttribute('open', '');
-  $('#ad-mode-badge')?.classList.toggle('hidden', !state.adMode);
-  $('#ad-brand').value = state.adBrand || '';
-  $('#ad-tone-level').value = state.adToneLevel || 'balanced';
-  $('#ad-disclosure').checked = state.adDisclosure !== false;
+  updateProjectChrome();
 }
 
 function renderReferenceList() {
@@ -1710,17 +1876,6 @@ function renderReferenceList() {
     ? state.referenceScripts.map((s) => `<li>${esc(s.name)} (${s.text.length}자)</li>`).join('')
     : '<li class="muted">없음</li>';
   $('#ref-stats').textContent = `${state.referenceScripts.length}개`;
-}
-
-function renderAdGuideList() {
-  const list = $('#ad-guide-list');
-  if (!list) return;
-  list.innerHTML = state.adGuides.length
-    ? state.adGuides.map((g) => `<li>${esc(g.name)}</li>`).join('')
-    : '<li class="muted">없음</li>';
-  const totalChars = state.adGuides.reduce((n, s) => n + (s.text?.length || 0), 0);
-  const stats = $('#ad-guide-stats');
-  if (stats) stats.textContent = state.adGuides.length ? `${state.adGuides.length}개 · ${totalChars.toLocaleString()}자` : '0개';
 }
 
 function syncModelSelect() {
@@ -1769,34 +1924,6 @@ function clearReferences() {
   saveProject();
 }
 
-async function addAdGuideFromPaste() {
-  const text = $('#ad-guide-paste')?.value.trim();
-  if (!text) return showToast('가이드를 붙여넣으세요.', true);
-  state.adGuides.push({ id: `ad-${Date.now()}`, name: '붙여넣기', source: 'paste', text, chars: text.length });
-  $('#ad-guide-paste').value = '';
-  renderAdGuideList();
-  saveProject();
-}
-
-async function addAdGuideFiles(fileList) {
-  if (!fileList?.length || !REF) return;
-  for (const file of fileList) {
-    try {
-      state.adGuides.push(await REF.parseReferenceFile(file));
-    } catch (e) {
-      showToast(e.message, true);
-    }
-  }
-  renderAdGuideList();
-  saveProject();
-}
-
-function clearAdGuides() {
-  state.adGuides = [];
-  renderAdGuideList();
-  saveProject();
-}
-
 function bindDrawerPanels() {
   $('#toggle-settings')?.addEventListener('click', () => togglePanel('#settings-panel', '#toggle-settings'));
   $('#toggle-prompt')?.addEventListener('click', () => togglePanel('#prompt-panel', '#toggle-prompt'));
@@ -1831,6 +1958,25 @@ function bindDrawerPanels() {
     await PM?.loadDefaultPromptFile?.();
     $('#prompt-editor').value = PM?.getActiveSystemRules?.() || '';
   });
+  $('#btn-prompt-export')?.addEventListener('click', () => {
+    const text = $('#prompt-editor')?.value || '';
+    if (!text.trim()) return showToast('프롬프트 내용이 비어 있습니다.', true);
+    const filename = $('#prompt-filename')?.value || `dididit-prompt-v${PM.PROMPT_VERSION}.txt`;
+    PM?.downloadPromptTxt?.(text, filename);
+  });
+  $('#prompt-file-input')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      $('#prompt-editor').value = text;
+      $('#prompt-filename').value = file.name;
+      showToast(`${file.name} 불러옴 — [적용]으로 반영하세요.`);
+    } catch (err) {
+      showToast(err.message || '파일 읽기 실패', true);
+    }
+    e.target.value = '';
+  });
 }
 
 function renderCategoryOptions() {
@@ -1853,15 +1999,12 @@ function bindEvents() {
   $('#btn-add-captions')?.addEventListener('click', runAddCaptions);
   $('#btn-add-chapter')?.addEventListener('click', addChapter);
   $('#btn-sheet-push')?.addEventListener('click', pushToSheet);
-  $('#btn-sheet-push-inline')?.addEventListener('click', pushToSheet);
   $('#btn-sheet-pull')?.addEventListener('click', pullFromSheet);
-  $('#btn-sheet-pull-inline')?.addEventListener('click', pullFromSheet);
   $('#btn-pipeline-next-brief')?.addEventListener('click', () => navigatePipeline(2));
   document.querySelectorAll('[data-goto]').forEach((btn) => {
     btn.addEventListener('click', () => navigatePipeline(Number(btn.dataset.goto)));
   });
   $('#btn-sheet-open')?.addEventListener('click', openSheetUrl);
-  $('#btn-sheet-open-inline')?.addEventListener('click', openSheetUrl);
   $('#prose-draft')?.addEventListener('input', (e) => { state.proseDraft = e.target.value; saveProject(); updatePipelineUI(); });
   $('#price-info')?.addEventListener('input', (e) => { state.priceInfo = e.target.value; saveProject(); });
   $('#category')?.addEventListener('change', (e) => { state.categoryId = e.target.value; renderSpecFields(); saveProject(); });
@@ -1880,6 +2023,10 @@ function openSheetUrl() {
 
 async function initPromptOnBoot() {
   if (!PM.loadPromptState()?.text) await PM.loadDefaultPromptFile();
+  else if (String(PM.getActivePromptSource?.() || '').includes('v1.0.0')) {
+    await PM.loadDefaultPromptFile();
+    showToast('프롬프트 v1.1.0으로 갱신했습니다. (단계별 규칙 분리)');
+  }
   $('#prompt-editor').value = PM.getActiveSystemRules();
   $('#active-prompt-label').textContent = PM.getActivePromptSource?.() || '';
 }

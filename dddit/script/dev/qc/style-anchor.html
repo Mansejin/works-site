@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>스타일 앵커 컨펌 · 디디딧</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #fff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #1d4ed8;
+      --accent-soft: #eff6ff;
+      --ok: #15803d;
+      --ok-soft: #dcfce7;
+      --warn: #b45309;
+      --warn-soft: #fef3c7;
+      --group: #f1f5f9;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Pretendard, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .top {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
+      color: #fff;
+      padding: 28px 24px 32px;
+    }
+    .top .wrap { max-width: 1080px; margin: 0 auto; }
+    .top .badge {
+      display: inline-block;
+      font-size: .75rem;
+      font-weight: 600;
+      background: rgba(255,255,255,.18);
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+    }
+    .top h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
+    .top p { font-size: .92rem; opacity: .92; max-width: 640px; }
+    .layout {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 800px) {
+      .layout { grid-template-columns: 1fr; }
+      .nav { position: static !important; }
+    }
+    .nav {
+      position: sticky;
+      top: 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      font-size: .82rem;
+    }
+    .nav h2 { font-size: .78rem; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
+    .nav a {
+      display: block;
+      color: var(--text);
+      text-decoration: none;
+      padding: 6px 8px;
+      border-radius: 6px;
+      margin-bottom: 2px;
+    }
+    .nav a:hover { background: var(--group); }
+    .nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    .summary {
+      background: var(--warn-soft);
+      border: 1px solid #fcd34d;
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin-bottom: 20px;
+      font-size: .9rem;
+    }
+    .summary strong { color: var(--warn); }
+    .progress {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .progress .bar-wrap { flex: 1; min-width: 160px; }
+    .progress .bar {
+      height: 8px;
+      background: var(--group);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress .bar-fill { height: 100%; background: var(--ok); border-radius: 4px; transition: width .2s; }
+    .progress .count { font-size: .85rem; color: var(--muted); }
+    .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+    button {
+      font: inherit;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+    }
+    button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    button.ok { background: var(--ok); color: #fff; border-color: var(--ok); }
+    .group-title {
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin: 28px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+    .group-title:first-child { margin-top: 0; }
+    .section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .section.ok { border-color: #86efac; }
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .section-head:hover { background: #fafbfc; }
+    .section-head input { margin-top: 4px; width: 18px; height: 18px; flex-shrink: 0; cursor: pointer; }
+    .section-head .meta { flex: 1; }
+    .section-head h3 { font-size: .95rem; font-weight: 600; }
+    .section-head .tag {
+      display: inline-block;
+      font-size: .72rem;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+    .section-body {
+      padding: 0 16px 16px 46px;
+      border-top: 1px solid var(--border);
+    }
+    .section-body pre {
+      font-family: Pretendard, sans-serif;
+      font-size: .88rem;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      color: #334155;
+      background: var(--group);
+      padding: 14px 16px;
+      border-radius: 8px;
+    }
+    .section-body .rules {
+      font-size: .85rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .section-body table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .85rem;
+      margin-bottom: 4px;
+    }
+    .section-body th, .section-body td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+    }
+    .section-body th { background: var(--group); font-weight: 600; }
+    .footer-note {
+      font-size: .82rem;
+      color: var(--muted);
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .footer-note a { color: var(--accent); }
+    .done-banner {
+      display: none;
+      background: var(--ok-soft);
+      border: 1px solid #86efac;
+      color: var(--ok);
+      padding: 14px 18px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+    .done-banner.show { display: block; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <span class="badge">컨펌 요청 · 2026-07</span>
+      <h1>디디딧 대본 스타일 앵커</h1>
+      <p>콘티 작성기 AI가 참고하는 톤·호흡 기준입니다. 각 섹션을 검토하시고 체크해 주세요. 예시 문장은 제품별 복사가 아니라 말투·리듬 참고용입니다.</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="nav" id="nav"></nav>
+
+    <main>
+      <div class="summary">
+        <strong>확인 부탁드립니다.</strong> 아래 톤 가이드가 디디딧 채널 방향과 맞는지 검토해 주세요. 전 항목 체크 후 «컨펌 완료»를 누르시면 됩니다. 수정 의견은 섹션별로 메모해 주셔도 됩니다.
+      </div>
+
+      <div class="done-banner" id="done-banner">전체 섹션 컨펌 완료 — 감사합니다.</div>
+
+      <div class="progress">
+        <div class="bar-wrap">
+          <div class="count" id="progress-text">0 / 0 확인</div>
+          <div class="bar"><div class="bar-fill" id="progress-bar" style="width:0%"></div></div>
+        </div>
+        <div class="btns">
+          <button type="button" id="btn-all">전체 확인</button>
+          <button type="button" id="btn-reset">초기화</button>
+          <button type="button" class="primary" id="btn-copy">요약 복사</button>
+        </div>
+      </div>
+
+      <div id="sections"></div>
+
+      <p class="footer-note">
+        라운드업(N개 아이템) 포맷은 별도: <a href="style-anchor.html#roundup-note">하단 참고</a> ·
+        <a href="index.html">대본 QC 도구</a> · 개발 전용 (콘티 작성기 UI 미노출)
+      </p>
+    </main>
+  </div>
+
+  <script src="style-anchor-view.js"></script>
+</body>
+</html>

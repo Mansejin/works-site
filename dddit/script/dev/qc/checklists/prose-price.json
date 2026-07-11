@@ -1,0 +1,32 @@
+{
+  "id": "prose-price",
+  "label": "가격 줄글 QC",
+  "target": "가격 단독 챕터 (가격·라인업이 핵심)",
+  "items": [
+    {
+      "id": "price-clear",
+      "label": "가격·구성 명확",
+      "hint": "모델별·채널별 가격이 문장 속에 있는가"
+    },
+    {
+      "id": "lineup-compare",
+      "label": "라인업 비교",
+      "hint": "용량·모델 차이와 선택 팁이 있는가"
+    },
+    {
+      "id": "purchase-caveat",
+      "label": "구매 주의",
+      "hint": "정발·구성품·기능 제한 등 구매 전 체크 포인트가 있는가"
+    },
+    {
+      "id": "no-hype",
+      "label": "과장 없음",
+      "hint": "단연 최고·무조건 등 과장 없음"
+    },
+    {
+      "id": "rhythm",
+      "label": "담백한 리듬",
+      "hint": "카탈로그 가격 읽기가 아닌 구어체인가"
+    }
+  ]
+}
