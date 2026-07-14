@@ -54,7 +54,7 @@ window.DdditWorksApi = (function () {
     return null;
   }
 
-  async function postGemini(model, body, apiKey) {
+  async function postGemini(model, body, apiKey, options = {}) {
     const url = isBackendMode()
       ? geminiUrl(model)
       : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey || "")}`;
@@ -63,6 +63,7 @@ window.DdditWorksApi = (function () {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: options.signal,
     });
 
     if (!res.ok) {

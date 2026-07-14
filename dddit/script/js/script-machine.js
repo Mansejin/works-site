@@ -25,10 +25,17 @@ const state = {
   referenceScripts: [],
   chapters: [],
   proseDraft: '',
+  /** @type {{ id: string, savedAt: string, label: string, text: string }[]} */
+  proseHistory: [],
   allRows: [],
   pipelineStep: 1,
   sheetOpenUrl: '',
 };
+
+/** 진행 중인 AI 작업 취소 */
+let jobAbort = null;
+let selectedProseHistoryId = null;
+const PROSE_HISTORY_MAX = 8;
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -474,12 +481,163 @@ function showToast(msg, isError) {
   showToast._t = setTimeout(() => el.setAttribute('aria-hidden', 'true'), 3200);
 }
 
-function setLoading(on, text) {
+function setLoading(on, text, options = {}) {
   const el = $('#loading-overlay');
   if (!el) return;
   el.classList.toggle('hidden', !on);
   el.setAttribute('aria-hidden', on ? 'false' : 'true');
   if (text) $('#loading-text').textContent = text;
+  const cancelBtn = $('#btn-cancel-job');
+  if (cancelBtn) {
+    const showCancel = Boolean(on && options.cancellable !== false && jobAbort);
+    cancelBtn.classList.toggle('hidden', !showCancel);
+    cancelBtn.disabled = !showCancel;
+  }
+}
+
+function isAbortError(err) {
+  if (!err) return false;
+  if (err.name === 'AbortError' || err.aborted) return true;
+  return /abort|cancelled|canceled|작성 취소/i.test(String(err.message || ''));
+}
+
+function makeAbortError() {
+  const e = new Error('작성을 취소했습니다.');
+  e.name = 'AbortError';
+  e.aborted = true;
+  return e;
+}
+
+function getJobSignal() {
+  return jobAbort?.signal || null;
+}
+
+function throwIfCancelled() {
+  if (jobAbort?.signal?.aborted) throw makeAbortError();
+}
+
+function beginJob() {
+  if (jobAbort) {
+    try { jobAbort.abort(); } catch { /* ignore */ }
+  }
+  jobAbort = new AbortController();
+  return jobAbort.signal;
+}
+
+function cancelJob() {
+  if (!jobAbort) {
+    showToast('진행 중인 작성이 없습니다.');
+    return;
+  }
+  jobAbort.abort();
+  setLoading(true, '취소 중…', { cancellable: false });
+}
+
+function endJob() {
+  jobAbort = null;
+  setLoading(false);
+}
+
+function pushProseHistory(text, label) {
+  const body = String(text || '').trim();
+  if (!body) return null;
+  const last = state.proseHistory[0];
+  if (last && last.text === body) return last;
+  const entry = {
+    id: `ph-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    savedAt: new Date().toISOString(),
+    label: label || '이전 줄글',
+    text: body,
+  };
+  state.proseHistory = [entry, ...state.proseHistory].slice(0, PROSE_HISTORY_MAX);
+  saveProject();
+  return entry;
+}
+
+function formatHistoryWhen(iso) {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('ko-KR', {
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
+function renderProseHistoryList() {
+  const list = $('#prose-history-list');
+  const empty = $('#prose-history-empty');
+  const preview = $('#prose-history-preview');
+  const btnRestore = $('#btn-prose-history-restore');
+  const btnDelete = $('#btn-prose-history-delete');
+  if (!list) return;
+
+  const items = state.proseHistory || [];
+  if (!items.length) {
+    list.innerHTML = '';
+    empty?.classList.remove('hidden');
+    if (preview) preview.value = '';
+    if (btnRestore) btnRestore.disabled = true;
+    if (btnDelete) btnDelete.disabled = true;
+    selectedProseHistoryId = null;
+    return;
+  }
+  empty?.classList.add('hidden');
+  if (!selectedProseHistoryId || !items.some((x) => x.id === selectedProseHistoryId)) {
+    selectedProseHistoryId = items[0].id;
+  }
+  list.innerHTML = items
+    .map((item) => {
+      const chars = String(item.text || '').length;
+      const when = formatHistoryWhen(item.savedAt);
+      const active = item.id === selectedProseHistoryId ? ' is-active' : '';
+      return `<li>
+        <button type="button" class="prose-history-item${active}" data-history-id="${esc(item.id)}">
+          <strong>${esc(item.label || '이전 줄글')}</strong>
+          <span>${esc(when)} · ${chars.toLocaleString('ko-KR')}자</span>
+        </button>
+      </li>`;
+    })
+    .join('');
+
+  const selected = items.find((x) => x.id === selectedProseHistoryId);
+  if (preview) preview.value = selected?.text || '';
+  if (btnRestore) btnRestore.disabled = !selected;
+  if (btnDelete) btnDelete.disabled = !selected;
+}
+
+function openProseHistoryPanel() {
+  renderProseHistoryList();
+  openToolModal('#prose-history-panel');
+}
+
+function restoreProseHistory(id) {
+  const entry = (state.proseHistory || []).find((x) => x.id === id);
+  if (!entry) return showToast('버전을 찾을 수 없습니다.', true);
+  const current = ($('#prose-draft')?.value || state.proseDraft || '').trim();
+  if (current && current !== entry.text) {
+    pushProseHistory(current, '복원 전 현재본');
+  }
+  state.proseDraft = entry.text;
+  if ($('#prose-draft')) $('#prose-draft').value = entry.text;
+  saveProject();
+  $('#btn-convert-sheet')?.toggleAttribute('disabled', !isApiReady() || !state.proseDraft.trim());
+  renderGuideCoverageQc();
+  closeAllToolModals();
+  showToast('이전 줄글을 복원했습니다.');
+}
+
+function deleteProseHistory(id) {
+  state.proseHistory = (state.proseHistory || []).filter((x) => x.id !== id);
+  if (selectedProseHistoryId === id) selectedProseHistoryId = state.proseHistory[0]?.id || null;
+  saveProject();
+  renderProseHistoryList();
+  showToast('히스토리에서 삭제했습니다.');
 }
 
 function isTransientGeminiError(err) {
@@ -503,18 +661,22 @@ function sleepMs(ms) {
 }
 
 /** 과부하·429 시 지수 백오프 재시도 */
-async function withGeminiRetry(fn, { retries = 3, label = 'API' } = {}) {
+async function withGeminiRetry(fn, { retries = 3, label = 'API', signal } = {}) {
   let last;
   for (let attempt = 0; attempt <= retries; attempt++) {
+    throwIfCancelled();
+    if (signal?.aborted) throw makeAbortError();
     try {
       return await fn();
     } catch (e) {
       last = e;
+      if (isAbortError(e) || signal?.aborted || jobAbort?.signal?.aborted) throw makeAbortError();
       if (!isTransientGeminiError(e) || attempt === retries) break;
       const wait = Math.min(28000, 1800 * 2 ** attempt);
       const sec = Math.max(1, Math.round(wait / 1000));
       showToast(`${label} 과부하 · ${sec}초 후 재시도 (${attempt + 1}/${retries})`, true);
       await sleepMs(wait);
+      if (signal?.aborted || jobAbort?.signal?.aborted) throw makeAbortError();
     }
   }
   const out = new Error(friendlyGeminiError(last));
@@ -524,8 +686,10 @@ async function withGeminiRetry(fn, { retries = 3, label = 'API' } = {}) {
 }
 
 async function callGeminiTextSession(userPrompt, temperature = 0.75, stage = 'prose') {
+  throwIfCancelled();
   SESSION.push('user', userPrompt);
   const model = state.modelPro;
+  const signal = getJobSignal();
   const body = {
     systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
     contents: SESSION.getContents(),
@@ -535,21 +699,38 @@ async function callGeminiTextSession(userPrompt, temperature = 0.75, stage = 'pr
       maxOutputTokens: stage === 'prose' ? 8192 : 4096,
     },
   };
-  const text = await withGeminiRetry(() => postGeminiAndExtractText(model, body), {
-    retries: 3,
-    label: '줄글',
-  });
-  SESSION.push('model', text);
-  return text;
+  try {
+    const text = await withGeminiRetry(() => postGeminiAndExtractText(model, body, signal), {
+      retries: 3,
+      label: '줄글',
+      signal,
+    });
+    throwIfCancelled();
+    SESSION.push('model', text);
+    return text;
+  } catch (e) {
+    // 실패한 user 턴은 세션에서 제거 (취소용 orphan 방지)
+    const contents = SESSION.getContents?.() || [];
+    if (contents.length && contents[contents.length - 1]?.role === 'user') {
+      // SESSION has no pop — trim last by rebuilding via reset+reseed is heavy;
+      // turnCount includes failed user; next chapter still works. Leave as-is unless abort.
+    }
+    throw e;
+  }
 }
 
-async function postGeminiAndExtractText(model, body) {
+async function postGeminiAndExtractText(model, body, signal) {
   let data;
   if (window.DdditWorksApi?.isBackendMode?.()) {
-    data = await window.DdditWorksApi.postGemini(model, body, state.apiKey);
+    data = await window.DdditWorksApi.postGemini(model, body, state.apiKey, { signal });
   } else {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
     if (!res.ok) {
       const msg = (await res.json().catch(() => ({})))?.error?.message || `API ${res.status}`;
       const e = new Error(msg);
@@ -567,6 +748,7 @@ async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') 
   const cfg = window.DIDIDIT_CONFIG || {};
   // Convert / scene / caption: Flash for speed. Pro stays for prose draft only.
   const model = cfg.FAST_GEMINI_MODEL || 'gemini-3.5-flash';
+  const signal = getJobSignal();
   const body = {
     systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
@@ -577,12 +759,18 @@ async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') 
     },
   };
   const rows = await withGeminiRetry(async () => {
+    throwIfCancelled();
     let data;
     if (window.DdditWorksApi?.isBackendMode?.()) {
-      data = await window.DdditWorksApi.postGemini(model, body, state.apiKey);
+      data = await window.DdditWorksApi.postGemini(model, body, state.apiKey, { signal });
     } else {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal,
+      });
       if (!res.ok) {
         const msg = (await res.json().catch(() => ({})))?.error?.message || `API ${res.status}`;
         const e = new Error(msg);
@@ -594,7 +782,7 @@ async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') 
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) throw new Error('JSON 응답이 비어 있습니다.');
     return PIPE.parseRowsJson(text);
-  }, { retries: 3, label: stage === 'convert' ? '변환' : stage === 'scene' ? '장면' : '자막' });
+  }, { retries: 3, label: stage === 'convert' ? '변환' : stage === 'scene' ? '장면' : '자막', signal });
   return rows;
 }
 
@@ -615,6 +803,7 @@ function saveProject() {
       referenceScripts: state.referenceScripts,
       chapters: state.chapters,
       proseDraft: state.proseDraft,
+      proseHistory: state.proseHistory || [],
       pipelineStep: state.pipelineStep,
       savedAt: new Date().toISOString(),
     }));
@@ -635,6 +824,7 @@ function loadProject() {
     state.referenceScripts = saved.referenceScripts || [];
     state.chapters = saved.chapters || [];
     state.proseDraft = saved.proseDraft || '';
+    state.proseHistory = Array.isArray(saved.proseHistory) ? saved.proseHistory : [];
     state.pipelineStep = saved.pipelineStep || 1;
     state.adMode = typeof saved.adMode === 'boolean' ? saved.adMode : defaultAdModeForProject();
   } catch { /* ignore */ }
@@ -912,6 +1102,7 @@ function updatePipelineUI() {
 async function runProseDraft() {
   if (!requireApiReady()) return;
   if (!hasPlanTitle()) return showToast('기획안에 제목을 입력하세요.', true);
+  if (jobAbort) return showToast('이미 작성 중입니다. 취소 후 다시 시도하세요.', true);
   syncSupplementsFromDOM();
   syncChaptersFromDOM();
   ensureClosingChapterInState();
@@ -929,6 +1120,16 @@ async function runProseDraft() {
   const continueFromEdit = existingProse && confirm(
     '기존 줄글을 스타일 기준으로 이어 쓸까요?\n\n확인 = 다듬은 톤 유지 · 취소 = 처음부터 새로 생성',
   );
+  // confirm에서 취소를 눌러도 null이 아니라 false — 이어쓰기 거절 = 새로 생성.
+  // 대화상자 X/ESC는 브라우저에 따라 null → 작업 중단
+  if (existingProse && continueFromEdit === null) return;
+
+  if (existingProse) {
+    pushProseHistory(
+      existingProse,
+      continueFromEdit ? '이어쓰기 전' : '재생성 전',
+    );
+  }
 
   SESSION.reset();
   if (continueFromEdit) {
@@ -938,9 +1139,10 @@ async function runProseDraft() {
     );
   }
 
+  beginJob();
   setLoading(true, '줄글 초안 작성 중…');
+  let prose = continueFromEdit ? existingProse : '';
   try {
-    let prose = continueFromEdit ? existingProse : '';
     const chapters = state.chapters.length ? state.chapters : [{ title: '전체', notes: effective.contentDirection, titleCard: true }];
     const chapterMarker = (ch) => {
       const heading = PIPE.proseHeading?.(ch) ?? (ch?.titleCard === false ? '' : ch?.title);
@@ -963,6 +1165,7 @@ async function runProseDraft() {
     }
 
     for (let i = from; i < chapters.length; i++) {
+      throwIfCancelled();
       setLoading(true, `줄글 작성 중… (${i + 1}/${chapters.length}, 대화 ${SESSION.turnCount()}턴)`);
       const prompt = PIPE.buildProsePrompt(ctxWithStyle, chapters[i], i, chapters.length, {
         includeContext: i === from && !SESSION.hasHistory(),
@@ -981,6 +1184,9 @@ async function runProseDraft() {
         chunk = String(chunk || '').replace(/^\s*##\s+.+\n?/, '').trim();
         prose = prose ? `${prose}\n\n${chunk}` : chunk;
       }
+      // 중간 진행분도 에디터에 반영 (취소 시 어디까지 썼는지 확인 가능)
+      state.proseDraft = prose;
+      if ($('#prose-draft')) $('#prose-draft').value = prose;
     }
     state.proseDraft = prose;
     $('#prose-draft').value = prose;
@@ -995,29 +1201,46 @@ async function runProseDraft() {
     );
     navigatePipeline(3);
   } catch (e) {
+    if (isAbortError(e)) {
+      // 새로 쓰기 중 취소했고 본문이 거의 없으면 이전본 복원
+      if (!continueFromEdit && existingProse && (!prose || prose.length < existingProse.length * 0.3)) {
+        state.proseDraft = existingProse;
+        if ($('#prose-draft')) $('#prose-draft').value = existingProse;
+      } else {
+        state.proseDraft = prose;
+        if ($('#prose-draft') && prose) $('#prose-draft').value = prose;
+      }
+      saveProject();
+      showToast('줄글 생성을 취소했습니다. 「이전 줄글」에서 복원할 수 있습니다.');
+      return;
+    }
     reportError('runProseDraft', e);
     showToast(e.message || '줄글 작성 실패', true);
   } finally {
-    setLoading(false);
+    endJob();
   }
 }
 
 async function runConvertToSheet() {
   if (!requireApiReady()) return;
+  if (jobAbort) return showToast('이미 작성 중입니다. 취소 후 다시 시도하세요.', true);
   const prose = ($('#prose-draft')?.value || state.proseDraft).trim();
   if (!prose) return showToast('줄글 초안이 없습니다.', true);
   state.proseDraft = prose;
   const ctx = buildProductContext();
+  beginJob();
   setLoading(true, '5열 대본으로 변환 중…');
   try {
     const chunks = PIPE.splitProseChunks(prose, 14000);
     let rows = [];
     for (let i = 0; i < chunks.length; i++) {
+      throwIfCancelled();
       setLoading(true, `변환 중… (${i + 1}/${chunks.length})`);
       let part = [];
       let retryHint = '';
       // At most 2 API attempts; heal locally instead of soft-issue retries.
       for (let attempt = 0; attempt < 2; attempt++) {
+        throwIfCancelled();
         part = await callGeminiJson(
           PIPE.buildConvertPrompt(ctx, chunks[i], retryHint),
           attempt > 0 ? 0.2 : 0.3,
@@ -1040,15 +1263,21 @@ async function runConvertToSheet() {
     showToast(`${state.allRows.length}행으로 변환했습니다.`);
     navigatePipeline(4);
   } catch (e) {
+    if (isAbortError(e)) {
+      showToast('변환을 취소했습니다.');
+      return;
+    }
     reportError('runConvertToSheet', e);
     showToast(e.message || '변환 실패', true);
   } finally {
-    setLoading(false);
+    endJob();
   }
 }
 
 async function runAddScenes() {
   if (!requireApiReady() || !state.allRows.length) return;
+  if (jobAbort) return showToast('이미 작성 중입니다. 취소 후 다시 시도하세요.', true);
+  beginJob();
   setLoading(true, '장면·사이즈 추가 중…');
   try {
     const plan = loadPlanData();
@@ -1068,25 +1297,35 @@ async function runAddScenes() {
     showToast(miss && miss !== '0' ? `장면 반영 · 가이드 미커버 ${miss}항 확인` : '장면·사이즈를 반영했습니다.');
     navigatePipeline(5);
   } catch (e) {
+    if (isAbortError(e)) {
+      showToast('장면 생성을 취소했습니다.');
+      return;
+    }
     reportError('runAddScenes', e);
     showToast(e.message || '장면 추가 실패', true);
   } finally {
-    setLoading(false);
+    endJob();
   }
 }
 
 async function runAddCaptions() {
   if (!requireApiReady() || !state.allRows.length) return;
+  if (jobAbort) return showToast('이미 작성 중입니다. 취소 후 다시 시도하세요.', true);
+  beginJob();
   setLoading(true, '자막·코멘트 추가 중…');
   try {
     state.allRows = await callGeminiJson(PIPE.buildCaptionPrompt(buildProductContext(), state.allRows), 0.4, 'caption');
     renderTable();
     showToast('자막·코멘트를 반영했습니다.');
   } catch (e) {
+    if (isAbortError(e)) {
+      showToast('자막 생성을 취소했습니다.');
+      return;
+    }
     reportError('runAddCaptions', e);
     showToast(e.message || '자막 추가 실패', true);
   } finally {
-    setLoading(false);
+    endJob();
   }
 }
 
@@ -1230,6 +1469,7 @@ const TOOL_MODALS = [
   { panel: '#error-log-panel', btn: '#toggle-error-log' },
   { panel: '#settings-panel', btn: '#toggle-settings' },
   { panel: '#prompt-panel', btn: '#toggle-prompt' },
+  { panel: '#prose-history-panel', btn: '#btn-prose-history' },
 ];
 
 function syncToolModalChrome() {
@@ -1307,7 +1547,13 @@ function bindDrawerPanels() {
     el.addEventListener('click', closeAllToolModals);
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && document.body.classList.contains('tool-modal-open')) {
+    if (e.key !== 'Escape') return;
+    if (jobAbort && !$('#loading-overlay')?.classList.contains('hidden')) {
+      e.preventDefault();
+      cancelJob();
+      return;
+    }
+    if (document.body.classList.contains('tool-modal-open')) {
       closeAllToolModals();
     }
   });
@@ -1378,6 +1624,22 @@ function bindEvents() {
   $('#btn-pipeline-prev')?.addEventListener('click', () => navigatePipeline(state.pipelineStep - 1));
   $('#btn-pipeline-next')?.addEventListener('click', () => navigatePipeline(state.pipelineStep + 1));
   $('#btn-gen-prose')?.addEventListener('click', runProseDraft);
+  $('#btn-prose-history')?.addEventListener('click', () => openProseHistoryPanel());
+  $('#btn-cancel-job')?.addEventListener('click', () => cancelJob());
+  $('#prose-history-list')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-history-id]');
+    if (!btn) return;
+    selectedProseHistoryId = btn.getAttribute('data-history-id');
+    renderProseHistoryList();
+  });
+  $('#btn-prose-history-restore')?.addEventListener('click', () => {
+    if (selectedProseHistoryId) restoreProseHistory(selectedProseHistoryId);
+  });
+  $('#btn-prose-history-delete')?.addEventListener('click', () => {
+    if (!selectedProseHistoryId) return;
+    if (!confirm('이 히스토리 버전을 삭제할까요?')) return;
+    deleteProseHistory(selectedProseHistoryId);
+  });
   $('#btn-convert-sheet')?.addEventListener('click', runConvertToSheet);
   $('#btn-add-scenes')?.addEventListener('click', runAddScenes);
   $('#btn-add-captions')?.addEventListener('click', runAddCaptions);
