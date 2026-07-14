@@ -439,14 +439,14 @@ ${continuity}`;
       : '';
     return `${getNarrationRhythmBlock()}
 
-# 작업: 줄글 → 대본 열 변환
-아래 줄글을 JSON \`rows\` 배열로 변환하세요.
+# 작업: 대본 → 시트(대본 열) 변환
+아래 대본을 JSON \`rows\` 배열로 변환하세요.
 - **대본 열만** 채우고 장면·사이즈·자막·코멘트는 빈 문자열.
-- 줄글 내용을 삭제·왜곡하지 말고 **말하기 호흡 단위**로만 나눕니다.
+- 대본 내용을 삭제·왜곡하지 말고 **말하기 호흡 단위**로만 나눕니다.
 - 목표 ${ROW_CHARS_TARGET_MIN}~${ROW_CHARS_TARGET_MAX}자 / 상한 ${ROW_CHARS_HARD_MAX}자. 긴 문장은 호흡 쉼에서 분할.
 ${productHint}${retryHint || ''}
 
-## 줄글 원문
+## 대본 원문
 ${prose}`;
   }
 

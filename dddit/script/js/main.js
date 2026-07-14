@@ -414,8 +414,17 @@ const GEMINI_MODELS = [
 ];
 
 const PRO_GEMINI_MODEL = 'gemini-3.1-pro-preview';
-/** Fast path for convert / scene / caption stages */
-const FAST_GEMINI_MODEL = 'gemini-3.5-flash';
+/**
+ * Fast path for convert / scene / caption.
+ * Flash-Lite 우선 — 3.5 Flash는 수요·thinking 부담이 커서 변환 단계에서
+ * high-demand/빈 응답이 잦음. 실패 시 아래 체인으로 폴백.
+ */
+const FAST_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const FAST_GEMINI_FALLBACKS = [
+  'gemini-3.1-flash-lite',
+  'gemini-3-flash-preview',
+  'gemini-3.5-flash',
+];
 
 function isSupportedGeminiModel(id) {
   return GEMINI_MODELS.some((m) => m.id === id);
@@ -427,6 +436,7 @@ window.DIDIDIT_CONFIG = {
   GEMINI_MODELS,
   PRO_GEMINI_MODEL,
   FAST_GEMINI_MODEL,
+  FAST_GEMINI_FALLBACKS,
   isSupportedGeminiModel,
   isRoundupFormat,
   hasRoundupQuantity,
@@ -1322,14 +1332,14 @@ ${continuity}`;
       : '';
     return `${getNarrationRhythmBlock()}
 
-# 작업: 줄글 → 대본 열 변환
-아래 줄글을 JSON \`rows\` 배열로 변환하세요.
+# 작업: 대본 → 시트(대본 열) 변환
+아래 대본을 JSON \`rows\` 배열로 변환하세요.
 - **대본 열만** 채우고 장면·사이즈·자막·코멘트는 빈 문자열.
-- 줄글 내용을 삭제·왜곡하지 말고 **말하기 호흡 단위**로만 나눕니다.
+- 대본 내용을 삭제·왜곡하지 말고 **말하기 호흡 단위**로만 나눕니다.
 - 목표 ${ROW_CHARS_TARGET_MIN}~${ROW_CHARS_TARGET_MAX}자 / 상한 ${ROW_CHARS_HARD_MAX}자. 긴 문장은 호흡 쉼에서 분할.
 ${productHint}${retryHint || ''}
 
-## 줄글 원문
+## 대본 원문
 ${prose}`;
   }
 
@@ -2055,7 +2065,7 @@ function pushProseHistory(text, label) {
   const entry = {
     id: `ph-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     savedAt: new Date().toISOString(),
-    label: label || '이전 줄글',
+    label: label || '이전 대본',
     text: body,
   };
   state.proseHistory = [entry, ...state.proseHistory].slice(0, PROSE_HISTORY_MAX);
@@ -2107,7 +2117,7 @@ function renderProseHistoryList() {
       const active = item.id === selectedProseHistoryId ? ' is-active' : '';
       return `<li>
         <button type="button" class="prose-history-item${active}" data-history-id="${esc(item.id)}">
-          <strong>${esc(item.label || '이전 줄글')}</strong>
+          <strong>${esc(item.label || '이전 대본')}</strong>
           <span>${esc(when)} · ${chars.toLocaleString('ko-KR')}자</span>
         </button>
       </li>`;
@@ -2138,7 +2148,7 @@ function restoreProseHistory(id) {
   $('#btn-convert-sheet')?.toggleAttribute('disabled', !isApiReady() || !state.proseDraft.trim());
   renderGuideCoverageQc();
   closeAllToolModals();
-  showToast('이전 줄글을 복원했습니다.');
+  showToast('이전 대본을 복원했습니다.');
 }
 
 function deleteProseHistory(id) {
@@ -2151,26 +2161,38 @@ function deleteProseHistory(id) {
 
 function isTransientGeminiError(err) {
   const status = Number(err?.apiStatus || err?.status || 0);
-  if (status === 429 || status === 503) return true;
+  if (status === 429 || status === 503 || status === 502 || status === 504) return true;
   const msg = String(err?.message || err || '');
-  return /high demand|try again later|resource.?exhausted|unavailable|overloaded|quota|rate.?limit|\b429\b|\b503\b/i.test(
+  // bare "unavailable"/"quota"는 모델 미지원·설정 오류와 혼동되므로 제외
+  return /high demand|try again later|resource.?exhausted|overloaded|rate.?limit|quota.?exceeded|too many requests|temporar(?:y|ily)|현재.*지연|사용량이 많/i.test(
     msg,
   );
 }
 
+function isModelNotFoundError(err) {
+  const status = Number(err?.apiStatus || err?.status || 0);
+  const msg = String(err?.message || err || '');
+  if (status === 404) return true;
+  return /not found|is not supported|unknown model|does not exist|유효하지 않은 모델/i.test(msg);
+}
+
 function friendlyGeminiError(err) {
-  if (isTransientGeminiError(err)) {
-    return '모델 사용량이 많아 잠시 지연됩니다. 잠시 후 다시 시도해 주세요.';
+  const raw = String(err?.message || err || 'API 오류');
+  if (isModelNotFoundError(err)) {
+    return `모델을 사용할 수 없습니다 (${err?.apiModel || 'unknown'}). ${raw}`;
   }
-  return String(err?.message || err || 'API 오류');
+  if (isTransientGeminiError(err)) {
+    return `모델 일시 과부하·지연입니다. ${raw}`;
+  }
+  return raw;
 }
 
 function sleepMs(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** 과부하·429 시 지수 백오프 재시도 */
-async function withGeminiRetry(fn, { retries = 3, label = 'API', signal } = {}) {
+/** 과부하·429 시 짧은 재시도 (같은 모델) */
+async function withGeminiRetry(fn, { retries = 2, label = 'API', signal } = {}) {
   let last;
   for (let attempt = 0; attempt <= retries; attempt++) {
     throwIfCancelled();
@@ -2181,17 +2203,47 @@ async function withGeminiRetry(fn, { retries = 3, label = 'API', signal } = {}) 
       last = e;
       if (isAbortError(e) || signal?.aborted || jobAbort?.signal?.aborted) throw makeAbortError();
       if (!isTransientGeminiError(e) || attempt === retries) break;
-      const wait = Math.min(28000, 1800 * 2 ** attempt);
+      const wait = Math.min(12000, 1200 * 2 ** attempt);
       const sec = Math.max(1, Math.round(wait / 1000));
-      showToast(`${label} 과부하 · ${sec}초 후 재시도 (${attempt + 1}/${retries})`, true);
+      // 원문 오류를 로그에 남기고, 토스트는 한 줄로만
+      reportError(`${label}.retry`, e, { attempt: attempt + 1, wait });
+      showToast(`${label} 지연 · ${sec}초 후 재시도 (${attempt + 1}/${retries})`, true);
       await sleepMs(wait);
       if (signal?.aborted || jobAbort?.signal?.aborted) throw makeAbortError();
     }
   }
   const out = new Error(friendlyGeminiError(last));
   out.apiStatus = last?.apiStatus;
+  out.apiModel = last?.apiModel;
   out.cause = last;
   throw out;
+}
+
+function fastModelCandidates(preferred) {
+  const cfg = window.DIDIDIT_CONFIG || {};
+  const list = [
+    preferred,
+    cfg.FAST_GEMINI_MODEL,
+    ...(cfg.FAST_GEMINI_FALLBACKS || []),
+    'gemini-3.1-flash-lite',
+    'gemini-3-flash-preview',
+  ].filter(Boolean);
+  return [...new Set(list)];
+}
+
+function buildFastGenerationConfig({ temperature, json, model }) {
+  const config = {
+    temperature,
+  };
+  if (json) {
+    config.responseMimeType = 'application/json';
+    config.responseSchema = PIPE.ROWS_SCHEMA;
+  }
+  // 3.x thinking 모델만 budget 0 — Flash-Lite에는 보내지 않음
+  if (/gemini-3\.5-flash|gemini-3-flash-preview/i.test(String(model || ''))) {
+    config.thinkingConfig = { thinkingBudget: 0 };
+  }
+  return config;
 }
 
 async function callGeminiTextSession(userPrompt, temperature = 0.75, stage = 'prose') {
@@ -2204,26 +2256,19 @@ async function callGeminiTextSession(userPrompt, temperature = 0.75, stage = 'pr
     contents: SESSION.getContents(),
     generationConfig: {
       temperature,
-      // Single-response budget only (prevents context blow-ups). Body chapters have no soft word-cap in prompts.
       maxOutputTokens: stage === 'prose' ? 8192 : 4096,
     },
   };
   try {
     const text = await withGeminiRetry(() => postGeminiAndExtractText(model, body, signal), {
-      retries: 3,
-      label: '줄글',
+      retries: 2,
+      label: '대본',
       signal,
     });
     throwIfCancelled();
     SESSION.push('model', text);
     return text;
   } catch (e) {
-    // 실패한 user 턴은 세션에서 제거 (취소용 orphan 방지)
-    const contents = SESSION.getContents?.() || [];
-    if (contents.length && contents[contents.length - 1]?.role === 'user') {
-      // SESSION has no pop — trim last by rebuilding via reset+reseed is heavy;
-      // turnCount includes failed user; next chapter still works. Leave as-is unless abort.
-    }
     throw e;
   }
 }
@@ -2241,58 +2286,108 @@ async function postGeminiAndExtractText(model, body, signal) {
       signal,
     });
     if (!res.ok) {
-      const msg = (await res.json().catch(() => ({})))?.error?.message || `API ${res.status}`;
+      const errBody = await res.json().catch(() => ({}));
+      const msg = errBody?.error?.message || `API ${res.status}`;
       const e = new Error(msg);
       e.apiStatus = res.status;
+      e.apiModel = model;
       throw e;
     }
     data = await res.json();
   }
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('응답이 비어 있습니다.');
+  const text = extractGeminiText(data);
+  if (!text) {
+    const reason = data?.candidates?.[0]?.finishReason || data?.promptFeedback?.blockReason || 'empty';
+    const e = new Error(`응답이 비어 있습니다 (${reason})`);
+    e.apiModel = model;
+    e.apiBody = data;
+    throw e;
+  }
   return text.trim();
+}
+
+function extractGeminiText(data) {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return '';
+  return parts
+    .filter((p) => p && !p.thought && typeof p.text === 'string')
+    .map((p) => p.text)
+    .join('')
+    .trim();
+}
+
+async function postGeminiJsonRows(model, body, signal) {
+  let data;
+  if (window.DdditWorksApi?.isBackendMode?.()) {
+    data = await window.DdditWorksApi.postGemini(model, body, state.apiKey, { signal });
+  } else {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      const msg = errBody?.error?.message || `API ${res.status}`;
+      const e = new Error(msg);
+      e.apiStatus = res.status;
+      e.apiModel = model;
+      throw e;
+    }
+    data = await res.json();
+  }
+  const text = extractGeminiText(data);
+  if (!text) {
+    const reason = data?.candidates?.[0]?.finishReason || data?.promptFeedback?.blockReason || 'empty';
+    const e = new Error(`JSON 응답이 비어 있습니다 (${reason})`);
+    e.apiModel = model;
+    e.apiBody = data;
+    throw e;
+  }
+  return PIPE.parseRowsJson(text);
 }
 
 async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') {
   const cfg = window.DIDIDIT_CONFIG || {};
-  // Convert / scene / caption: Flash for speed. Pro stays for prose draft only.
-  const model = cfg.FAST_GEMINI_MODEL || 'gemini-3.5-flash';
+  const preferred = cfg.FAST_GEMINI_MODEL || 'gemini-3.1-flash-lite';
+  const models = fastModelCandidates(preferred);
   const signal = getJobSignal();
-  const body = {
+  const label = stage === 'convert' ? '시트 변환' : stage === 'scene' ? '장면' : '자막';
+  const bodyBase = {
     systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-    generationConfig: {
-      temperature,
-      responseMimeType: 'application/json',
-      responseSchema: PIPE.ROWS_SCHEMA,
-    },
   };
-  const rows = await withGeminiRetry(async () => {
+
+  let lastErr;
+  for (let mi = 0; mi < models.length; mi++) {
+    const model = models[mi];
     throwIfCancelled();
-    let data;
-    if (window.DdditWorksApi?.isBackendMode?.()) {
-      data = await window.DdditWorksApi.postGemini(model, body, state.apiKey, { signal });
-    } else {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+    const body = {
+      ...bodyBase,
+      generationConfig: buildFastGenerationConfig({ temperature, json: true, model }),
+    };
+    try {
+      return await withGeminiRetry(() => postGeminiJsonRows(model, body, signal), {
+        retries: mi === 0 ? 1 : 0,
+        label: `${label}`,
         signal,
       });
-      if (!res.ok) {
-        const msg = (await res.json().catch(() => ({})))?.error?.message || `API ${res.status}`;
-        const e = new Error(msg);
-        e.apiStatus = res.status;
-        throw e;
-      }
-      data = await res.json();
+    } catch (e) {
+      lastErr = e;
+      if (isAbortError(e)) throw e;
+      const canFallback = isTransientGeminiError(e) || isModelNotFoundError(e) || /thinking|빈어|empty|JSON 응답/i.test(String(e.message || ''));
+      reportError(`${label}.model`, e, { model, next: models[mi + 1] || null });
+      if (!canFallback || mi === models.length - 1) break;
+      showToast(`${label}: ${model} 실패 → ${models[mi + 1]} 로 전환`, true);
     }
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error('JSON 응답이 비어 있습니다.');
-    return PIPE.parseRowsJson(text);
-  }, { retries: 3, label: stage === 'convert' ? '변환' : stage === 'scene' ? '장면' : '자막', signal });
-  return rows;
+  }
+  const out = new Error(friendlyGeminiError(lastErr));
+  out.apiStatus = lastErr?.apiStatus;
+  out.apiModel = lastErr?.apiModel;
+  out.cause = lastErr;
+  throw out;
 }
 
 function saveSettings() {
@@ -2577,12 +2672,12 @@ function navigatePipeline(step) {
 }
 
 function updatePipelineUI() {
-  const labels = ['', '기획안', '줄글 초안', '시트 변환', '장면·사이즈', '자막·공유'];
+  const labels = ['', '기획안', '대본', '시트 변환', '장면·사이즈', '자막·공유'];
   const hints = [
     '',
-    '기획안 확인 후 줄글 단계로',
+    '기획안 확인 후 대본 단계로',
     '챕터 지정 후 AI 생성, 또는 직접 작성',
-    '줄글을 5열 대본으로 변환',
+    '대본을 시트 5열로 변환',
     '장면·사이즈 열 자동 생성',
     '자막·코멘트 추가 후 시트 전송',
   ];
@@ -2627,7 +2722,7 @@ async function runProseDraft() {
   const ctxWithStyle = [ctx, styleAnchor, formatAnchor].filter(Boolean).join('\n\n');
   const existingProse = ($('#prose-draft')?.value || state.proseDraft || '').trim();
   const continueFromEdit = existingProse && confirm(
-    '기존 줄글을 스타일 기준으로 이어 쓸까요?\n\n확인 = 다듬은 톤 유지 · 취소 = 처음부터 새로 생성',
+    '기존 대본을 스타일 기준으로 이어 쓸까요?\n\n확인 = 다듬은 톤 유지 · 취소 = 처음부터 새로 생성',
   );
   // confirm에서 취소를 눌러도 null이 아니라 false — 이어쓰기 거절 = 새로 생성.
   // 대화상자 X/ESC는 브라우저에 따라 null → 작업 중단
@@ -2644,12 +2739,12 @@ async function runProseDraft() {
   if (continueFromEdit) {
     SESSION.seedApprovedProse(
       existingProse,
-      `${ctxWithStyle}\n\n[승인된 줄글] 작성자가 다듬은 줄글입니다. 이 톤·호흡·리듬을 그대로 유지하세요.`,
+      `${ctxWithStyle}\n\n[승인된 대본] 작성자가 다듬은 대본입니다. 이 톤·호흡·리듬을 그대로 유지하세요.`,
     );
   }
 
   beginJob();
-  setLoading(true, '줄글 초안 작성 중…');
+  setLoading(true, '대본 초안 작성 중…');
   let prose = continueFromEdit ? existingProse : '';
   try {
     const chapters = state.chapters.length ? state.chapters : [{ title: '전체', notes: effective.contentDirection, titleCard: true }];
@@ -2675,7 +2770,7 @@ async function runProseDraft() {
 
     for (let i = from; i < chapters.length; i++) {
       throwIfCancelled();
-      setLoading(true, `줄글 작성 중… (${i + 1}/${chapters.length}, 대화 ${SESSION.turnCount()}턴)`);
+      setLoading(true, `대본 작성 중… (${i + 1}/${chapters.length}, 대화 ${SESSION.turnCount()}턴)`);
       const prompt = PIPE.buildProsePrompt(ctxWithStyle, chapters[i], i, chapters.length, {
         includeContext: i === from && !SESSION.hasHistory(),
         hasSession: SESSION.turnCount() > 0,
@@ -2705,8 +2800,8 @@ async function runProseDraft() {
     const fail = Number($('#guide-qc-fail-count')?.textContent || 0);
     showToast(
       fail > 0
-        ? `줄글 완성 · 가이드 미커버 ${fail}항 (1단계 QC 확인)`
-        : `줄글 완성 (대화 ${SESSION.turnCount()}턴 — 스타일 맥락 유지)`,
+        ? `대본 완성 · 가이드 미커버 ${fail}항 (1단계 QC 확인)`
+        : `대본 완성 (대화 ${SESSION.turnCount()}턴 — 스타일 맥락 유지)`,
     );
     navigatePipeline(3);
   } catch (e) {
@@ -2720,11 +2815,11 @@ async function runProseDraft() {
         if ($('#prose-draft') && prose) $('#prose-draft').value = prose;
       }
       saveProject();
-      showToast('줄글 생성을 취소했습니다. 「이전 줄글」에서 복원할 수 있습니다.');
+      showToast('대본 생성을 취소했습니다. 「이전 대본」에서 복원할 수 있습니다.');
       return;
     }
     reportError('runProseDraft', e);
-    showToast(e.message || '줄글 작성 실패', true);
+    showToast(e.message || '대본 작성 실패', true);
   } finally {
     endJob();
   }
@@ -2734,17 +2829,17 @@ async function runConvertToSheet() {
   if (!requireApiReady()) return;
   if (jobAbort) return showToast('이미 작성 중입니다. 취소 후 다시 시도하세요.', true);
   const prose = ($('#prose-draft')?.value || state.proseDraft).trim();
-  if (!prose) return showToast('줄글 초안이 없습니다.', true);
+  if (!prose) return showToast('대본 초안이 없습니다.', true);
   state.proseDraft = prose;
   const ctx = buildProductContext();
   beginJob();
-  setLoading(true, '5열 대본으로 변환 중…');
+  setLoading(true, '시트 변환 중…');
   try {
     const chunks = PIPE.splitProseChunks(prose, 14000);
     let rows = [];
     for (let i = 0; i < chunks.length; i++) {
       throwIfCancelled();
-      setLoading(true, `변환 중… (${i + 1}/${chunks.length})`);
+      setLoading(true, `시트 변환 중… (${i + 1}/${chunks.length})`);
       let part = [];
       let retryHint = '';
       // At most 2 API attempts; heal locally instead of soft-issue retries.
@@ -2760,7 +2855,7 @@ async function runConvertToSheet() {
         if (!hard.length) break;
         retryHint = PIPE.buildConvertRetryHint(hard);
         if (attempt === 1) {
-          reportError('runConvertToSheet.validate', new Error(hard.join('; ')), { chunk: i + 1 }, { silent: true });
+          reportError('runConvertToSheet.validate', new Error(hard.join('; ')), { chunk: i + 1 });
         }
       }
       part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
@@ -2773,11 +2868,15 @@ async function runConvertToSheet() {
     navigatePipeline(4);
   } catch (e) {
     if (isAbortError(e)) {
-      showToast('변환을 취소했습니다.');
+      showToast('시트 변환을 취소했습니다.');
       return;
     }
-    reportError('runConvertToSheet', e);
-    showToast(e.message || '변환 실패', true);
+    reportError('runConvertToSheet', e, {
+      cause: e?.cause?.message || null,
+      model: e?.apiModel || e?.cause?.apiModel || null,
+      status: e?.apiStatus || e?.cause?.apiStatus || null,
+    });
+    showToast(e.message || '시트 변환 실패', true);
   } finally {
     endJob();
   }
@@ -2866,7 +2965,15 @@ function updateTableHead(mode) {
   thead.innerHTML = cols.map((h) => `<th>${h}</th>`).join('');
 }
 
-function reportError(tag, err) {
+function reportError(tag, err, extra) {
+  if (extra) {
+    const wrapped = new Error(`${err?.message || err} | ${JSON.stringify(extra)}`);
+    wrapped.cause = err;
+    wrapped.apiStatus = err?.apiStatus;
+    wrapped.apiModel = err?.apiModel;
+    LOG?.log(tag, wrapped);
+    return;
+  }
   LOG?.log(tag, err);
 }
 
