@@ -164,6 +164,7 @@ function switchToProject(slug, options = {}) {
   const current = getSheetSlug();
   if (next === current && !options.forceReload) {
     renderPlanSummary();
+    renderChapters();
     updateProjectChrome();
     showToast(`${window.DdditPlanBriefSync?.projectLabel?.(next) || next} 기획안을 확인했습니다.`);
     return true;
@@ -172,6 +173,8 @@ function switchToProject(slug, options = {}) {
   saveProject();
   setProjectSlug(next);
   loadProject();
+  // 기획안 구성으로 챕터 제목 QC 강제 적용 (로컬에 긴 제목이 남아 있어도 덮어씀)
+  applyChaptersFromPlan({ force: true });
   state.pipelineStep = 1;
   applyBriefToDOM();
   updateProjectChrome();
@@ -180,14 +183,96 @@ function switchToProject(slug, options = {}) {
 
   const plan = loadPlanData();
   const label = window.DdditPlanBriefSync?.projectLabel?.(next) || next;
-  if (plan?.title) showToast(`${label} 기획안을 불러왔습니다.`);
-  else showToast(`${label}에 기획안이 없습니다. 「기획안 편집」에서 작성하세요.`, true);
+  if (plan?.title) {
+    const n = state.chapters.length;
+    showToast(n ? `${label} 기획안 · 챕터 ${n}개 짧은 제목 적용` : `${label} 기획안을 불러왔습니다.`);
+  } else showToast(`${label}에 기획안이 없습니다. 「기획안 편집」에서 작성하세요.`, true);
   return true;
 }
 
 function loadSelectedPlanProject() {
   const slug = $('#plan-project-select')?.value || '';
   switchToProject(slug, { forceReload: true });
+}
+
+function chaptersNeedQc(chapters) {
+  const QC = window.DdditChapterTitleQc;
+  if (!Array.isArray(chapters) || !chapters.length) return true;
+  if (!QC) return false;
+  return chapters.some((ch) => {
+    const title = String(ch?.title || '');
+    if (QC.looksTooLong?.(title)) return true;
+    if ((QC.qcIssues?.(ch) || []).length) return true;
+    if (ch.sourceTitle && ch.sourceTitle === title && /[（(]/.test(title)) return true;
+    return false;
+  });
+}
+
+function chaptersFromPlanStructure(structure) {
+  const SYNC = window.DdditPlanBriefSync;
+  if (!structure || !SYNC?.parseStructureToChapters) return [];
+  return SYNC.parseStructureToChapters(structure);
+}
+
+/** 기획안 구성 → QC된 챕터 제목 적용 */
+function applyChaptersFromPlan(options = {}) {
+  const plan = loadPlanData();
+  const structure = plan?.structure;
+  if (!structure) return { ok: false, reason: 'empty' };
+  const next = chaptersFromPlanStructure(structure);
+  if (!next.length) return { ok: false, reason: 'empty' };
+  if (!options.force && state.chapters.length && !chaptersNeedQc(state.chapters)) {
+    return { ok: true, skipped: true, chapters: state.chapters };
+  }
+  state.chapters = next;
+  saveProject();
+  return { ok: true, chapters: next };
+}
+
+function renderChapterQcPreview(chapters) {
+  const list = $('#chapter-qc-preview');
+  const empty = $('#chapter-qc-empty');
+  const panel = $('#chapter-qc-panel');
+  if (!list) return;
+  const plan = loadPlanData();
+  const preview = (chapters && chapters.length)
+    ? chapters
+    : chaptersFromPlanStructure(plan?.structure);
+  if (!preview.length) {
+    list.innerHTML = '';
+    empty?.classList.remove('hidden');
+    panel?.classList.toggle('hidden', !plan);
+    return;
+  }
+  empty?.classList.add('hidden');
+  panel?.classList.remove('hidden');
+  list.innerHTML = preview.map((ch) => {
+    const noCard = ch.titleCard === false || window.DdditChapterTitleQc?.isIntroTitle?.(ch.title);
+    const notes = String(ch.notes || '').trim();
+    return `<li>
+      <span class="chapter-qc-title">${esc(ch.title)}${noCard ? '<span class="chapter-qc-badge">타이틀 카드 없음</span>' : ''}</span>
+      ${notes ? `<span class="chapter-qc-notes">${esc(notes)}</span>` : ''}
+    </li>`;
+  }).join('');
+}
+
+function reloadChaptersFromPlanQc(options = {}) {
+  const plan = loadPlanData();
+  if (!plan?.structure) return showToast('기획안 구성이 없습니다.', true);
+  if (
+    !options.silent
+    && state.chapters.length
+    && !chaptersNeedQc(state.chapters)
+    && !confirm('현재 챕터 목록을 기획안 구성 기준 짧은 제목으로 바꿀까요?')
+  ) {
+    return;
+  }
+  const result = applyChaptersFromPlan({ force: true });
+  if (!result.ok) return showToast('구성에서 챕터를 만들 수 없습니다.', true);
+  renderChapterQcPreview(state.chapters);
+  renderChapters();
+  saveProject();
+  if (!options.silent) showToast(`챕터 ${state.chapters.length}개 · 짧은 제목 적용`);
 }
 
 function renderPlanSummary() {
@@ -209,6 +294,7 @@ function renderPlanSummary() {
   if (!plan || !container) {
     container && (container.innerHTML = '');
     missing?.classList.remove('hidden');
+    renderChapterQcPreview([]);
     return;
   }
   missing?.classList.add('hidden');
@@ -236,9 +322,11 @@ function renderPlanSummary() {
       <div class="plan-summary-val">${esc(v)}</div>
     </div>`).join('');
 
-  if (!state.chapters.length && plan.structure) {
-    state.chapters = SYNC.parseStructureToChapters(plan.structure);
+  // 기획안 구성 → 챕터: 비어 있거나 긴 제목이면 자동 QC
+  if (plan.structure && (!state.chapters.length || chaptersNeedQc(state.chapters))) {
+    applyChaptersFromPlan({ force: true });
   }
+  renderChapterQcPreview(state.chapters);
 }
 
 function getEffectiveState() {
@@ -566,19 +654,9 @@ function addChapter() {
   });
   $('#new-chapter-title').value = '';
   $('#new-chapter-notes').value = '';
+  renderChapterQcPreview(state.chapters);
   renderChapters();
   saveProject();
-}
-
-function reloadChaptersFromPlanQc() {
-  const plan = loadPlanData();
-  if (!plan?.structure) return showToast('기획안 구성(structure)이 없습니다.', true);
-  if (state.chapters.length && !confirm('현재 챕터 목록을 기획안 기준 QC 제목으로 바꿀까요?')) return;
-  const SYNC = window.DdditPlanBriefSync;
-  state.chapters = SYNC?.parseStructureToChapters?.(plan.structure) || [];
-  renderChapters();
-  saveProject();
-  showToast(`챕터 ${state.chapters.length}개 · 제목 QC 적용`);
 }
 
 function navigatePipeline(step) {
@@ -1079,7 +1157,8 @@ function bindEvents() {
   $('#btn-add-scenes')?.addEventListener('click', runAddScenes);
   $('#btn-add-captions')?.addEventListener('click', runAddCaptions);
   $('#btn-add-chapter')?.addEventListener('click', addChapter);
-  $('#btn-chapter-qc')?.addEventListener('click', reloadChaptersFromPlanQc);
+  $('#btn-chapter-qc')?.addEventListener('click', () => reloadChaptersFromPlanQc());
+  $('#btn-chapter-qc-step2')?.addEventListener('click', () => reloadChaptersFromPlanQc());
   $('#btn-sheet-push')?.addEventListener('click', pushToSheet);
   $('#btn-sheet-pull')?.addEventListener('click', pullFromSheet);
   $('#btn-pipeline-next-brief')?.addEventListener('click', () => navigatePipeline(2));

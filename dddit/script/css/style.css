@@ -906,6 +906,68 @@ body.hosted [data-local-only] { display: none !important; }
 .panel { /* noop */ }
 .hint-inline { font-weight: 400; color: var(--text-muted); font-size: 0.78rem; }
 
+.chapter-qc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  background: #f0fdf4;
+}
+
+.chapter-qc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chapter-qc-head h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.chapter-qc-preview {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chapter-qc-preview li {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  list-style: decimal;
+}
+
+.chapter-qc-title {
+  display: block;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.chapter-qc-notes {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+}
+
+.chapter-qc-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #15803d;
+}
+
 .plan-load-panel {
   display: flex;
   flex-direction: column;
