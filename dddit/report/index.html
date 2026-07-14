@@ -518,11 +518,25 @@
         <div class="card-head"><h2>보고 데이터 편집 (팀용)</h2></div>
         <div class="card-body">
           <label for="studio-curl-editor">Studio 프로모션 cURL 캡처 (Copy as cURL)</label>
-          <textarea id="studio-curl-editor" rows="4" placeholder="Studio → 프로모션 탭 → DevTools Network → 목록 요청 → Copy as cURL 붙여넣기"></textarea>
+          <textarea id="studio-curl-editor" rows="4" placeholder="Network에서 list_promotions 요청 → 우클릭 Copy as cURL (Response는 안 봐도 됨)"></textarea>
           <div class="header-actions" style="margin-bottom:12px;">
             <button id="btn-studio-capture" class="btn btn-ghost" type="button">캡처 저장</button>
             <span id="studio-capture-status" class="status-pill">1회 저장 후 Studio 동기화 가능</span>
           </div>
+          <details class="studio-import-details" style="margin-bottom:12px;">
+            <summary style="cursor:pointer;color:var(--muted);font-size:0.9rem;">Response가 안 보일 때 — JSON 붙여넣기</summary>
+            <p style="font-size:0.82rem;color:var(--muted);margin:8px 0;">
+              DevTools Search로 숫자는 찾았는데 Response가 challenge만 보이면, 아래 콘솔 스니펫 실행 후 프로모션 탭 새로고침 →
+              <code>copy(__studioPromoJson)</code> 한 뒤 여기 붙여넣기.
+            </p>
+            <pre class="studio-snippet" style="font-size:0.72rem;overflow:auto;padding:8px;background:#f8fafc;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">(function(){const o=fetch;fetch=async(...a)=>{const r=await o(...a);const u=String(a[0]||"");if(u.includes("list_promotions")){const c=r.clone();c.text().then(t=>{window.__studioPromoJson=t;console.log("저장됨. 콘솔에 copy(__studioPromoJson) 입력");});}return r;};console.log("훅 설치됨 — 프로모션 탭 새로고침");})();</pre>
+            <label for="studio-response-editor">list_promotions 응답 JSON</label>
+            <textarea id="studio-response-editor" rows="5" placeholder='{"promotions":[...]} 또는 list_promotions 전체 응답'></textarea>
+            <div class="header-actions" style="margin-top:8px;">
+              <button id="btn-studio-import" class="btn btn-ghost" type="button">JSON 가져오기</button>
+              <span id="studio-import-status" class="status-pill">Search만 되고 Response가 안 보일 때</span>
+            </div>
+          </details>
           <label for="issues-editor">주요 이슈 (한 줄씩)</label>
           <textarea id="issues-editor" placeholder="채널 노출 부족…"></textarea>
           <label for="promotions-editor">프로모션 JSON (비용·노출·조회·구독)</label>
@@ -545,6 +559,6 @@
     <div id="loading" class="card loading-block">보고 데이터를 불러오는 중…</div>
   </div>
 
-  <script src="js/report.js?v=17"></script>
+  <script src="js/report.js?v=18"></script>
 </body>
 </html>

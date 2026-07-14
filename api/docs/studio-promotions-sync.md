@@ -3,6 +3,34 @@
 Studio 「프로모션」탭 데이터를 **공식 API가 아니라 Studio 내부(youtubei) 요청을 재생**해서
 `promotions.json`에 반영합니다.
 
+## Response가 안 보일 때 (challenge만 보임)
+
+**Response 내용을 읽을 필요 없습니다.** Search로 `45489` 같은 숫자가 `list_promotions`에 있다면 이미 맞는 요청입니다.
+
+### 방법 A — cURL만 복사 (가장 쉬움)
+
+1. Network 상단 필터에 `list_promotions` 입력
+2. 목록에 뜬 **`list_promotions` 행** 우클릭 → **Copy** → **Copy as cURL (bash)**
+3. 보고 페이지 **캡처 저장** → **Studio 동기화**
+
+Response 탭은 열지 않아도 됩니다.
+
+### 방법 B — Search 결과에서 Network로 이동
+
+1. DevTools **Search** 탭에서 `45489` 검색
+2. `list_promotions` 줄 번호 **클릭** → Network 패널로 이동
+3. 그 요청 행 우클릭 → **Copy as cURL**
+
+### 방법 C — 콘솔로 JSON 뽑기 (Preview/Response가 막혔을 때)
+
+Studio 프로모션 탭에서 `F12` → **Console**에 아래 붙여넣기 → Enter → **F5 새로고침**:
+
+```javascript
+(function(){const o=fetch;fetch=async(...a)=>{const r=await o(...a);const u=String(a[0]||"");if(u.includes("list_promotions")){r.clone().text().then(t=>{window.__studioPromoJson=t;console.log("저장됨 → copy(__studioPromoJson)");});}return r;};console.log("훅 설치 — 새로고침하세요");})();
+```
+
+콘솔에 `copy(__studioPromoJson)` 입력 후, 보고 페이지 **Response가 안 보일 때 — JSON 붙여넣기** → **JSON 가져오기**.
+
 ## 1회 설정 (캡처)
 
 1. Chrome에서 [studio.youtube.com](https://studio.youtube.com) 로그인

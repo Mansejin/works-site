@@ -31,6 +31,8 @@
     snapshotsEditor: document.getElementById("snapshots-editor"),
     studioCurlEditor: document.getElementById("studio-curl-editor"),
     studioCaptureStatus: document.getElementById("studio-capture-status"),
+    studioResponseEditor: document.getElementById("studio-response-editor"),
+    studioImportStatus: document.getElementById("studio-import-status"),
   };
 
   let charts = {
@@ -1227,6 +1229,40 @@
         els.studioCaptureStatus.className = "status-pill error";
       }
       showError(err.message || "캡처 저장 실패");
+    }
+  });
+  document.getElementById("btn-studio-import")?.addEventListener("click", async () => {
+    try {
+      const raw = els.studioResponseEditor?.value?.trim() || "";
+      if (raw.length < 10) throw new Error("list_promotions 응답 JSON을 붙여넣으세요");
+      let payload;
+      try {
+        payload = JSON.parse(raw);
+      } catch {
+        throw new Error("JSON 형식이 아닙니다");
+      }
+      setStatus("Studio JSON 가져오는 중…");
+      const res = await fetch(`${API_BASE}/api/dddit/youtube/report/studio-promotions/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payload }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.ok === false) {
+        throw new Error(body.detail || body.message || `HTTP ${res.status}`);
+      }
+      if (els.studioImportStatus) {
+        els.studioImportStatus.textContent = body.message || "JSON 가져오기 완료";
+        els.studioImportStatus.className = "status-pill ok";
+      }
+      setStatus(body.message || "Studio JSON 가져오기 완료", "ok");
+      await loadReport(true);
+    } catch (err) {
+      if (els.studioImportStatus) {
+        els.studioImportStatus.textContent = err.message || "JSON 가져오기 실패";
+        els.studioImportStatus.className = "status-pill error";
+      }
+      showError(err.message || "JSON 가져오기 실패");
     }
   });
   document.getElementById("btn-copy-link")?.addEventListener("click", async () => {
