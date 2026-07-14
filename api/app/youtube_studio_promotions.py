@@ -664,6 +664,21 @@ def save_capture_from_curl(curl_text: str, *, also_store_cookies: bool = True) -
     channel_id = youtube_channel_id()
     parsed["channelId"] = channel_id
     url_warning = _capture_url_warning(str(parsed.get("url") or ""), parsed.get("body"))
+
+    if not cookies:
+        return {
+            "ok": False,
+            "capture": {k: parsed.get(k) for k in ("url", "method", "capturedAt", "channelId")},
+            "cookieCount": 0,
+            "cookiesConfigured": False,
+            "warning": url_warning,
+            "message": (
+                "cURL에서 로그인 쿠키를 찾지 못했습니다. "
+                "Studio에서 Copy as cURL (bash)로 다시 복사하세요. "
+                "(-b 'SID=...; SAPISID=...' 줄이 포함되어야 합니다)"
+            ),
+        }
+
     write_capture(parsed)
 
     cookie_note = None
@@ -671,9 +686,11 @@ def save_capture_from_curl(curl_text: str, *, also_store_cookies: bool = True) -
         # Persist cookies next to capture for NAS-local use (not committed).
         cookie_path = DATA_DIR / "studio-cookies.json"
         _write_json(cookie_path, {"cookies": cookies, "updatedAt": datetime.now(timezone.utc).isoformat()})
-        cookie_note = f"쿠키 {len(cookies)}개 로컬 저장 (data/youtube/studio-cookies.json)"
+        cookie_note = f"쿠키 {len(cookies)}개 로컬 저장"
 
-    message = "캡처 저장 완료" + (f" · {cookie_note}" if cookie_note else "")
+    message = f"캡처 저장 완료 · 쿠키 {len(cookies)}개"
+    if cookie_note:
+        message = f"{message} ({cookie_note})"
     if url_warning:
         message = f"{message} · 경고: {url_warning}"
 
@@ -681,6 +698,7 @@ def save_capture_from_curl(curl_text: str, *, also_store_cookies: bool = True) -
         "ok": True,
         "capture": {k: parsed.get(k) for k in ("url", "method", "capturedAt", "channelId")},
         "cookieCount": len(cookies),
+        "cookiesConfigured": cookies_configured(cookies),
         "warning": url_warning,
         "message": message,
     }
