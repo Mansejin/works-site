@@ -3001,7 +3001,7 @@ async function runProseDraft() {
   }
 
   beginJob();
-  setLoading(true, '대본 초안 작성 중…');
+  setLoading(true, '대본 초안 작성 중…', { model: state.modelPro });
   let prose = continueFromEdit ? existingProse : '';
   try {
     const chapters = state.chapters.length ? state.chapters : [{ title: '전체', notes: effective.contentDirection, titleCard: true }];
@@ -3027,7 +3027,7 @@ async function runProseDraft() {
 
     for (let i = from; i < chapters.length; i++) {
       throwIfCancelled();
-      setLoading(true, `대본 작성 중… (${i + 1}/${chapters.length}, 대화 ${SESSION.turnCount()}턴)`);
+      setLoading(true, `대본 작성 중… (${i + 1}/${chapters.length}, 대화 ${SESSION.turnCount()}턴)`, { model: state.modelPro });
       const prompt = PIPE.buildProsePrompt(ctxWithStyle, chapters[i], i, chapters.length, {
         includeContext: i === from && !SESSION.hasHistory(),
         hasSession: SESSION.turnCount() > 0,
