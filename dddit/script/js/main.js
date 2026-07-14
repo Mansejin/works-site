@@ -56,7 +56,9 @@
 - 성우 내레이션 **줄글(연속 텍스트)** 만 작성합니다.
 - 행 분할·글자 수·바이트·표·JSON·장면·사이즈·자막·코멘트 규칙은 **이 단계에서 적용하지 않습니다**.
 - 스펙·수치는 문장 속에 자연스럽게 녹이고, 나열형 낭독은 피합니다.
-- 브리프·기획안의 mustHighlight는 빠뜨리지 말고, carefulPoints는 솔직히 다룹니다.
+- 브리프·기획안의 mustHighlight는 빠뜨리지 마세요.
+- **광고 모드 ON**: 단점·한계·비추천 표현 지양. carefulPoints는 고지용만.
+- **광고 모드 OFF**: carefulPoints·단점을 솔직히 다룹니다.
 - 첫 챕터(프롤로그)에는 [오프닝] 고정 멘트를 포함합니다.
 - 마지막·총평 챕터 클로징: 요청 메시지의 역할 힌트와 아래 **[이 영상 클로징]** 만 사용. 단일/라운드업을 섞지 마세요.
 - 출력: 마크다운·JSON·표 없이 줄글 본문만`,
@@ -161,23 +163,38 @@ ${closingBlock}
     return buildBaseSystemRules(options);
   }
 
+  function buildAdModePin(adMode) {
+    if (adMode) {
+      return `# 광고·협찬 모드 (최우선)
+- **단점·한계·아쉬운 점·불편·부족·비추천** 등 비판적 표현을 쓰지 마세요.
+- brandAvoid/carefulPoints는 제품 단점이 아니라 **법적·필수 고지**(협찬 고지·보조금·시연 주의)로만 다루세요.
+- 총평·편의성 챕터에서도 단점 요약·한계 나열·솔직한 비추천을 넣지 마세요.
+- 허위 과장·「무조건 추천」은 금지. 체감 장점·사용 장면 중심으로 담백하게.`;
+    }
+    return `# 일반 리뷰 모드
+- 장점과 단점·주의점을 왜곡 없이 균형 있게 다룹니다.
+- carefulPoints는 솔직히 반영합니다.`;
+  }
+
   /**
    * API 호출용 — 기본 프롬프트 + 단계 규칙.
    * 커스텀 프롬프트를 쓰더라도 단계 규칙이 최우선으로 앞에 붙어 패러독스를 방지합니다.
    * @param {string} stage
-   * @param {{ format?: 'single'|'roundup'|'both' }} [options]
+   * @param {{ format?: 'single'|'roundup'|'both', adMode?: boolean }} [options]
    */
   function getSystemRulesForStage(stage, options = {}) {
     const format = options.format || 'both';
     const stageBlock = STAGE_RULES[stage];
     const base = getActiveSystemRules({ format });
-    // Custom saved prompts still get an explicit closing pin for prose.
-    let closingPin = '';
+    let pins = '';
     if (stage === 'prose' && format !== 'both') {
-      closingPin = `\n\n# 이 영상 클로징 (필수·최우선)\n${formatClosingBlock(format === 'roundup')}\n- 위 클로징만 사용. 다른 포맷 클로징 금지.\n`;
+      pins += `\n\n# 이 영상 클로징 (필수·최우선)\n${formatClosingBlock(format === 'roundup')}\n- 위 클로징만 사용. 다른 포맷 클로징 금지.\n`;
     }
-    if (!stageBlock) return `${closingPin}${base}`.trim();
-    return `${stageBlock}${closingPin}\n\n---\n\n${base}`;
+    if (stage === 'prose') {
+      pins += `\n\n${buildAdModePin(Boolean(options.adMode))}\n`;
+    }
+    if (!stageBlock) return `${pins}${base}`.trim();
+    return `${stageBlock}${pins}\n\n---\n\n${base}`;
   }
 
   function getActivePromptSource() {
@@ -776,22 +793,42 @@ ${blocks.join('\n\n')}`.trim();
     return lines.length ? lines.join('\n') : '(구조화 제원 없음)';
   }
 
-  function formatReviewBriefBlock(brief) {
+  function formatReviewBriefBlock(brief, options = {}) {
     const b = brief || {};
+    const adMode = Boolean(options.adMode);
+    const carefulLabel = adMode
+      ? '- 필수 고지·주의 (단점 서술 금지, 고지용만):'
+      : '- 단점·주의 (왜곡 없이):';
     const lines = [
       b.thesis && `- 한 줄 테제: ${b.thesis}`,
       b.targetScenario && `- 타깃 사용 시나리오: ${b.targetScenario}`,
       b.mustHighlight && `- 반드시 다룰 포인트: ${b.mustHighlight}`,
-      b.carefulPoints && `- 단점·주의 (왜곡 없이): ${b.carefulPoints}`,
+      b.carefulPoints && `${carefulLabel} ${b.carefulPoints}`,
       b.compareWith && `- 비교·경쟁 모델: ${b.compareWith}`,
     ].filter(Boolean);
     return lines.length ? lines.join('\n') : '(리뷰 방향 미입력)';
   }
 
+  function buildAdModeBlock(adMode) {
+    if (adMode) {
+      return `
+## 광고·협찬 모드 (최우선)
+- 이 콘텐츠는 유료광고·협찬입니다.
+- **단점·한계·아쉬운 점·불편·부족·비추천 표현을 하지 마세요.**
+- carefulPoints/브랜드 주의는 제품 비하가 아니라 **필수 고지**(협찬 고지·보조금·시연 주의 등)로만 다루세요.
+- 총평에서도 단점 요약·솔직한 비추천을 넣지 마세요.
+- 허위 과장·「무조건 사라」식 과잉 홍보는 금지. 체감 장점·사용 장면 중심으로 담백하게.`;
+    }
+    return `
+## 일반 리뷰 모드
+- 장점과 함께 단점·주의점도 왜곡 없이 균형 있게 다룹니다.`;
+  }
+
   function buildPromptContext(state, category, refBlock) {
     const cat = category || {};
+    const adMode = Boolean(state.adMode);
     const specsBlock = formatSpecsBlock(state.productSpecs, state.categoryId);
-    const briefBlock = formatReviewBriefBlock(state.reviewBrief);
+    const briefBlock = formatReviewBriefBlock(state.reviewBrief, { adMode });
     const extraNotes = String(state.productNotes || '').trim();
     const teamNotes = String(state.teamBriefNotes || '').trim();
     const teamBlock = teamNotes ? `\n## 팀 제공 자료 (최우선 반영)\n${teamNotes}` : '';
@@ -799,13 +836,16 @@ ${blocks.join('\n\n')}`.trim();
       state.briefSource === 'team'
         ? '\n- 브리프 출처: 팀 제공 (자동 서치 생략). 팀 자료·구조화 제원·리뷰 방향을 함께 반영.'
         : '';
+    const adBrand = String(state.adBrand || '').trim();
 
     return `
 # 제품 브리프
 제품명: ${state.productName}
 카테고리: ${cat.name || '기타'} — ${cat.focusHints || ''}
 콘텐츠 방향: ${state.contentDirection || '(미입력)'}
-가격·라인업: ${state.priceInfo || '(미입력)'}${sourceNote}
+가격·라인업: ${state.priceInfo || '(미입력)'}
+광고 모드: ${adMode ? 'ON' : 'OFF'}${adBrand ? `\n광고 브랜드: ${adBrand}` : ''}${sourceNote}
+${buildAdModeBlock(adMode)}
 ${teamBlock}
 
 ## 구조화 제원
@@ -822,6 +862,7 @@ ${briefBlock}${refBlock ? `\n${refBlock}` : ''}`.trim();
     emptyReviewBrief,
     formatSpecsBlock,
     formatReviewBriefBlock,
+    buildAdModeBlock,
     buildPromptContext,
   };
 })();
@@ -1150,6 +1191,7 @@ window.DIDIDIT_PIPELINE = (function () {
 
   function buildProsePrompt(ctx, chapter, chapterIndex, chapterTotal, options = {}) {
     const includeContext = options.includeContext !== false;
+    const adMode = Boolean(options.adMode);
     const title = chapter?.title || '전체';
     const notes = chapter?.notes || '';
     const roleHints = [];
@@ -1171,6 +1213,9 @@ window.DIDIDIT_PIPELINE = (function () {
           : '- 이 챕터 마지막에 [클로징 — 단일 제품]만 포함하세요. 「장단점과 평점을 정리해드리며」. 라운드업(어떠셨나요/정보 정리/감사합니다) 멘트 금지.',
       );
     }
+    if (adMode) {
+      roleHints.push('- **광고 모드**: 단점·한계·아쉬운 점·비추천 표현 금지. 필수 고지만 허용.');
+    }
     const roleBlock = roleHints.length ? `\n${roleHints.join('\n')}` : '';
     const roundupCategoryHint =
       isRoundup && window.DIDIDIT_CONFIG?.buildRoundupCategoryHint
@@ -1187,7 +1232,15 @@ window.DIDIDIT_PIPELINE = (function () {
         : '';
     const designChapter =
       /디자인|외관|첫인상/i.test(title) || /디자인|외관/i.test(notes)
-        ? `\n- 디자인 챕터: 형태·크기·재질·조작부 중심. 실사용 시나리오(빨래·퇴근 후 등) 반복 금지. 외관 vs 실용성 트레이드오프 한 줄.\n`
+        ? adMode
+          ? `\n- 디자인 챕터: 형태·크기·재질·조작부 중심의 긍정적 체감. 단점·트레이드오프 나열 금지.\n`
+          : `\n- 디자인 챕터: 형태·크기·재질·조작부 중심. 실사용 시나리오(빨래·퇴근 후 등) 반복 금지. 외관 vs 실용성 트레이드오프 한 줄.\n`
+        : '';
+    const limitChapter =
+      /한계|단점|주의/i.test(title) || /한계|단점/i.test(notes)
+        ? adMode
+          ? `\n- 제목에 한계·단점이 있어도 **광고 모드**에서는 사용 편의·관리 팁만 다루고 단점·한계 서술은 피하세요.\n`
+          : `\n- 편의와 함께 한계·아쉬운 점을 왜곡 없이 짧게 다룹니다.\n`
         : '';
     const prologueChapter =
       chapterIndex === 0 || isPrologueChapter(title)
@@ -1196,11 +1249,15 @@ window.DIDIDIT_PIPELINE = (function () {
     const priceChapter =
       (/^가격$|가성비/i.test(title.trim()) || /^가격$/i.test(notes.trim())) &&
       !/총평|마무리/i.test(title)
-        ? `\n- 가격 단독 챕터: 모델·채널별 가격, 라인업 비교, 구매 전 주의사항(정발·구성품·기능 제한). 가격이 핵심일 때 타사·다른 라인업 비교.\n`
+        ? adMode
+          ? `\n- 가격 챕터(광고 모드): 가격·구성 안내 중심. 비싸다는 불만·비추천 톤 금지.\n`
+          : `\n- 가격 단독 챕터: 모델·채널별 가격, 라인업 비교, 구매 전 주의사항(정발·구성품·기능 제한). 가격이 핵심일 때 타사·다른 라인업 비교.\n`
         : '';
     const closingChapter =
       /총평|마무리|정리/i.test(title) || chapterIndex === chapterTotal - 1
-        ? `\n- 총평: 가격 적정성 판단 + 추천 대상 + 앞 챕터 단점 요약. 가격 중점이 낮으면 가격을 총평에 엮음. 가격이 핵심이면 타사·라인업 비교·솔직한 비추천 포함. \`적극 추천\`·\`확신\` 금지.\n`
+        ? adMode
+          ? `\n- 총평(광고 모드): 잘 맞는 사용 장면·추천 대상·가격 안내 중심. **단점 요약·한계 나열·솔직한 비추천 금지.** \`적극 추천\`·\`확신\` 과잉도 금지.\n`
+          : `\n- 총평: 가격 적정성 판단 + 추천 대상 + 앞 챕터 단점 요약. 가격 중점이 낮으면 가격을 총평에 엮음. 가격이 핵심이면 타사·라인업 비교·솔직한 비추천 포함. \`적극 추천\`·\`확신\` 금지.\n`
         : '';
     const ctxBlock = includeContext && ctx ? `${ctx}\n\n` : '';
     const continuity =
@@ -1216,7 +1273,7 @@ window.DIDIDIT_PIPELINE = (function () {
 - 성우 내레이션 중심의 **자연스러운 줄글**만 작성합니다.
 - 표·행 분할·장면·자막·JSON은 넣지 않습니다.
 ${titleLine}
-${notes ? `- 챕터 메모: ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${specChapter}${designChapter}${priceChapter}${closingChapter}
+${notes ? `- 챕터 메모: ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${specChapter}${designChapter}${limitChapter}${priceChapter}${closingChapter}
 ${continuity}`;
   }
 
@@ -1422,6 +1479,8 @@ const state = {
   modelPro: 'gemini-3.1-pro-preview',
   /** 'single' | 'roundup' | 'both' — 줄글 단계에서 클로징 멘트 선택 */
   scriptFormat: 'both',
+  /** 광고·협찬 톤 (단점 표현 지양). 프로젝트별로 저장 */
+  adMode: true,
   productSpecs: {},
   priceInfo: '',
   categoryId: 'other',
@@ -1471,7 +1530,10 @@ function bindModules() {
 
 function getSystemRules(stage) {
   if (stage && PM.getSystemRulesForStage) {
-    return PM.getSystemRulesForStage(stage, { format: state.scriptFormat || 'both' });
+    return PM.getSystemRulesForStage(stage, {
+      format: state.scriptFormat || 'both',
+      adMode: Boolean(state.adMode),
+    });
   }
   return PM?.getActiveSystemRules?.() || '';
 }
@@ -1778,6 +1840,7 @@ function getEffectiveState() {
   const chapters = state.chapters.length ? state.chapters : (fromPlan.chapters || []);
   return {
     ...fromPlan,
+    adMode: Boolean(state.adMode),
     productSpecs: state.productSpecs,
     priceInfo: state.priceInfo,
     categoryId: state.categoryId,
@@ -1888,6 +1951,7 @@ function saveProject() {
     syncChaptersFromDOM();
     state.proseDraft = $('#prose-draft')?.value || state.proseDraft;
     localStorage.setItem(projectStorageKey(), JSON.stringify({
+      adMode: Boolean(state.adMode),
       productSpecs: state.productSpecs,
       priceInfo: state.priceInfo,
       categoryId: state.categoryId,
@@ -1900,6 +1964,11 @@ function saveProject() {
   } catch { /* quota */ }
 }
 
+function defaultAdModeForProject() {
+  // 브랜드 기획안이 있는 프로젝트는 광고 모드 기본 ON
+  return Boolean(loadPlanData());
+}
+
 function loadProject() {
   try {
     const saved = JSON.parse(localStorage.getItem(projectStorageKey()) || '{}');
@@ -1910,6 +1979,7 @@ function loadProject() {
     state.chapters = saved.chapters || [];
     state.proseDraft = saved.proseDraft || '';
     state.pipelineStep = saved.pipelineStep || 1;
+    state.adMode = typeof saved.adMode === 'boolean' ? saved.adMode : defaultAdModeForProject();
   } catch { /* ignore */ }
 }
 
@@ -1929,6 +1999,30 @@ function applyBriefToDOM() {
   renderSpecFields();
   renderChapters();
   renderReferenceList();
+  syncAdModeUI();
+}
+
+function syncAdModeUI() {
+  const on = Boolean(state.adMode);
+  const check = $('#ad-mode-check');
+  if (check) check.checked = on;
+  const btn = $('#ad-mode-toggle');
+  if (btn) {
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.classList.toggle('is-on', on);
+    btn.classList.toggle('is-off', !on);
+    btn.textContent = on ? '광고 ON' : '광고 OFF';
+  }
+}
+
+function setAdMode(on, options = {}) {
+  state.adMode = Boolean(on);
+  syncAdModeUI();
+  updateProjectChrome();
+  if (!options.silent) {
+    saveProject();
+    showToast(state.adMode ? '광고 모드 ON — 단점·한계 표현 지양' : '광고 모드 OFF — 솔직한 장단점');
+  }
 }
 
 function syncSupplementsFromDOM() {
@@ -2218,6 +2312,7 @@ async function runProseDraft() {
         hasSession: SESSION.turnCount() > 0,
         roundup: isRoundup,
         roundupDetectText: ctx,
+        adMode: Boolean(state.adMode),
       });
       let chunk = await callGeminiTextSession(prompt, 0.72, 'prose');
       const marker = chapterMarker(chapters[i]);
@@ -2409,7 +2504,6 @@ async function pullFromSheet() {
 }
 
 function updateProjectChrome() {
-  const effective = getEffectiveState();
   const project = getSheetSlug();
   const badge = $('#workspace-project-badge');
   if (badge) {
@@ -2421,7 +2515,7 @@ function updateProjectChrome() {
       badge.classList.add('hidden');
     }
   }
-  $('#ad-mode-badge')?.classList.toggle('hidden', !effective.adMode);
+  syncAdModeUI();
 }
 
 async function initSheetIntegration() {
@@ -2619,6 +2713,8 @@ function bindEvents() {
   $('#btn-sheet-pull')?.addEventListener('click', pullFromSheet);
   $('#btn-pipeline-next-brief')?.addEventListener('click', () => navigatePipeline(2));
   $('#btn-plan-load')?.addEventListener('click', loadSelectedPlanProject);
+  $('#ad-mode-check')?.addEventListener('change', (e) => setAdMode(e.target.checked));
+  $('#ad-mode-toggle')?.addEventListener('click', () => setAdMode(!state.adMode));
   $('#plan-project-select')?.addEventListener('change', () => {
     const slug = $('#plan-project-select')?.value || '';
     if (slug) switchToProject(slug);

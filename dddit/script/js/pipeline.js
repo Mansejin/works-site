@@ -322,6 +322,7 @@ window.DIDIDIT_PIPELINE = (function () {
 
   function buildProsePrompt(ctx, chapter, chapterIndex, chapterTotal, options = {}) {
     const includeContext = options.includeContext !== false;
+    const adMode = Boolean(options.adMode);
     const title = chapter?.title || '전체';
     const notes = chapter?.notes || '';
     const roleHints = [];
@@ -343,6 +344,9 @@ window.DIDIDIT_PIPELINE = (function () {
           : '- 이 챕터 마지막에 [클로징 — 단일 제품]만 포함하세요. 「장단점과 평점을 정리해드리며」. 라운드업(어떠셨나요/정보 정리/감사합니다) 멘트 금지.',
       );
     }
+    if (adMode) {
+      roleHints.push('- **광고 모드**: 단점·한계·아쉬운 점·비추천 표현 금지. 필수 고지만 허용.');
+    }
     const roleBlock = roleHints.length ? `\n${roleHints.join('\n')}` : '';
     const roundupCategoryHint =
       isRoundup && window.DIDIDIT_CONFIG?.buildRoundupCategoryHint
@@ -359,7 +363,15 @@ window.DIDIDIT_PIPELINE = (function () {
         : '';
     const designChapter =
       /디자인|외관|첫인상/i.test(title) || /디자인|외관/i.test(notes)
-        ? `\n- 디자인 챕터: 형태·크기·재질·조작부 중심. 실사용 시나리오(빨래·퇴근 후 등) 반복 금지. 외관 vs 실용성 트레이드오프 한 줄.\n`
+        ? adMode
+          ? `\n- 디자인 챕터: 형태·크기·재질·조작부 중심의 긍정적 체감. 단점·트레이드오프 나열 금지.\n`
+          : `\n- 디자인 챕터: 형태·크기·재질·조작부 중심. 실사용 시나리오(빨래·퇴근 후 등) 반복 금지. 외관 vs 실용성 트레이드오프 한 줄.\n`
+        : '';
+    const limitChapter =
+      /한계|단점|주의/i.test(title) || /한계|단점/i.test(notes)
+        ? adMode
+          ? `\n- 제목에 한계·단점이 있어도 **광고 모드**에서는 사용 편의·관리 팁만 다루고 단점·한계 서술은 피하세요.\n`
+          : `\n- 편의와 함께 한계·아쉬운 점을 왜곡 없이 짧게 다룹니다.\n`
         : '';
     const prologueChapter =
       chapterIndex === 0 || isPrologueChapter(title)
@@ -368,11 +380,15 @@ window.DIDIDIT_PIPELINE = (function () {
     const priceChapter =
       (/^가격$|가성비/i.test(title.trim()) || /^가격$/i.test(notes.trim())) &&
       !/총평|마무리/i.test(title)
-        ? `\n- 가격 단독 챕터: 모델·채널별 가격, 라인업 비교, 구매 전 주의사항(정발·구성품·기능 제한). 가격이 핵심일 때 타사·다른 라인업 비교.\n`
+        ? adMode
+          ? `\n- 가격 챕터(광고 모드): 가격·구성 안내 중심. 비싸다는 불만·비추천 톤 금지.\n`
+          : `\n- 가격 단독 챕터: 모델·채널별 가격, 라인업 비교, 구매 전 주의사항(정발·구성품·기능 제한). 가격이 핵심일 때 타사·다른 라인업 비교.\n`
         : '';
     const closingChapter =
       /총평|마무리|정리/i.test(title) || chapterIndex === chapterTotal - 1
-        ? `\n- 총평: 가격 적정성 판단 + 추천 대상 + 앞 챕터 단점 요약. 가격 중점이 낮으면 가격을 총평에 엮음. 가격이 핵심이면 타사·라인업 비교·솔직한 비추천 포함. \`적극 추천\`·\`확신\` 금지.\n`
+        ? adMode
+          ? `\n- 총평(광고 모드): 잘 맞는 사용 장면·추천 대상·가격 안내 중심. **단점 요약·한계 나열·솔직한 비추천 금지.** \`적극 추천\`·\`확신\` 과잉도 금지.\n`
+          : `\n- 총평: 가격 적정성 판단 + 추천 대상 + 앞 챕터 단점 요약. 가격 중점이 낮으면 가격을 총평에 엮음. 가격이 핵심이면 타사·라인업 비교·솔직한 비추천 포함. \`적극 추천\`·\`확신\` 금지.\n`
         : '';
     const ctxBlock = includeContext && ctx ? `${ctx}\n\n` : '';
     const continuity =
@@ -388,7 +404,7 @@ window.DIDIDIT_PIPELINE = (function () {
 - 성우 내레이션 중심의 **자연스러운 줄글**만 작성합니다.
 - 표·행 분할·장면·자막·JSON은 넣지 않습니다.
 ${titleLine}
-${notes ? `- 챕터 메모: ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${specChapter}${designChapter}${priceChapter}${closingChapter}
+${notes ? `- 챕터 메모: ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${specChapter}${designChapter}${limitChapter}${priceChapter}${closingChapter}
 ${continuity}`;
   }
 
