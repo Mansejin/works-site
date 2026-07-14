@@ -14,7 +14,7 @@ const CONTI_DIR = process.env.CONTI_DATA_DIR || path.join(__dirname, "..", "data
 const YJS_DIR = path.join(CONTI_DIR, ".yjs");
 const PERSIST_DEBOUNCE_MS = Number(process.env.CONTI_PERSIST_DEBOUNCE_MS || 2000);
 
-const HEADERS = ["대본", "장면", "사이즈", "자막", "코멘트"];
+const HEADERS = ["대본", "장면", "자막", "코멘트"];
 const ROOM_PREFIX = "conti-";
 
 const persistTimers = new Map();

@@ -8,7 +8,7 @@ from typing import Any
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 CONTI_DIR = DATA_DIR / "conti"
 
-HEADERS = ("대본", "장면", "사이즈", "자막", "코멘트")
+HEADERS = ("대본", "장면", "자막", "코멘트")
 PROJECT_RE = re.compile(r"^[a-z0-9-]+$")
 
 

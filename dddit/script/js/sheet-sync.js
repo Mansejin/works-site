@@ -3,7 +3,7 @@
  * 브랜드(프로젝트)마다 스프레드시트 1개 · works.mansejin.com 은 NAS works-api 경유
  */
 window.DdditSheetSync = (function () {
-  const HEADERS = ['대본', '장면', '사이즈', '자막', '코멘트'];
+  const HEADERS = ['대본', '장면', '자막', '코멘트'];
 
   const PROJECT_LABELS = {
     xenics: 'Xenics',
@@ -143,7 +143,6 @@ window.DdditSheetSync = (function () {
     return (allRows || []).map((r) => ({
       대본: r.대본 || '',
       장면: r.장면 || '',
-      사이즈: r.사이즈 || '',
       자막: r.자막 || '',
       코멘트: r.코멘트 || '',
     }));
