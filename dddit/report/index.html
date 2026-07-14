@@ -264,8 +264,15 @@
       font-weight: 700;
       background: #fef3c7;
       color: #92400e;
+      white-space: nowrap;
+      vertical-align: middle;
+      margin-left: 6px;
     }
     .badge.done { background: #dcfce7; color: #166534; }
+    .badge.active { background: #dbeafe; color: #1d4ed8; }
+    .promo-name-cell strong {
+      vertical-align: middle;
+    }
 
     .video-grid {
       display: grid;
@@ -552,40 +559,8 @@
           </div>
           <div class="card-body promo-table-wrap">
             <p class="video-note" style="margin:0 0 10px;">
-              <strong>자동:</strong> 「동기화 코드 복사」→ Studio 프로모션 탭에서 F12 → Console → 붙여넣기 → Enter<br />
-              <strong>수동:</strong> 아래 숫자만 입력 후 저장 · 이름이 깨졌으면 「깨진 동기화 정리」
+              「동기화 코드 복사」→ Studio 프로모션 탭 → F12 Console에 붙여넣기 · 이름이 깨졌으면 「깨진 동기화 정리」
             </p>
-            <div class="promo-quick-form">
-              <label>캠페인
-                <input id="promo-form-title" list="promo-title-list" placeholder="레노버 아이디어 탭 11" />
-                <datalist id="promo-title-list"></datalist>
-              </label>
-              <div class="promo-quick-fields">
-                <label>비용
-                  <input id="promo-form-cost" type="number" inputmode="numeric" placeholder="44435" />
-                </label>
-                <label>노출
-                  <input id="promo-form-impressions" type="number" inputmode="numeric" placeholder="23905" />
-                </label>
-                <label>조회
-                  <input id="promo-form-views" type="number" inputmode="numeric" placeholder="298" />
-                </label>
-                <label>구독
-                  <input id="promo-form-subscribers" type="number" inputmode="numeric" placeholder="125" />
-                </label>
-                <label>상태
-                  <select id="promo-form-status">
-                    <option>진행중</option>
-                    <option>일시중지</option>
-                    <option>완료</option>
-                  </select>
-                </label>
-              </div>
-              <div class="promo-quick-actions">
-                <button id="btn-promo-quick-save" class="btn" type="button">숫자 저장</button>
-                <span id="promo-form-status-msg" class="video-note" style="margin:0;"></span>
-              </div>
-            </div>
             <table>
               <thead>
                 <tr>
@@ -641,6 +616,6 @@
     <div id="loading" class="card loading-block">보고 데이터를 불러오는 중…</div>
   </div>
 
-  <script src="js/report.js?v=31"></script>
+  <script src="js/report.js?v=32"></script>
 </body>
 </html>
