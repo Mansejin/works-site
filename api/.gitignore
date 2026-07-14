@@ -2,6 +2,8 @@ data/*
 !data/.gitkeep
 !data/youtube/
 !data/youtube/*.json
+data/youtube/studio-cookies.json
+data/youtube/studio-promo-capture.json
 __pycache__/
 *.pyc
 conti-collab/node_modules/
