@@ -955,16 +955,33 @@
     els.adsSyncStatus.title = adsSync.message || "Ads 동기화 버튼을 눌러 연동하세요";
   }
 
+  function sortPromotionsForDisplay(promotions) {
+    const rank = (status) => {
+      if (status === "진행중") return 0;
+      if (status === "일시중지") return 1;
+      return 2;
+    };
+    return [...(promotions || [])].sort((a, b) => {
+      const byStatus = rank(a.status) - rank(b.status);
+      if (byStatus) return byStatus;
+      return (Number(b.cost) || 0) - (Number(a.cost) || 0);
+    });
+  }
+
   function renderPromotions(promotions) {
     if (!promotions?.length) {
       els.promoBody.innerHTML = `<tr><td colspan="8">등록된 프로모션이 없습니다. 아래 JSON 편집으로 추가하세요.</td></tr>`;
       return;
     }
-    els.promoBody.innerHTML = promotions
-      .map((p) => {
-        const m = p.metrics || {};
-        const effClass = m.cpv && m.cpv <= 30 ? "metric-good" : m.cps && m.cps <= 400 ? "metric-good" : "";
-        return `
+    const sorted = sortPromotionsForDisplay(promotions);
+    const visible = sorted.slice(0, 5);
+    const hidden = Math.max(0, sorted.length - visible.length);
+    els.promoBody.innerHTML =
+      visible
+        .map((p) => {
+          const m = p.metrics || {};
+          const effClass = m.cpv && m.cpv <= 30 ? "metric-good" : m.cps && m.cps <= 400 ? "metric-good" : "";
+          return `
         <tr>
           <td>
             <strong>${esc(p.title)}</strong>${sourceBadge(p.source)}
@@ -978,8 +995,11 @@
           <td>${m.cps != null ? `${formatNum(m.cps)}원` : "—"}</td>
           <td class="${effClass}">${esc(m.efficiencyText || "—")}</td>
         </tr>`;
-      })
-      .join("");
+        })
+        .join("") +
+      (hidden
+        ? `<tr><td colspan="8" class="video-note">진행중 우선 · 상위 5개 표시 · 나머지 ${hidden}개는 JSON 편집에서 확인</td></tr>`
+        : "");
   }
 
   function renderVideos(videos) {
@@ -987,7 +1007,8 @@
       els.videoGrid.innerHTML = `<p class="video-note">영상 데이터가 없습니다. YOUTUBE_API_KEY를 확인하세요.</p>`;
       return;
     }
-    els.videoGrid.innerHTML = videos
+    const list = (videos || []).slice(0, 4);
+    els.videoGrid.innerHTML = list
       .map((v) => {
         const date = v.publishedAt ? new Date(v.publishedAt).toLocaleDateString("ko-KR") : "—";
         return `

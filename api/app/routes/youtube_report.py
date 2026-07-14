@@ -315,7 +315,7 @@ def _build_recent_videos_bar(
     videos: list[dict[str, Any]],
     promotions: list[dict[str, Any]],
     *,
-    limit: int = 6,
+    limit: int = 4,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for video in videos[:limit]:
@@ -385,11 +385,11 @@ def _build_subscriber_trend(
 def _overview_insights(videos: list[dict[str, Any]], issues: list[str]) -> list[str]:
     insights = list(issues)
     if videos:
-        recent = videos[:6]
+        recent = videos[:4]
         avg_views = sum(v.get("views", 0) for v in recent) / len(recent)
         top = max(recent, key=lambda v: v.get("views", 0))
         if avg_views < 2000:
-            insights.append(f"최근 6개 영상 평균 조회 {int(avg_views):,}회 — 프로모션·썸네일·제목 A/B 검토 권장")
+            insights.append(f"최근 4개 영상 평균 조회 {int(avg_views):,}회 — 프로모션·썸네일·제목 A/B 검토 권장")
         insights.append(f"최근 최고 조회: 「{top.get('title', '')[:24]}…」 {top.get('viewsText', '')}")
     return insights
 
