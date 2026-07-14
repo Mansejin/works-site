@@ -1718,6 +1718,9 @@ function chaptersNeedQc(chapters) {
   if (!Array.isArray(chapters) || !chapters.length) return true;
   if (!QC) return false;
   if (QC.missingClosingChapter?.(chapters)) return true;
+  // 기획안 구성보다 챕터가 적으면(저장본이 잘린 경우) 재적용
+  const proposed = chaptersFromPlanStructure(loadPlanData()?.structure);
+  if (proposed.length && chapters.length < proposed.length) return true;
   return chapters.some((ch) => {
     const title = String(ch?.title || '');
     if (QC.looksTooLong?.(title)) return true;
@@ -1988,6 +1991,47 @@ function setLoading(on, text) {
   if (text) $('#loading-text').textContent = text;
 }
 
+function isTransientGeminiError(err) {
+  const status = Number(err?.apiStatus || err?.status || 0);
+  if (status === 429 || status === 503) return true;
+  const msg = String(err?.message || err || '');
+  return /high demand|try again later|resource.?exhausted|unavailable|overloaded|quota|rate.?limit|\b429\b|\b503\b/i.test(
+    msg,
+  );
+}
+
+function friendlyGeminiError(err) {
+  if (isTransientGeminiError(err)) {
+    return '모델 사용량이 많아 잠시 지연됩니다. 잠시 후 다시 시도해 주세요.';
+  }
+  return String(err?.message || err || 'API 오류');
+}
+
+function sleepMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** 과부하·429 시 지수 백오프 재시도 */
+async function withGeminiRetry(fn, { retries = 3, label = 'API' } = {}) {
+  let last;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      if (!isTransientGeminiError(e) || attempt === retries) break;
+      const wait = Math.min(28000, 1800 * 2 ** attempt);
+      const sec = Math.max(1, Math.round(wait / 1000));
+      showToast(`${label} 과부하 · ${sec}초 후 재시도 (${attempt + 1}/${retries})`, true);
+      await sleepMs(wait);
+    }
+  }
+  const out = new Error(friendlyGeminiError(last));
+  out.apiStatus = last?.apiStatus;
+  out.cause = last;
+  throw out;
+}
+
 async function callGeminiTextSession(userPrompt, temperature = 0.75, stage = 'prose') {
   SESSION.push('user', userPrompt);
   const model = state.modelPro;
@@ -2000,7 +2044,10 @@ async function callGeminiTextSession(userPrompt, temperature = 0.75, stage = 'pr
       maxOutputTokens: stage === 'prose' ? 8192 : 4096,
     },
   };
-  const text = await postGeminiAndExtractText(model, body);
+  const text = await withGeminiRetry(() => postGeminiAndExtractText(model, body), {
+    retries: 3,
+    label: '줄글',
+  });
   SESSION.push('model', text);
   return text;
 }
@@ -2012,7 +2059,12 @@ async function postGeminiAndExtractText(model, body) {
   } else {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error?.message || `API ${res.status}`);
+    if (!res.ok) {
+      const msg = (await res.json().catch(() => ({})))?.error?.message || `API ${res.status}`;
+      const e = new Error(msg);
+      e.apiStatus = res.status;
+      throw e;
+    }
     data = await res.json();
   }
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -2033,18 +2085,26 @@ async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') 
       responseSchema: PIPE.ROWS_SCHEMA,
     },
   };
-  let data;
-  if (window.DdditWorksApi?.isBackendMode?.()) {
-    data = await window.DdditWorksApi.postGemini(model, body, state.apiKey);
-  } else {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error?.message || `API ${res.status}`);
-    data = await res.json();
-  }
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('JSON 응답이 비어 있습니다.');
-  return PIPE.parseRowsJson(text);
+  const rows = await withGeminiRetry(async () => {
+    let data;
+    if (window.DdditWorksApi?.isBackendMode?.()) {
+      data = await window.DdditWorksApi.postGemini(model, body, state.apiKey);
+    } else {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) {
+        const msg = (await res.json().catch(() => ({})))?.error?.message || `API ${res.status}`;
+        const e = new Error(msg);
+        e.apiStatus = res.status;
+        throw e;
+      }
+      data = await res.json();
+    }
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('JSON 응답이 비어 있습니다.');
+    return PIPE.parseRowsJson(text);
+  }, { retries: 3, label: stage === 'convert' ? '변환' : stage === 'scene' ? '장면' : '자막' });
+  return rows;
 }
 
 function saveSettings() {
@@ -2882,10 +2942,11 @@ function openSheetUrl() {
 }
 
 async function initPromptOnBoot() {
+  const src = String(PM.getActivePromptSource?.() || '');
   if (!PM.loadPromptState()?.text) await PM.loadDefaultPromptFile();
-  else if (String(PM.getActivePromptSource?.() || '').includes('v1.0.0')) {
+  else if (/v1\.0\.0|v1\.1\.0/.test(src)) {
     await PM.loadDefaultPromptFile();
-    showToast('프롬프트 v1.1.0으로 갱신했습니다. (단계별 규칙 분리)');
+    showToast('프롬프트 v1.1.1로 갱신했습니다. (기획안 우선·챕터 중복 금지)');
   }
   $('#prompt-editor').value = PM.getActiveSystemRules();
   $('#active-prompt-label').textContent = PM.getActivePromptSource?.() || '';
@@ -2901,6 +2962,10 @@ async function boot() {
     loadState();
     loadProject();
     ensureClosingChapterInState();
+    // 기획안 대비 챕터가 부족·긴 제목이면 구성 기준으로 맞춤 (2단계 진입 시에도)
+    if (loadPlanData()?.structure && chaptersNeedQc(state.chapters)) {
+      applyChaptersFromPlan({ force: true });
+    }
     syncModelSelect();
     renderCategoryOptions();
     applyBriefToDOM();
