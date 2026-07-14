@@ -144,7 +144,28 @@ window.DdditChapterTitleQc = (function () {
       }
       merged.push({ ...ch });
     }
-    return merged.map((ch, i) => ({ ...ch, id: `ch-plan-${i}` }));
+    return ensureClosingChapter(merged.map((ch, i) => ({ ...ch, id: `ch-plan-${i}` })));
+  }
+
+  /** 구성에 총평·마무리·클로징이 없으면 마지막에 총평 챕터를 붙입니다. */
+  function ensureClosingChapter(chapters) {
+    const list = Array.isArray(chapters) ? chapters.slice() : [];
+    if (!list.length) return list;
+    const hasClosing = list.some((ch) => isClosingTitle(ch?.title) || /가격\s*및\s*총평/i.test(ch?.title || ''));
+    if (hasClosing) return list.map((ch, i) => ({ ...ch, id: ch.id || `ch-plan-${i}` }));
+    list.push({
+      id: `ch-plan-${list.length}`,
+      title: '총평',
+      notes: '가격 적정성·추천 대상·단점 요약',
+      titleCard: true,
+      sourceTitle: '(자동 추가 · 총평)',
+    });
+    return list;
+  }
+
+  function missingClosingChapter(chapters) {
+    if (!Array.isArray(chapters) || !chapters.length) return true;
+    return !chapters.some((ch) => isClosingTitle(ch?.title) || /가격\s*및\s*총평/i.test(ch?.title || ''));
   }
 
   /** YouTube 더보기 설명란 타임라인 파서 */
@@ -212,6 +233,8 @@ window.DdditChapterTitleQc = (function () {
     looksTooLong,
     normalizeChapterSegment,
     parseStructureToChapters,
+    ensureClosingChapter,
+    missingClosingChapter,
     parseDescriptionChapters,
     timestampToSeconds,
     qcIssues,

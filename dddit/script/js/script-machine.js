@@ -15,6 +15,8 @@ let SESSION = null;
 const state = {
   apiKey: '',
   modelPro: 'gemini-3.1-pro-preview',
+  /** 'single' | 'roundup' | 'both' — 줄글 단계에서 클로징 멘트 선택 */
+  scriptFormat: 'both',
   productSpecs: {},
   priceInfo: '',
   categoryId: 'other',
@@ -63,8 +65,10 @@ function bindModules() {
 }
 
 function getSystemRules(stage) {
-  if (stage && PM.getSystemRulesForStage) return PM.getSystemRulesForStage(stage);
-  return PM.getActiveSystemRules();
+  if (stage && PM.getSystemRulesForStage) {
+    return PM.getSystemRulesForStage(stage, { format: state.scriptFormat || 'both' });
+  }
+  return PM?.getActiveSystemRules?.() || '';
 }
 
 function getCategories() {
@@ -199,6 +203,7 @@ function chaptersNeedQc(chapters) {
   const QC = window.DdditChapterTitleQc;
   if (!Array.isArray(chapters) || !chapters.length) return true;
   if (!QC) return false;
+  if (QC.missingClosingChapter?.(chapters)) return true;
   return chapters.some((ch) => {
     const title = String(ch?.title || '');
     if (QC.looksTooLong?.(title)) return true;
@@ -206,6 +211,17 @@ function chaptersNeedQc(chapters) {
     if (ch.sourceTitle && ch.sourceTitle === title && /[（(]/.test(title)) return true;
     return false;
   });
+}
+
+/** 저장된 챕터에 총평이 없으면 붙입니다 (기획안 미반영·옛 로컬 데이터 대비). */
+function ensureClosingChapterInState() {
+  const QC = window.DdditChapterTitleQc;
+  if (!QC?.ensureClosingChapter || !state.chapters.length) return false;
+  if (!QC.missingClosingChapter?.(state.chapters)) return false;
+  state.chapters = QC.ensureClosingChapter(state.chapters);
+  renderChapters();
+  saveProject();
+  return true;
 }
 
 function chaptersFromPlanStructure(structure) {
@@ -431,7 +447,9 @@ async function postGeminiAndExtractText(model, body) {
 }
 
 async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') {
-  const model = state.modelPro;
+  const cfg = window.DIDIDIT_CONFIG || {};
+  // Convert / scene / caption: Flash for speed. Pro stays for prose draft only.
+  const model = cfg.FAST_GEMINI_MODEL || 'gemini-3.5-flash';
   const body = {
     systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
@@ -740,10 +758,15 @@ async function runProseDraft() {
   if (!hasPlanTitle()) return showToast('기획안에 제목을 입력하세요.', true);
   syncSupplementsFromDOM();
   syncChaptersFromDOM();
+  ensureClosingChapterInState();
   const effective = getEffectiveState();
   const ctx = buildProductContext();
   const styleAnchor = await PM.getStyleAnchorBlock?.();
-  const isRoundup = PM.isRoundupFormat ? PM.isRoundupFormat(ctx) : window.DIDIDIT_CONFIG?.isRoundupFormat?.(ctx);
+  // Detect only from product brief — never from style-anchor (contains "라운드업" docs).
+  const isRoundup = Boolean(
+    PM.isRoundupFormat ? PM.isRoundupFormat(ctx) : window.DIDIDIT_CONFIG?.isRoundupFormat?.(ctx),
+  );
+  state.scriptFormat = isRoundup ? 'roundup' : 'single';
   const formatAnchor = isRoundup ? await PM.getFormatAnchorBlock?.() : '';
   const ctxWithStyle = [ctx, styleAnchor, formatAnchor].filter(Boolean).join('\n\n');
   const existingProse = ($('#prose-draft')?.value || state.proseDraft || '').trim();
@@ -788,6 +811,8 @@ async function runProseDraft() {
       const prompt = PIPE.buildProsePrompt(ctxWithStyle, chapters[i], i, chapters.length, {
         includeContext: i === from && !SESSION.hasHistory(),
         hasSession: SESSION.turnCount() > 0,
+        roundup: isRoundup,
+        roundupDetectText: ctx,
       });
       let chunk = await callGeminiTextSession(prompt, 0.72, 'prose');
       const marker = chapterMarker(chapters[i]);
@@ -828,19 +853,22 @@ async function runConvertToSheet() {
       setLoading(true, `변환 중… (${i + 1}/${chunks.length})`);
       let part = [];
       let retryHint = '';
-      for (let attempt = 0; attempt < 3; attempt++) {
+      // At most 2 API attempts; heal locally instead of soft-issue retries.
+      for (let attempt = 0; attempt < 2; attempt++) {
         part = await callGeminiJson(
           PIPE.buildConvertPrompt(ctx, chunks[i], retryHint),
-          attempt > 0 ? 0.25 : 0.35,
+          attempt > 0 ? 0.2 : 0.3,
           'convert',
         );
-        const issues = PIPE.validateScriptRows(part);
-        if (!issues.length) break;
-        retryHint = PIPE.buildConvertRetryHint(issues);
-        if (attempt === 2) {
-          reportError('runConvertToSheet.validate', new Error(issues.join('; ')), { chunk: i + 1 }, { silent: true });
+        part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
+        const hard = PIPE.validateHardIssues(part);
+        if (!hard.length) break;
+        retryHint = PIPE.buildConvertRetryHint(hard);
+        if (attempt === 1) {
+          reportError('runConvertToSheet.validate', new Error(hard.join('; ')), { chunk: i + 1 }, { silent: true });
         }
       }
+      part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
       rows = rows.concat(part);
     }
     state.allRows = PIPE.normalizeRows(rows);
@@ -1237,6 +1265,7 @@ async function boot() {
     LOG?.updateBadge?.();
     loadState();
     loadProject();
+    ensureClosingChapterInState();
     syncModelSelect();
     renderCategoryOptions();
     applyBriefToDOM();

@@ -98,6 +98,8 @@ const GEMINI_MODELS = [
 ];
 
 const PRO_GEMINI_MODEL = 'gemini-3.1-pro-preview';
+/** Fast path for convert / scene / caption stages */
+const FAST_GEMINI_MODEL = 'gemini-3.5-flash';
 
 function isSupportedGeminiModel(id) {
   return GEMINI_MODELS.some((m) => m.id === id);
@@ -108,6 +110,7 @@ window.DIDIDIT_CONFIG = {
   ROUNDUP_CATEGORIES,
   GEMINI_MODELS,
   PRO_GEMINI_MODEL,
+  FAST_GEMINI_MODEL,
   isSupportedGeminiModel,
   isRoundupFormat,
   hasRoundupQuantity,

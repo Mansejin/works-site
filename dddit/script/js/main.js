@@ -58,13 +58,15 @@
 - 스펙·수치는 문장 속에 자연스럽게 녹이고, 나열형 낭독은 피합니다.
 - 브리프·기획안의 mustHighlight는 빠뜨리지 말고, carefulPoints는 솔직히 다룹니다.
 - 첫 챕터(프롤로그)에는 [오프닝] 고정 멘트를 포함합니다.
-- 마지막 챕터: **단일 제품**은 [클로징—단일], **N개 아이템 라운드업**은 [클로징—라운드업] 고정 멘트.
+- 마지막·총평 챕터 클로징: 요청 메시지의 역할 힌트와 아래 **[이 영상 클로징]** 만 사용. 단일/라운드업을 섞지 마세요.
 - 출력: 마크다운·JSON·표 없이 줄글 본문만`,
 
     convert: `# 현재 작업 단계: 줄글 → 대본 열 변환 (최우선)
 - 줄글을 JSON \`rows\` 배열로 변환합니다. **대본 열만** 채우고 장면·사이즈·자막·코멘트는 빈 문자열.
-- 1행 = 성우 한 호흡. 행당 공백 포함 **25~45자** (50자 초과 금지).
-- 마침표마다 무조건 분리 X. 호흡이 바뀔 때 새 행. 15자 내외 초단문 연속 나열 금지.
+- 1행 = 성우가 **한 호흡에 말하기 좋은 단위** (문장 단위 ≠ 기계적 마침표 분할).
+- 행당 공백 포함 목표 **20~40자**, 권장 상한 **48자**. 그 이상이면 자막이 길어지므로 호흡 쉼에서 나눕니다.
+- 긴 문장은 연결 어미·쉼표(고/서/는데/지만/,)에서 나누고, **조사만 남은 미완성**(은/는/이/가/을/를…)으로 끊지 마세요.
+- 15자 미만 초단문만 연속 나열 금지. 의미 없이 한 호흡을 억지로 합치지 마세요.
 - 대본에 제품을 '이 녀석'이라 지칭하지 말 것.
 - 출력: 유효한 JSON만. {"rows":[{"대본":"...","장면":"","사이즈":"","자막":"","코멘트":""}]}`,
 
@@ -83,7 +85,25 @@
 - 출력: JSON rows 전체`,
   };
 
-  function buildBaseSystemRules() {
+  function buildBaseSystemRules(options = {}) {
+    const format = options.format || 'both';
+    let closingBlock = '';
+    if (format === 'single') {
+      closingBlock = `${formatClosingBlock(false)}
+- 이 영상은 **단일 제품** 리뷰입니다. 위 단일 클로징만 사용하세요.
+- 라운드업 멘트(「어떠셨나요?」「정보를 정리」「감사합니다!」)는 넣지 마세요.`;
+    } else if (format === 'roundup') {
+      closingBlock = `${formatClosingBlock(true)}
+- 이 영상은 **N개 아이템 라운드업**입니다. 위 라운드업 클로징만 사용하세요.
+- 단일 제품 멘트(「장단점과 평점을 정리」)는 넣지 마세요.`;
+    } else {
+      closingBlock = `[클로징 — 단일 제품 · 총평·마지막 챕터]
+${MANDATORY_CLOSING.map((l) => `- ${l}`).join('\n')}
+
+[클로징 — N개 아이템 라운드업 · 마지막]
+${MANDATORY_CLOSING_ROUNDUP.map((l) => `- ${l}`).join('\n')}`;
+    }
+
     return `# 디디딧 시스템 프롬프트 (기본)
 
 ## 역할·톤
@@ -111,11 +131,7 @@ Tone & Manner: 솔직 담백, 과장 없는 팩트, 실생활 밀착형 공감 �
 [오프닝 — 프롤로그·첫 챕터에만]
 ${MANDATORY_OPENING.map((l) => `- ${l}`).join('\n')}
 
-[클로징 — 단일 제품 · 총평·마지막 챕터]
-${MANDATORY_CLOSING.map((l) => `- ${l}`).join('\n')}
-
-[클로징 — N개 아이템 라운드업 · 마지막]
-${MANDATORY_CLOSING_ROUNDUP.map((l) => `- ${l}`).join('\n')}
+${closingBlock}
 
 ## 파이프라인 안내
 줄글 → 대본 분할 → 장면·사이즈 → 자막·코멘트 순으로 작성합니다.
@@ -124,7 +140,7 @@ ${MANDATORY_CLOSING_ROUNDUP.map((l) => `- ${l}`).join('\n')}
 
   /** 하위 호환: 편집기·내장값 표시용 */
   function buildDefaultSystemRules() {
-    return buildBaseSystemRules();
+    return buildBaseSystemRules({ format: 'both' });
   }
 
   function loadPromptState() {
@@ -139,20 +155,29 @@ ${MANDATORY_CLOSING_ROUNDUP.map((l) => `- ${l}`).join('\n')}
     localStorage.setItem(PROMPT_STORAGE_KEY, JSON.stringify(data));
   }
 
-  function getActiveSystemRules() {
+  function getActiveSystemRules(options = {}) {
     const saved = loadPromptState();
     if (saved.text) return saved.text;
-    return buildBaseSystemRules();
+    return buildBaseSystemRules(options);
   }
 
   /**
    * API 호출용 — 기본 프롬프트 + 단계 규칙.
    * 커스텀 프롬프트를 쓰더라도 단계 규칙이 최우선으로 앞에 붙어 패러독스를 방지합니다.
+   * @param {string} stage
+   * @param {{ format?: 'single'|'roundup'|'both' }} [options]
    */
-  function getSystemRulesForStage(stage) {
+  function getSystemRulesForStage(stage, options = {}) {
+    const format = options.format || 'both';
     const stageBlock = STAGE_RULES[stage];
-    if (!stageBlock) return getActiveSystemRules();
-    return `${stageBlock}\n\n---\n\n${getActiveSystemRules()}`;
+    const base = getActiveSystemRules({ format });
+    // Custom saved prompts still get an explicit closing pin for prose.
+    let closingPin = '';
+    if (stage === 'prose' && format !== 'both') {
+      closingPin = `\n\n# 이 영상 클로징 (필수·최우선)\n${formatClosingBlock(format === 'roundup')}\n- 위 클로징만 사용. 다른 포맷 클로징 금지.\n`;
+    }
+    if (!stageBlock) return `${closingPin}${base}`.trim();
+    return `${stageBlock}${closingPin}\n\n---\n\n${base}`;
   }
 
   function getActivePromptSource() {
@@ -365,6 +390,8 @@ const GEMINI_MODELS = [
 ];
 
 const PRO_GEMINI_MODEL = 'gemini-3.1-pro-preview';
+/** Fast path for convert / scene / caption stages */
+const FAST_GEMINI_MODEL = 'gemini-3.5-flash';
 
 function isSupportedGeminiModel(id) {
   return GEMINI_MODELS.some((m) => m.id === id);
@@ -375,6 +402,7 @@ window.DIDIDIT_CONFIG = {
   ROUNDUP_CATEGORIES,
   GEMINI_MODELS,
   PRO_GEMINI_MODEL,
+  FAST_GEMINI_MODEL,
   isSupportedGeminiModel,
   isRoundupFormat,
   hasRoundupQuantity,
@@ -804,9 +832,14 @@ ${briefBlock}${refBlock ? `\n${refBlock}` : ''}`.trim();
 window.DIDIDIT_PIPELINE = (function () {
   const HEADERS = ['대본', '장면', '사이즈', '자막', '코멘트'];
 
-  const ROW_CHARS_MIN = 20;
-  const ROW_CHARS_TARGET_MAX = 45;
-  const ROW_CHARS_HARD_MAX = 50;
+  const ROW_CHARS_MIN = 16;
+  /** Comfortable spoken breath + on-screen caption length */
+  const ROW_CHARS_TARGET_MIN = 20;
+  const ROW_CHARS_TARGET_MAX = 40;
+  /** Soft preferred max — above this, local heal splits at breath pauses */
+  const ROW_CHARS_HARD_MAX = 48;
+  /** Hard fail / last-resort split */
+  const ROW_CHARS_FORCE_SPLIT = 64;
 
   const ROWS_SCHEMA = {
     type: 'object',
@@ -848,12 +881,66 @@ window.DIDIDIT_PIPELINE = (function () {
 
   function getNarrationRhythmBlock() {
     return `
-# 대본 호흡·행 분할 (변환 단계 필수)
-- 1행 = 성우 한 호흡. 행당 공백 포함 **25~45자** (50자 초과 금지).
-- 호흡이 바뀔 때 새 행. 마침표마다 무조건 분리 X.
-- 15자 내외 초단문만 연속 나열 금지. 여러 문장을 한 행에 합치기 금지.
-- 좋은 예: 3문장을 호흡 단위로 3행 분할
-- 나쁜 예: 3문장을 1행에 합침 / 10자짜리 행만 10개 연속`;
+# 대본 호흡·행 분할 (변환 단계 필수 · 정밀)
+- 1행 = 성우가 **한 호흡에 말하기 좋은 단위**. 문장 단위로 기계 분할하지 마세요.
+- 행당 공백 포함 목표 **${ROW_CHARS_TARGET_MIN}~${ROW_CHARS_TARGET_MAX}자**, 권장 상한 **${ROW_CHARS_HARD_MAX}자**.
+  (이보다 길면 화면 자막이 답답해집니다.)
+- 긴 문장은 호흡 쉼에서 나눕니다: 연결 어미·쉼표 (고 / 서 / 며 / 는데 / 지만 / ,).
+- **나쁜 절단(금지)**: 조사만 남김 — "배터리는" / "하루 종일" 처럼 은·는·이·가·을·를·의 로 끝.
+- 마침표마다 무조건 1행 X. 아주 짧은 호흡 2개를 억지로 한 행에 합치지 마세요.
+- 좋은 예:
+  - "배터리는 하루 종일 버팁니다." (한 호흡·완결)
+  - "충전은 USB-C로 연결하고," / "케이블 하나로 끝납니다." (긴 문장의 호흡 분할)
+- 나쁜 예:
+  - "배터리는 하루" + "종일 버팁니다." (의미 중간 절단)
+  - 70자짜리 한 행에 문장 두 개를 몰아넣기 (자막 과다)`;
+  }
+
+  function bareScript(text) {
+    return String(text || '')
+      .trim()
+      .replace(/["'”’」』)\]]+$/g, '')
+      .trim();
+  }
+
+  /** True when the cut leaves a hanging particle / unfinished fragment (not speakable alone). */
+  function isDanglingFragment(text) {
+    const bare = bareScript(text);
+    if (!bare) return false;
+    if (/(은|는|이|가|을|를|의|와|과|도|만|께|로|으로|라고|이라는|라는)$/.test(bare)) return true;
+    if (/(보다|마다|만큼|대로|마저|조차|부터|까지)$/.test(bare) && bare.length < 28) return true;
+    // dangling adjective/noun stem without ending (very short mid-chunks)
+    if (bare.length <= 10 && !/[.?!…]$/.test(bare) && !/(다|요|죠|네|고|서|며|데|니)$/.test(bare)) {
+      return true;
+    }
+    return false;
+  }
+
+  /** Korean sentence-final (strong end). */
+  function endsCompleteSentence(text) {
+    const bare = bareScript(text);
+    if (!bare) return true;
+    if (/[.?!…～~]$/.test(bare)) return true;
+    if (/(보다|마다|만큼|대로|마저|조차|부터|까지)$/.test(bare)) return false;
+    if (/(습니다|습니까|세요|셔요|군요|네요|데요|죠|예요|이에요|답니다|거든요|니까요|에요|이요)[.?!…]*$/.test(bare)) {
+      return true;
+    }
+    if (/요$/.test(bare) && bare.length >= 6) return true;
+    if (/(았|었|였|했|됐|됩|합|입|갑|옵|습)다$/.test(bare)) return true;
+    if (/(ㄴ다|는다|운다|인다|한다|된다|이다)$/.test(bare) && bare.length >= 8) return true;
+    return false;
+  }
+
+  /** Soft breath-ok ending: sentence end OR clause pause suitable for one breath. */
+  function endsBreathUnit(text) {
+    if (endsCompleteSentence(text)) return true;
+    const bare = bareScript(text);
+    if (!bare || isDanglingFragment(bare)) return false;
+    if (/(고|서|며|데|니|지만|는데|니까|다가|면서|거나|싶어|해서)$/.test(bare) && bare.length >= ROW_CHARS_MIN) {
+      return true;
+    }
+    if (/[,，、]$/.test(bare) && bare.length >= ROW_CHARS_MIN) return true;
+    return false;
   }
 
   function detectChoppyRhythm(rows) {
@@ -866,33 +953,177 @@ window.DIDIDIT_PIPELINE = (function () {
   }
 
   function detectOverlongRows(rows) {
-    const longRows = rows.filter((r) => r.대본.length > ROW_CHARS_HARD_MAX);
+    const longRows = rows.filter((r) => r.대본.length > ROW_CHARS_FORCE_SPLIT);
     if (longRows.length) {
-      return `${longRows.length}행이 ${ROW_CHARS_HARD_MAX}자 초과 — 호흡마다 분할 필요`;
+      return `${longRows.length}행이 ${ROW_CHARS_FORCE_SPLIT}자 초과 — 호흡 경계에서 분할`;
     }
-    const avg = rows.reduce((s, r) => s + r.대본.length, 0) / rows.length;
-    if (avg > 48) return `평균 ${Math.round(avg)}자/행 — 장문 합침`;
     return null;
   }
 
+  function detectBadBreathCuts(rows) {
+    if (rows.length < 2) return null;
+    let cuts = 0;
+    for (let i = 0; i < rows.length - 1; i++) {
+      if (isDanglingFragment(rows[i].대본)) cuts += 1;
+    }
+    if (cuts > 0) return `${cuts}행이 조사·미완성으로 끊김`;
+    return null;
+  }
+
+  /** Soft checklist (logging). Soft issues alone do not force API retry. */
   function validateScriptRows(rows) {
     const issues = [];
     if (!rows.length) issues.push('행이 없습니다');
     rows.forEach((r, i) => {
       if (!r.대본.trim()) issues.push(`${i + 1}행 대본 누락`);
       const len = r.대본.length;
-      if (len > ROW_CHARS_HARD_MAX) issues.push(`${i + 1}행 ${len}자 (50자 초과)`);
+      if (len > ROW_CHARS_FORCE_SPLIT) issues.push(`${i + 1}행 ${len}자 (${ROW_CHARS_FORCE_SPLIT}자 초과)`);
+      else if (len > ROW_CHARS_HARD_MAX) issues.push(`${i + 1}행 ${len}자 (권장 ${ROW_CHARS_HARD_MAX}자 초과 · 자막 과다)`);
       else if (len < ROW_CHARS_MIN && rows.length >= 6) issues.push(`${i + 1}행 ${len}자 (너무 짧음)`);
     });
     const choppy = detectChoppyRhythm(rows);
     if (choppy) issues.push(choppy);
     const overlong = detectOverlongRows(rows);
     if (overlong) issues.push(overlong);
+    const bad = detectBadBreathCuts(rows);
+    if (bad) issues.push(bad);
+    return issues;
+  }
+
+  /** Only these trigger another Gemini convert attempt. */
+  function validateHardIssues(rows) {
+    const issues = [];
+    if (!rows.length) issues.push('행이 없습니다');
+    rows.forEach((r, i) => {
+      if (!r.대본.trim()) issues.push(`${i + 1}행 대본 누락`);
+      if (r.대본.length > ROW_CHARS_FORCE_SPLIT) {
+        issues.push(`${i + 1}행 ${r.대본.length}자 (${ROW_CHARS_FORCE_SPLIT}자 초과)`);
+      }
+    });
+    const bad = detectBadBreathCuts(rows);
+    if (bad) issues.push(bad);
     return issues;
   }
 
   function buildConvertRetryHint(issues) {
-    return `\n\n[재시도] 이전 변환 문제: ${issues.slice(0, 4).join(' · ')}. 호흡마다 행 분할, 행당 25~45자, 50자 초과 금지.`;
+    return `\n\n[재시도] 이전 변환 문제: ${issues.slice(0, 4).join(' · ')}. 한 호흡 ${ROW_CHARS_TARGET_MIN}~${ROW_CHARS_TARGET_MAX}자·상한 ${ROW_CHARS_HARD_MAX}자. 조사 중간 절단 금지. 긴 문장은 고/서/는데/, 에서 나누세요.`;
+  }
+
+  function mergeRowPair(a, b) {
+    const script = `${a.대본} ${b.대본}`.replace(/\s+/g, ' ').trim();
+    return {
+      대본: script,
+      장면: a.장면 || b.장면,
+      사이즈: a.사이즈 || b.사이즈,
+      자막: [a.자막, b.자막].filter(Boolean).join(' · '),
+      코멘트: [a.코멘트, b.코멘트].filter(Boolean).join(' · '),
+    };
+  }
+
+  function findBreathSplitIndex(text, maxLen) {
+    const t = String(text || '');
+    if (t.length <= maxLen) return -1;
+    const window = t.slice(0, maxLen);
+    const patterns = [
+      /[.?!…]\s*/g,
+      /(?:습니다|습니까|세요|네요|군요|죠|다|요)[.?!…]?\s*/g,
+      /(?:고|서|며|데|니|지만|는데|니까|다가|면서|거나)\s*/g,
+      /[,，、]\s*/g,
+      /\s+/g,
+    ];
+    for (const re of patterns) {
+      let last = -1;
+      let m;
+      re.lastIndex = 0;
+      while ((m = re.exec(window)) !== null) {
+        const end = m.index + m[0].length;
+        if (end >= Math.floor(maxLen * 0.4)) last = end;
+      }
+      if (last > 0) {
+        const head = t.slice(0, last).trim();
+        if (!isDanglingFragment(head)) return last;
+      }
+    }
+    return maxLen;
+  }
+
+  function forceSplitRow(row, maxLen = ROW_CHARS_HARD_MAX) {
+    const text = row.대본;
+    if (text.length <= maxLen) return [row];
+    const out = [];
+    let rest = text;
+    while (rest.length > maxLen) {
+      const cut = findBreathSplitIndex(rest, maxLen);
+      const head = rest.slice(0, cut).trim();
+      rest = rest.slice(cut).trim();
+      if (head) {
+        out.push({
+          대본: head,
+          장면: out.length ? '컷 유지' : row.장면,
+          사이즈: row.사이즈,
+          자막: out.length ? '' : row.자막,
+          코멘트: out.length ? '' : row.코멘트,
+        });
+      } else {
+        break;
+      }
+    }
+    if (rest) {
+      out.push({
+        대본: rest,
+        장면: out.length ? '컷 유지' : row.장면,
+        사이즈: row.사이즈,
+        자막: out.length ? '' : row.자막,
+        코멘트: out.length ? '' : row.코멘트,
+      });
+    }
+    return out.length ? out : [row];
+  }
+
+  /**
+   * Merge dangling particle cuts, then split long caption rows at breath pauses.
+   */
+  function healBreathRows(rows) {
+    const list = normalizeRows(rows);
+    if (!list.length) return [];
+    const merged = [];
+    let buf = { ...list[0] };
+    for (let i = 1; i < list.length; i++) {
+      const next = list[i];
+      const dangling = isDanglingFragment(buf.대본);
+      const tooShort = buf.대본.length < ROW_CHARS_MIN;
+      const mergedLen = `${buf.대본} ${next.대본}`.replace(/\s+/g, ' ').trim().length;
+      if ((dangling || tooShort) && mergedLen <= ROW_CHARS_FORCE_SPLIT + 12) {
+        buf = mergeRowPair(buf, next);
+        continue;
+      }
+      merged.push(buf);
+      buf = { ...next };
+    }
+    merged.push(buf);
+
+    // Glue residual dangling fragments
+    const glued = [];
+    for (let i = 0; i < merged.length; i++) {
+      let cur = merged[i];
+      while (
+        i + 1 < merged.length &&
+        isDanglingFragment(cur.대본) &&
+        `${cur.대본} ${merged[i + 1].대본}`.replace(/\s+/g, ' ').trim().length <= ROW_CHARS_FORCE_SPLIT
+      ) {
+        i += 1;
+        cur = mergeRowPair(cur, merged[i]);
+      }
+      glued.push(cur);
+    }
+
+    // Split rows that would make captions too long
+    return glued.flatMap((row) => forceSplitRow(row, ROW_CHARS_HARD_MAX));
+  }
+
+  /** @deprecated alias — breath heal */
+  function healSentenceRows(rows) {
+    return healBreathRows(rows);
   }
 
   function normalizeRows(rows) {
@@ -922,28 +1153,30 @@ window.DIDIDIT_PIPELINE = (function () {
     const title = chapter?.title || '전체';
     const notes = chapter?.notes || '';
     const roleHints = [];
-    const roundupCtx = `${ctx || ''}${notes}${title}`;
+    // Prefer explicit option from runProseDraft (product brief only). Never sniff style-anchor text.
+    const detectSource = options.roundupDetectText || `${notes}${title}`;
     const isRoundup =
-      options.roundup ||
-      (window.DIDIDIT_CONFIG?.isRoundupFormat
-        ? window.DIDIDIT_CONFIG.isRoundupFormat(roundupCtx)
-        : window.DIDIDIT_PROMPT?.isRoundupFormat?.(roundupCtx) ?? false);
+      typeof options.roundup === 'boolean'
+        ? options.roundup
+        : window.DIDIDIT_CONFIG?.isRoundupFormat
+          ? window.DIDIDIT_CONFIG.isRoundupFormat(detectSource)
+          : window.DIDIDIT_PROMPT?.isRoundupFormat?.(detectSource) ?? false;
     if (chapterIndex === 0 || isPrologueChapter(title)) {
       roleHints.push('- 이 챕터에 [오프닝] 고정 멘트 4줄을 자연스럽게 포함하세요.');
     }
     if (chapterIndex === chapterTotal - 1 || isClosingChapter(title)) {
       roleHints.push(
         isRoundup
-          ? '- 이 챕터 마지막에 [클로징 — N개 아이템] 고정 멘트를 포함하세요. 첫 줄의 [콘셉트·제품군명]은 영상 주제에 맞게 채웁니다. (장단점·평점 아님 → 정보 정리)'
-          : '- 이 챕터 마지막에 [클로징 — 단일 제품] 고정 멘트를 포함하세요. (장단점·평점 정리)',
+          ? '- 이 챕터 마지막에 [클로징 — N개 아이템 라운드업]만 포함하세요. 「어떠셨나요?」·「정보를 정리」·「감사합니다!」. 단일(장단점·평점) 멘트 금지. [콘셉트·제품군명]은 주제에 맞게.'
+          : '- 이 챕터 마지막에 [클로징 — 단일 제품]만 포함하세요. 「장단점과 평점을 정리해드리며」. 라운드업(어떠셨나요/정보 정리/감사합니다) 멘트 금지.',
       );
     }
     const roleBlock = roleHints.length ? `\n${roleHints.join('\n')}` : '';
     const roundupCategoryHint =
       isRoundup && window.DIDIDIT_CONFIG?.buildRoundupCategoryHint
-        ? window.DIDIDIT_CONFIG.buildRoundupCategoryHint(roundupCtx)
+        ? window.DIDIDIT_CONFIG.buildRoundupCategoryHint(detectSource)
         : isRoundup && window.DIDIDIT_PROMPT?.buildRoundupCategoryHint
-          ? window.DIDIDIT_PROMPT.buildRoundupCategoryHint(roundupCtx)
+          ? window.DIDIDIT_PROMPT.buildRoundupCategoryHint(detectSource)
           : '';
     const roundup = isRoundup
         ? `\n- **N개 아이템 라운드업**: 제품마다 \`[제품명]\` 단독 행 후 4~8호흡. 심층 리뷰보다 짧고 빠르게.\n${roundupCategoryHint}`
@@ -988,14 +1221,18 @@ ${continuity}`;
   }
 
   function buildConvertPrompt(ctx, prose, retryHint) {
-    return `${ctx}
-${getNarrationRhythmBlock()}
+    // Slim prompt: full product brief slows convert and is unused for row splitting.
+    const productHint = String(ctx || '').trim()
+      ? `- 제품·톤 힌트(참고만): ${String(ctx).replace(/\s+/g, ' ').slice(0, 200)}\n`
+      : '';
+    return `${getNarrationRhythmBlock()}
 
 # 작업: 줄글 → 대본 열 변환
 아래 줄글을 JSON \`rows\` 배열로 변환하세요.
 - **대본 열만** 채우고 장면·사이즈·자막·코멘트는 빈 문자열.
-- 줄글 문장을 삭제·왜곡하지 말고 호흡 단위로만 나눕니다.
-${retryHint || ''}
+- 줄글 내용을 삭제·왜곡하지 말고 **말하기 호흡 단위**로만 나눕니다.
+- 목표 ${ROW_CHARS_TARGET_MIN}~${ROW_CHARS_TARGET_MAX}자 / 상한 ${ROW_CHARS_HARD_MAX}자. 긴 문장은 호흡 쉼에서 분할.
+${productHint}${retryHint || ''}
 
 ## 줄글 원문
 ${prose}`;
@@ -1052,9 +1289,16 @@ JSON rows 전체를 반환.`;
     ROWS_SCHEMA,
     ROW_CHARS_MIN,
     ROW_CHARS_HARD_MAX,
+    ROW_CHARS_FORCE_SPLIT,
     normalizeRows,
     parseRowsJson,
     validateScriptRows,
+    validateHardIssues,
+    healBreathRows,
+    healSentenceRows,
+    endsCompleteSentence,
+    endsBreathUnit,
+    isDanglingFragment,
     buildConvertRetryHint,
     buildProsePrompt,
     buildConvertPrompt,
@@ -1176,6 +1420,8 @@ let SESSION = null;
 const state = {
   apiKey: '',
   modelPro: 'gemini-3.1-pro-preview',
+  /** 'single' | 'roundup' | 'both' — 줄글 단계에서 클로징 멘트 선택 */
+  scriptFormat: 'both',
   productSpecs: {},
   priceInfo: '',
   categoryId: 'other',
@@ -1224,8 +1470,10 @@ function bindModules() {
 }
 
 function getSystemRules(stage) {
-  if (stage && PM.getSystemRulesForStage) return PM.getSystemRulesForStage(stage);
-  return PM.getActiveSystemRules();
+  if (stage && PM.getSystemRulesForStage) {
+    return PM.getSystemRulesForStage(stage, { format: state.scriptFormat || 'both' });
+  }
+  return PM?.getActiveSystemRules?.() || '';
 }
 
 function getCategories() {
@@ -1360,6 +1608,7 @@ function chaptersNeedQc(chapters) {
   const QC = window.DdditChapterTitleQc;
   if (!Array.isArray(chapters) || !chapters.length) return true;
   if (!QC) return false;
+  if (QC.missingClosingChapter?.(chapters)) return true;
   return chapters.some((ch) => {
     const title = String(ch?.title || '');
     if (QC.looksTooLong?.(title)) return true;
@@ -1367,6 +1616,17 @@ function chaptersNeedQc(chapters) {
     if (ch.sourceTitle && ch.sourceTitle === title && /[（(]/.test(title)) return true;
     return false;
   });
+}
+
+/** 저장된 챕터에 총평이 없으면 붙입니다 (기획안 미반영·옛 로컬 데이터 대비). */
+function ensureClosingChapterInState() {
+  const QC = window.DdditChapterTitleQc;
+  if (!QC?.ensureClosingChapter || !state.chapters.length) return false;
+  if (!QC.missingClosingChapter?.(state.chapters)) return false;
+  state.chapters = QC.ensureClosingChapter(state.chapters);
+  renderChapters();
+  saveProject();
+  return true;
 }
 
 function chaptersFromPlanStructure(structure) {
@@ -1592,7 +1852,9 @@ async function postGeminiAndExtractText(model, body) {
 }
 
 async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') {
-  const model = state.modelPro;
+  const cfg = window.DIDIDIT_CONFIG || {};
+  // Convert / scene / caption: Flash for speed. Pro stays for prose draft only.
+  const model = cfg.FAST_GEMINI_MODEL || 'gemini-3.5-flash';
   const body = {
     systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
@@ -1901,10 +2163,15 @@ async function runProseDraft() {
   if (!hasPlanTitle()) return showToast('기획안에 제목을 입력하세요.', true);
   syncSupplementsFromDOM();
   syncChaptersFromDOM();
+  ensureClosingChapterInState();
   const effective = getEffectiveState();
   const ctx = buildProductContext();
   const styleAnchor = await PM.getStyleAnchorBlock?.();
-  const isRoundup = PM.isRoundupFormat ? PM.isRoundupFormat(ctx) : window.DIDIDIT_CONFIG?.isRoundupFormat?.(ctx);
+  // Detect only from product brief — never from style-anchor (contains "라운드업" docs).
+  const isRoundup = Boolean(
+    PM.isRoundupFormat ? PM.isRoundupFormat(ctx) : window.DIDIDIT_CONFIG?.isRoundupFormat?.(ctx),
+  );
+  state.scriptFormat = isRoundup ? 'roundup' : 'single';
   const formatAnchor = isRoundup ? await PM.getFormatAnchorBlock?.() : '';
   const ctxWithStyle = [ctx, styleAnchor, formatAnchor].filter(Boolean).join('\n\n');
   const existingProse = ($('#prose-draft')?.value || state.proseDraft || '').trim();
@@ -1949,6 +2216,8 @@ async function runProseDraft() {
       const prompt = PIPE.buildProsePrompt(ctxWithStyle, chapters[i], i, chapters.length, {
         includeContext: i === from && !SESSION.hasHistory(),
         hasSession: SESSION.turnCount() > 0,
+        roundup: isRoundup,
+        roundupDetectText: ctx,
       });
       let chunk = await callGeminiTextSession(prompt, 0.72, 'prose');
       const marker = chapterMarker(chapters[i]);
@@ -1989,19 +2258,22 @@ async function runConvertToSheet() {
       setLoading(true, `변환 중… (${i + 1}/${chunks.length})`);
       let part = [];
       let retryHint = '';
-      for (let attempt = 0; attempt < 3; attempt++) {
+      // At most 2 API attempts; heal locally instead of soft-issue retries.
+      for (let attempt = 0; attempt < 2; attempt++) {
         part = await callGeminiJson(
           PIPE.buildConvertPrompt(ctx, chunks[i], retryHint),
-          attempt > 0 ? 0.25 : 0.35,
+          attempt > 0 ? 0.2 : 0.3,
           'convert',
         );
-        const issues = PIPE.validateScriptRows(part);
-        if (!issues.length) break;
-        retryHint = PIPE.buildConvertRetryHint(issues);
-        if (attempt === 2) {
-          reportError('runConvertToSheet.validate', new Error(issues.join('; ')), { chunk: i + 1 }, { silent: true });
+        part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
+        const hard = PIPE.validateHardIssues(part);
+        if (!hard.length) break;
+        retryHint = PIPE.buildConvertRetryHint(hard);
+        if (attempt === 1) {
+          reportError('runConvertToSheet.validate', new Error(hard.join('; ')), { chunk: i + 1 }, { silent: true });
         }
       }
+      part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
       rows = rows.concat(part);
     }
     state.allRows = PIPE.normalizeRows(rows);
@@ -2398,6 +2670,7 @@ async function boot() {
     LOG?.updateBadge?.();
     loadState();
     loadProject();
+    ensureClosingChapterInState();
     syncModelSelect();
     renderCategoryOptions();
     applyBriefToDOM();
