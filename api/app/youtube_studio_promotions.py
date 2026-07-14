@@ -612,7 +612,10 @@ def extract_promotions_from_payload(payload: Any) -> list[dict[str, Any]]:
 def merge_studio_into_promotions(studio_promos: list[dict[str, Any]]) -> dict[str, Any]:
     data = read_promotions()
     manuals = list(data.get("promotions") or [])
-    issues = list(data.get("issues") or [])
+    memo = str(data.get("memo") or "").strip()
+    if not memo:
+        memo = "\n".join(str(item).strip() for item in (data.get("issues") or []) if str(item).strip())
+    issues: list[str] = []
     merged: list[dict[str, Any]] = []
     used_studio: set[str] = set()
 
@@ -684,7 +687,7 @@ def merge_studio_into_promotions(studio_promos: list[dict[str, Any]]) -> dict[st
             str(p.get("title") or ""),
         )
     )
-    return {"promotions": merged, "issues": issues}
+    return {"promotions": merged, "memo": memo, "issues": issues}
 
 
 def parse_curl_capture(curl_text: str) -> dict[str, Any]:

@@ -435,16 +435,14 @@ def _build_subscriber_trend(
     }
 
 
-def _overview_insights(videos: list[dict[str, Any]], issues: list[str]) -> list[str]:
-    insights = list(issues)
-    if videos:
-        recent = videos[:4]
-        avg_views = sum(v.get("views", 0) for v in recent) / len(recent)
-        top = max(recent, key=lambda v: v.get("views", 0))
-        if avg_views < 2000:
-            insights.append(f"최근 4개 영상 평균 조회 {int(avg_views):,}회 — 프로모션·썸네일·제목 A/B 검토 권장")
-        insights.append(f"최근 최고 조회: 「{top.get('title', '')[:24]}…」 {top.get('viewsText', '')}")
-    return insights
+def _overview_memo(promotions_data: dict[str, Any]) -> str:
+    memo = str(promotions_data.get("memo") or "").strip()
+    if memo:
+        return memo
+    issues = promotions_data.get("issues") or []
+    if isinstance(issues, list):
+        return "\n".join(str(item).strip() for item in issues if str(item).strip())
+    return ""
 
 
 async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
@@ -577,8 +575,9 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
                 snapshots_data, live_subs, analytics=analytics_overview
             ),
             "promotions": enriched_promos,
-            "issues": promotions_data.get("issues") or [],
-            "insights": _overview_insights(videos, promotions_data.get("issues") or []),
+            "memo": _overview_memo(promotions_data),
+            "issues": [],
+            "insights": [],
             "analytics": analytics_overview,
             "analyticsStatusNote": _analytics_status_note(analytics_overview),
             "adsSync": ads_status,
@@ -596,6 +595,7 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
 
 class PromotionsBody(BaseModel):
     promotions: list[dict[str, Any]] = Field(default_factory=list)
+    memo: str = ""
     issues: list[str] = Field(default_factory=list)
 
 
@@ -647,15 +647,21 @@ async def report_subscribers_trend(refresh: bool = Query(False)) -> dict[str, An
 def get_promotions() -> dict[str, Any]:
     data = read_merged_promotions()
     promos = [{**p, "metrics": _promotion_metrics(p)} for p in data.get("promotions") or []]
-    return {"ok": True, "promotions": promos, "issues": data.get("issues") or []}
+    memo = str(data.get("memo") or "").strip()
+    if not memo:
+        memo = "\n".join(str(item).strip() for item in (data.get("issues") or []) if str(item).strip())
+    return {"ok": True, "promotions": promos, "memo": memo, "issues": []}
 
 
 @router.put("/promotions")
 def put_promotions(body: PromotionsBody) -> dict[str, Any]:
-    write_promotions({"promotions": body.promotions, "issues": body.issues})
+    memo = (body.memo or "").strip()
+    if not memo and body.issues:
+        memo = "\n".join(str(item).strip() for item in body.issues if str(item).strip())
+    write_promotions({"promotions": body.promotions, "memo": memo, "issues": []})
     _REPORT_CACHE.clear()
     promos = [{**p, "metrics": _promotion_metrics(p)} for p in body.promotions]
-    return {"ok": True, "promotions": promos, "issues": body.issues}
+    return {"ok": True, "promotions": promos, "memo": memo, "issues": []}
 
 
 @router.get("/snapshots")

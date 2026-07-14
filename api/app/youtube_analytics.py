@@ -123,20 +123,21 @@ def _iso_duration_seconds(duration: str) -> int:
     return hours * 3600 + minutes * 60 + seconds
 
 
-async def _fetch_video_durations(
+async def _fetch_video_meta(
     client: httpx.AsyncClient,
     video_ids: list[str],
-) -> dict[str, int]:
+) -> dict[str, dict[str, Any]]:
+    """Return {videoId: {duration, title}} via Data API."""
     api_key = youtube_api_key()
     if not api_key or not video_ids:
         return {}
-    durations: dict[str, int] = {}
+    meta: dict[str, dict[str, Any]] = {}
     for index in range(0, len(video_ids), 50):
         chunk = video_ids[index : index + 50]
         res = await client.get(
             "https://www.googleapis.com/youtube/v3/videos",
             params={
-                "part": "contentDetails",
+                "part": "contentDetails,snippet",
                 "id": ",".join(chunk),
                 "key": api_key,
             },
@@ -145,10 +146,23 @@ async def _fetch_video_durations(
             continue
         for item in res.json().get("items") or []:
             video_id = str(item.get("id") or "")
+            if not video_id:
+                continue
             duration = (item.get("contentDetails") or {}).get("duration") or ""
-            if video_id:
-                durations[video_id] = _iso_duration_seconds(duration)
-    return durations
+            title = str((item.get("snippet") or {}).get("title") or "").strip()
+            meta[video_id] = {
+                "duration": _iso_duration_seconds(duration),
+                "title": title,
+            }
+    return meta
+
+
+async def _fetch_video_durations(
+    client: httpx.AsyncClient,
+    video_ids: list[str],
+) -> dict[str, int]:
+    meta = await _fetch_video_meta(client, video_ids)
+    return {vid: int(info.get("duration") or 0) for vid, info in meta.items()}
 
 
 def _is_shorts_video(duration_sec: int) -> bool:
@@ -464,6 +478,7 @@ async def _retention_series_for_videos(
             series.append(
                 {
                     "videoId": item["videoId"],
+                    "title": item.get("title") or "",
                     "views": item["views"],
                     "points": video_points,
                     "format": format_key,
@@ -491,10 +506,22 @@ async def _partition_top_videos_by_format(
     if not top_all:
         return [], []
 
-    durations = await _fetch_video_durations(client, [item["videoId"] for item in top_all])
-    if durations:
-        longform = [item for item in top_all if not _is_shorts_video(durations.get(item["videoId"], 0))]
-        shorts = [item for item in top_all if _is_shorts_video(durations.get(item["videoId"], 0))]
+    durations_and_titles = await _fetch_video_meta(client, [item["videoId"] for item in top_all])
+    if durations_and_titles:
+        for item in top_all:
+            info = durations_and_titles.get(item["videoId"]) or {}
+            if info.get("title"):
+                item["title"] = info["title"]
+        longform = [
+            item
+            for item in top_all
+            if not _is_shorts_video(int((durations_and_titles.get(item["videoId"]) or {}).get("duration") or 0))
+        ]
+        shorts = [
+            item
+            for item in top_all
+            if _is_shorts_video(int((durations_and_titles.get(item["videoId"]) or {}).get("duration") or 0))
+        ]
         return longform, shorts
 
     longform = await _top_videos_by_views(
@@ -515,6 +542,14 @@ async def _partition_top_videos_by_format(
         limit=3,
         content_type=_CONTENT_SHORTS,
     )
+    # Best-effort titles even on the Analytics contentType fallback path.
+    title_meta = await _fetch_video_meta(
+        client, [item["videoId"] for item in [*longform, *shorts]]
+    )
+    for item in [*longform, *shorts]:
+        title = (title_meta.get(item["videoId"]) or {}).get("title")
+        if title:
+            item["title"] = title
     return longform, shorts
 
 

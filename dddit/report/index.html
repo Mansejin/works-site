@@ -103,13 +103,20 @@
       grid-template-columns: minmax(200px, 24%) minmax(0, 1fr);
       align-items: start;
     }
-    .insights-card .card-body {
+    .memo-card .card-body {
       max-height: 320px;
       overflow-y: auto;
     }
-    .insights-card .insights {
-      font-size: 0.8rem;
-      gap: 6px;
+    .memo-display {
+      margin: 0;
+      white-space: pre-wrap;
+      font-size: 0.86rem;
+      line-height: 1.55;
+      color: var(--text);
+    }
+    .memo-display:empty::before {
+      content: "메모 없음 — 아래 편집란에서 작성";
+      color: var(--muted);
     }
 
     .card {
@@ -529,9 +536,9 @@
       </section>
 
       <div class="grid grid-promo-insights" style="margin-bottom:14px;">
-        <section class="card insights-card">
-          <div class="card-head"><h2>주요 이슈 · 진단</h2></div>
-          <div class="card-body"><ul class="insights" id="insights-list"></ul></div>
+        <section class="card memo-card">
+          <div class="card-head"><h2>메모</h2></div>
+          <div class="card-body"><p id="memo-display" class="memo-display"></p></div>
         </section>
         <section class="card">
           <div class="card-head">
@@ -611,8 +618,8 @@
       <section class="card edit-panel">
         <div class="card-head"><h2>보고 데이터 편집 (팀용)</h2></div>
         <div class="card-body">
-          <label for="issues-editor">주요 이슈 (한 줄씩)</label>
-          <textarea id="issues-editor" placeholder="채널 노출 부족…"></textarea>
+          <label for="memo-editor">자유 메모</label>
+          <textarea id="memo-editor" rows="6" placeholder="보고용 메모를 자유롭게 작성하세요"></textarea>
           <label for="promotions-editor">프로모션 JSON (비용·노출·조회·구독)</label>
           <textarea id="promotions-editor" rows="10"></textarea>
           <label for="snapshots-editor">구독자 주간 스냅샷 JSON (total / organic)</label>
@@ -633,6 +640,6 @@
     <div id="loading" class="card loading-block">보고 데이터를 불러오는 중…</div>
   </div>
 
-  <script src="js/report.js?v=28"></script>
+  <script src="js/report.js?v=29"></script>
 </body>
 </html>
