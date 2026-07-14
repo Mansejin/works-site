@@ -78,13 +78,35 @@ window.DdditSheetSync = (function () {
       url = buildUrl(url, params);
     }
 
-    const res = await fetch(url, {
-      method,
-      headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
-      body: method === 'POST' ? JSON.stringify(body || {}) : undefined,
-    });
+    let res;
+    try {
+      res = await fetch(url, {
+        method,
+        headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
+        body: method === 'POST' ? JSON.stringify(body || {}) : undefined,
+      });
+    } catch (err) {
+      const msg = String(err?.message || err || '');
+      if (/failed to fetch|networkerror|load failed|네트워크/i.test(msg)) {
+        throw new Error(
+          '시트 서버에 연결하지 못했습니다 (Failed to fetch). 네트워크·works-api 상태를 확인한 뒤 다시 시도해 주세요.',
+        );
+      }
+      throw err;
+    }
 
-    const data = await res.json().catch(() => ({}));
+    const raw = await res.text();
+    let data = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      if (!res.ok) {
+        throw new Error(
+          `시트 API 오류 (${res.status}). 서버가 JSON 대신 오류 페이지를 반환했습니다.`,
+        );
+      }
+      throw new Error('시트 API 응답을 읽을 수 없습니다.');
+    }
     if (!res.ok) {
       const detail = data.detail || data.error || `works-api 오류 (${res.status})`;
       throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));

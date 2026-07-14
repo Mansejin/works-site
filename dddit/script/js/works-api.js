@@ -59,12 +59,27 @@ window.DdditWorksApi = (function () {
       ? geminiUrl(model)
       : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey || "")}`;
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: options.signal,
-    });
+    let res;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: options.signal,
+      });
+    } catch (err) {
+      if (err?.name === "AbortError") throw err;
+      const msg = String(err?.message || err || "");
+      const e = new Error(
+        /failed to fetch|networkerror|load failed/i.test(msg)
+          ? "API 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."
+          : msg,
+      );
+      e.apiStatus = 0;
+      e.apiModel = model;
+      e.cause = err;
+      throw e;
+    }
 
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));

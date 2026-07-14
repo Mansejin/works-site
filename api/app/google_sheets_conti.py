@@ -255,19 +255,25 @@ async def write_project_rows(
     data = normalize_rows(rows)
     values = [list(HEADERS)] + [[row[h] for h in HEADERS] for row in data]
 
-    await client.post(
+    # NOTE: await binds weaker than attribute access —
+    # `await client.post(...).raise_for_status()` would call raise_for_status on the coroutine.
+    clear_res = await client.post(
         _values_url(spreadsheet_id, "A:E", "clear"),
         headers={"Authorization": f"Bearer {token}"},
         json={},
-    ).raise_for_status()
+    )
+    if clear_res.status_code >= 400:
+        raise _google_error(clear_res, "Sheets clear")
 
     if values:
-        await client.put(
+        put_res = await client.put(
             _values_url(spreadsheet_id, f"A1:E{len(values)}"),
             headers={"Authorization": f"Bearer {token}"},
             params={"valueInputOption": "USER_ENTERED"},
             json={"values": values},
-        ).raise_for_status()
+        )
+        if put_res.status_code >= 400:
+            raise _google_error(put_res, "Sheets write")
     return len(data)
 
 
@@ -281,12 +287,14 @@ async def append_project_rows(
     if not data:
         return 0
     values = [[row[h] for h in HEADERS] for row in data]
-    await client.post(
+    append_res = await client.post(
         _values_url(spreadsheet_id, "A:E", "append"),
         headers={"Authorization": f"Bearer {token}"},
         params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},
         json={"values": values},
-    ).raise_for_status()
+    )
+    if append_res.status_code >= 400:
+        raise _google_error(append_res, "Sheets append")
     return len(data)
 
 
