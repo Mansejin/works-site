@@ -1322,7 +1322,7 @@
 
   document.getElementById("btn-copy-bookmarklet")?.addEventListener("click", async () => {
     try {
-      const snippetUrl = new URL("js/studio-promo-sync-snippet.js", location.href).href + "?v=2";
+      const snippetUrl = new URL("js/studio-promo-sync-snippet.js", location.href).href + "?v=4";
       const res = await fetch(snippetUrl, { cache: "no-store" });
       if (!res.ok) throw new Error("동기화 코드를 불러오지 못했습니다");
       let code = (await res.text()).trim();
