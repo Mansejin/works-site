@@ -537,18 +537,18 @@
             <button id="btn-studio-capture" class="btn btn-ghost" type="button">캡처 저장</button>
             <span id="studio-capture-status" class="status-pill">1회 저장 후 Studio 동기화 가능</span>
           </div>
-          <details class="studio-import-details" style="margin-bottom:12px;">
-            <summary style="cursor:pointer;color:var(--muted);font-size:0.9rem;">Network에 list_promotions가 안 뜰 때 — 콘솔로 JSON 뽑기</summary>
-            <p style="font-size:0.82rem;color:var(--muted);margin:8px 0;">
-              Network 이름은 <code>get?alt=json</code>처럼 짧게만 보입니다. Search의 list_promotions는 응답 안 경로일 뿐 필터에 안 잡힐 수 있어요.
-              아래를 Console에 붙여넣기 → <strong>Preserve log</strong> 켠 뒤 프로모션 탭 <strong>F5</strong> → <code>copy(__studioPromoJson)</code>
+          <details class="studio-import-details" open style="margin-bottom:12px;border:1px solid #fde68a;background:#fffbeb;border-radius:10px;padding:10px 12px;">
+            <summary style="cursor:pointer;color:#92400e;font-size:0.9rem;font-weight:600;">401이 날 때 — Studio 응답 JSON으로 동기화 (권장)</summary>
+            <p style="font-size:0.82rem;color:#92400e;margin:8px 0;">
+              캡처/쿠키는 맞는데도 401이면 NAS 서버 IP에서 Studio 세션이 거절된 경우입니다.
+              Studio Console에 아래 훅을 넣고 <strong>F5</strong> → <code>copy(__studioPromoJson)</code> → 여기 붙여넣기 → <strong>JSON 가져오기</strong>
             </p>
-            <textarea id="studio-hook-snippet" readonly rows="6" style="font-size:0.72rem;font-family:monospace;margin-bottom:8px;">(function(){function s(u,t){if(!t||t.length<200)return;if(!/"\s*units\s*"\s*:\s*"\d+"/.test(t))return;if(!/(promotion|campaign|ypc|impression|subscriber)/i.test(t))return;window.__studioPromoJson=t;window.__studioPromoUrl=u;console.log("저장",u);console.log("copy(__studioPromoJson)");}const f=fetch;fetch=async(...a)=>{const r=await f(...a);const u=String(a[0]||"");if(u.includes("youtubei"))r.clone().text().then(t=>s(u,t));return r;};const o=XMLHttpRequest.prototype.open,send=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.open=function(m,u){this._u=u;return o.apply(this,arguments)};XMLHttpRequest.prototype.send=function(){this.addEventListener("load",function(){if(this._u&&String(this._u).includes("youtubei"))s(String(this._u),this.responseText)});return send.apply(this,arguments)};console.log("훅 설치 — Preserve log ON 후 F5");})();</textarea>
+            <textarea id="studio-hook-snippet" readonly rows="6" style="font-size:0.72rem;font-family:monospace;margin-bottom:8px;width:100%;">(function(){function s(u,t){if(!t||t.length<200)return;if(!/"\s*units\s*"\s*:\s*"\d+"/.test(t))return;if(!/(promotion|campaign|ypc|impression|subscriber)/i.test(t))return;window.__studioPromoJson=t;window.__studioPromoUrl=u;console.log("저장",u);console.log("copy(__studioPromoJson)");}const f=fetch;fetch=async(...a)=>{const r=await f(...a);const u=String(a[0]||"");if(u.includes("youtubei"))r.clone().text().then(t=>s(u,t));return r;};const o=XMLHttpRequest.prototype.open,send=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.open=function(m,u){this._u=u;return o.apply(this,arguments)};XMLHttpRequest.prototype.send=function(){this.addEventListener("load",function(){if(this._u&&String(this._u).includes("youtubei"))s(String(this._u),this.responseText)});return send.apply(this,arguments)};console.log("훅 설치 — Preserve log ON 후 F5");})();</textarea>
             <label for="studio-response-editor">프로모션 응답 JSON</label>
             <textarea id="studio-response-editor" rows="5" placeholder='copy(__studioPromoJson) 결과 붙여넣기'></textarea>
             <div class="header-actions" style="margin-top:8px;">
-              <button id="btn-studio-import" class="btn btn-ghost" type="button">JSON 가져오기</button>
-              <span id="studio-import-status" class="status-pill">Search만 되고 Response가 안 보일 때</span>
+              <button id="btn-studio-import" class="btn" type="button">JSON 가져오기</button>
+              <span id="studio-import-status" class="status-pill">브라우저에서 받은 응답을 바로 반영</span>
             </div>
           </details>
           <label for="issues-editor">주요 이슈 (한 줄씩)</label>
@@ -573,6 +573,6 @@
     <div id="loading" class="card loading-block">보고 데이터를 불러오는 중…</div>
   </div>
 
-  <script src="js/report.js?v=22"></script>
+  <script src="js/report.js?v=23"></script>
 </body>
 </html>

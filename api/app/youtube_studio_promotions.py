@@ -480,13 +480,64 @@ async def _post_studio(
     extra_headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     headers = studio_auth_headers(cookies, extra=extra_headers)
-    res = await client.post(url, headers=headers, json=body or {})
+    # Prefer Cookie jar over a raw Cookie header so Secure cookies are sent intact.
+    headers.pop("Cookie", None)
+    jar = httpx.Cookies()
+    for name, value in cookies.items():
+        jar.set(name, value, domain=".youtube.com", path="/")
+
+    post_url = url
+    if "key=" not in post_url:
+        sep = "&" if "?" in post_url else "?"
+        post_url = f"{post_url}{sep}key={_INNERTUBE_KEY_DEFAULT}"
+
+    res = await client.post(post_url, headers=headers, json=body or {}, cookies=jar)
     if not res.is_success:
         raise RuntimeError(f"Studio API {res.status_code}: {res.text[:400]}")
     try:
         return res.json()
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"Studio API JSON 파싱 실패: {exc}") from exc
+
+
+def _sanitize_capture_body(body: dict[str, Any] | None, channel_id: str) -> dict[str, Any] | None:
+    """Drop one-time session tokens that often break when replaying from NAS IP."""
+    if not isinstance(body, dict):
+        return body
+    clean = {k: v for k, v in body.items() if k not in {"_raw"}}
+    ctx = clean.get("context")
+    if isinstance(ctx, dict):
+        ctx = {**ctx}
+        req = ctx.get("request")
+        if isinstance(req, dict):
+            req = {
+                k: v
+                for k, v in req.items()
+                if k
+                not in {
+                    "eats",
+                    "sessionInfo",
+                    "consistencyTokenJars",
+                    "internalExperimentFlags",
+                }
+            }
+            ctx["request"] = req
+        # Keep delegation context (needed for channel-scoped promotions).
+        user = ctx.get("user")
+        if isinstance(user, dict):
+            user = {**user}
+            if channel_id and not user.get("delegationContext"):
+                user["delegationContext"] = {
+                    "externalChannelId": channel_id,
+                    "roleType": {"channelRoleType": "CREATOR_CHANNEL_ROLE_TYPE_OWNER"},
+                }
+            ctx["user"] = user
+        ctx.pop("clickTracking", None)
+        ctx.pop("clientScreenNonce", None)
+        clean["context"] = ctx
+    if channel_id and not clean.get("channelId"):
+        clean["channelId"] = channel_id
+    return clean
 
 
 def _candidate_urls(api_key: str) -> list[str]:
@@ -516,11 +567,12 @@ async def fetch_studio_payload(
 
     async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
         if cap.get("url"):
-            body = cap.get("body")
-            if isinstance(body, dict):
-                body = {**body}
-                if "context" not in body:
-                    body["context"] = context
+            body = _sanitize_capture_body(
+                cap.get("body") if isinstance(cap.get("body"), dict) else None,
+                channel_id,
+            )
+            if isinstance(body, dict) and "context" not in body:
+                body = {**body, "context": context}
             payload = await _post_studio(
                 client,
                 url=str(cap["url"]),
@@ -632,8 +684,9 @@ async def sync_studio_promotions(
         if "401" in err or "UNAUTHENTICATED" in err:
             err = (
                 "Studio 로그인 인증 실패(401). "
-                "cURL을 다시 복사해 「캡처 저장」한 뒤 동기화하세요. "
-                "(계정 전환 시 x-goog-authuser가 1일 수 있음 — 최신 캡처면 자동 반영)"
+                "NAS 서버 IP에서는 브라우저 쿠키가 거절될 수 있습니다. "
+                "보고 페이지 「JSON 가져오기」를 사용하세요 "
+                "(Studio Console에서 list_promotions 응답 복사)."
             )
         meta = {
             "ok": False,

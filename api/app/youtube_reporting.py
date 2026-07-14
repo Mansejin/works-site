@@ -248,12 +248,34 @@ async def fetch_reporting_reach(refresh: bool = False) -> dict[str, Any]:
         return payload
     except Exception as exc:
         stale = read_reporting_sync()
+        err = str(exc)
+        if "500" in err or "Internal Server Error" in err:
+            message = (
+                "YouTube Reporting API 일시 오류(500) — Google 쪽 장애일 수 있습니다. "
+                "노출/CTR은 캐시값이 있으면 유지하고, Analytics 나머지 지표는 정상입니다."
+            )
+        else:
+            message = f"YouTube Reporting API 조회 실패: {err[:180]}"
+        # Prefer stale impressions so the banner is warning, not a full break.
+        if stale.get("impressions") is not None:
+            return {
+                "ok": True,
+                "configured": True,
+                "status": "stale",
+                "message": message,
+                "impressions": stale.get("impressions"),
+                "ctr": stale.get("ctr"),
+                "reportCount": stale.get("reportCount") or 0,
+                "syncedAt": stale.get("syncedAt"),
+                "jobId": stale.get("jobId"),
+                "source": "reporting-api-stale",
+            }
         return {
             "ok": False,
             "configured": True,
-            "message": f"YouTube Reporting API 조회 실패: {exc}",
-            "impressions": stale.get("impressions"),
-            "ctr": stale.get("ctr"),
+            "message": message,
+            "impressions": None,
+            "ctr": None,
             "jobId": stale.get("jobId"),
             "source": "reporting-api",
         }
