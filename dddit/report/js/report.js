@@ -5,6 +5,9 @@
   const REFRESH_CACHE_KEY = "works/dddit/report/lastApiRefresh";
   const REFRESH_TTL_MS = 24 * 60 * 60 * 1000;
   const SUBSCRIBER_POLL_MS = 90_000;
+  const PROMO_PAGE_SIZE = 5;
+  const API_TIMEOUT_MS = 90_000;
+  const CAPTURE_TIMEOUT_MS = 45_000;
 
   const els = {
     root: document.getElementById("report-root"),
@@ -33,6 +36,7 @@
     studioCaptureStatus: document.getElementById("studio-capture-status"),
     studioResponseEditor: document.getElementById("studio-response-editor"),
     studioImportStatus: document.getElementById("studio-import-status"),
+    promoPagination: document.getElementById("promo-pagination"),
   };
 
   let charts = {
@@ -93,6 +97,8 @@
   };
 
   let loadSeq = 0;
+  let allPromotions = [];
+  let promoPage = 0;
 
   function readLastApiRefresh() {
     try {
@@ -170,9 +176,27 @@
     els.error?.classList.add("hidden");
   }
 
-  async function apiPost(path) {
-    const res = await fetch(`${API_BASE}${path}`, { method: "POST" });
-    const body = await res.json().catch(() => ({}));
+  async function fetchJson(url, options = {}) {
+    const timeoutMs = options.timeoutMs ?? API_TIMEOUT_MS;
+    const { timeoutMs: _t, ...fetchOpts } = options;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...fetchOpts, signal: controller.signal });
+      const body = await res.json().catch(() => ({}));
+      return { res, body };
+    } catch (err) {
+      if (err.name === "AbortError") {
+        throw new Error("요청 시간이 초과되었습니다. 잠시 후 다시 시도하세요.");
+      }
+      throw err;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  async function apiPost(path, options = {}) {
+    const { res, body } = await fetchJson(`${API_BASE}${path}`, { method: "POST", ...options });
     if (!res.ok) {
       throw new Error(body.detail || body.message || `HTTP ${res.status}`);
     }
@@ -183,12 +207,11 @@
   }
 
   async function apiGet(path, options = {}) {
-    const res = await fetch(`${API_BASE}${path}`, options);
+    const { res, body } = await fetchJson(`${API_BASE}${path}`, options);
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.detail || `HTTP ${res.status}`);
+      throw new Error(body.detail || body.message || `HTTP ${res.status}`);
     }
-    return res.json();
+    return body;
   }
 
   async function apiPut(path, payload) {
@@ -1009,6 +1032,20 @@
     els.studioSyncStatus.title = "프로모션 목록 cURL을 아래 편집란에 저장하세요";
   }
 
+  async function refreshStudioPromoStatus() {
+    const studio = await apiGet("/api/dddit/youtube/report/studio-promotions/status", {
+      timeoutMs: 15_000,
+    });
+    renderStudioSyncStatus(studio);
+    return studio;
+  }
+
+  async function refreshPromotionsTable() {
+    const data = await apiGet("/api/dddit/youtube/report/promotions", { timeoutMs: 15_000 });
+    promoPage = 0;
+    renderPromotions(data.promotions || []);
+    return data;
+  }
   function sortPromotionsForDisplay(promotions) {
     const rank = (status) => {
       if (status === "진행중") return 0;
@@ -1022,20 +1059,49 @@
     });
   }
 
-  function renderPromotions(promotions) {
-    if (!promotions?.length) {
-      els.promoBody.innerHTML = `<tr><td colspan="8">등록된 프로모션이 없습니다. 아래 JSON 편집으로 추가하세요.</td></tr>`;
+  function renderPromoPagination(total, page) {
+    if (!els.promoPagination) return;
+    const pages = Math.max(1, Math.ceil(total / PROMO_PAGE_SIZE));
+    if (total <= PROMO_PAGE_SIZE) {
+      els.promoPagination.innerHTML = "";
+      els.promoPagination.classList.add("hidden");
       return;
     }
-    const sorted = sortPromotionsForDisplay(promotions);
-    const visible = sorted.slice(0, 5);
-    const hidden = Math.max(0, sorted.length - visible.length);
-    els.promoBody.innerHTML =
-      visible
-        .map((p) => {
-          const m = p.metrics || {};
-          const effClass = m.cpv && m.cpv <= 30 ? "metric-good" : m.cps && m.cps <= 400 ? "metric-good" : "";
-          return `
+    els.promoPagination.classList.remove("hidden");
+    const start = page * PROMO_PAGE_SIZE + 1;
+    const end = Math.min(total, (page + 1) * PROMO_PAGE_SIZE);
+    els.promoPagination.innerHTML = `
+      <button type="button" class="btn btn-ghost promo-page-btn" data-dir="prev" ${page <= 0 ? "disabled" : ""}>이전</button>
+      <span class="promo-page-info">${start}–${end} / ${total} · ${page + 1}/${pages}</span>
+      <button type="button" class="btn btn-ghost promo-page-btn" data-dir="next" ${page >= pages - 1 ? "disabled" : ""}>다음</button>`;
+    els.promoPagination.querySelectorAll(".promo-page-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const dir = btn.getAttribute("data-dir");
+        if (dir === "prev" && promoPage > 0) promoPage -= 1;
+        if (dir === "next" && promoPage < pages - 1) promoPage += 1;
+        renderPromotions(allPromotions);
+      });
+    });
+  }
+
+  function renderPromotions(promotions) {
+    if (promotions) allPromotions = promotions;
+    const sorted = sortPromotionsForDisplay(allPromotions);
+    if (!sorted.length) {
+      els.promoBody.innerHTML = `<tr><td colspan="8">등록된 프로모션이 없습니다. 아래 JSON 편집으로 추가하세요.</td></tr>`;
+      renderPromoPagination(0, 0);
+      return;
+    }
+    const pages = Math.max(1, Math.ceil(sorted.length / PROMO_PAGE_SIZE));
+    if (promoPage >= pages) promoPage = pages - 1;
+    if (promoPage < 0) promoPage = 0;
+    const start = promoPage * PROMO_PAGE_SIZE;
+    const visible = sorted.slice(start, start + PROMO_PAGE_SIZE);
+    els.promoBody.innerHTML = visible
+      .map((p) => {
+        const m = p.metrics || {};
+        const effClass = m.cpv && m.cpv <= 30 ? "metric-good" : m.cps && m.cps <= 400 ? "metric-good" : "";
+        return `
         <tr>
           <td>
             <strong>${esc(p.title)}</strong>${sourceBadge(p.source)}
@@ -1049,11 +1115,9 @@
           <td>${m.cps != null ? `${formatNum(m.cps)}원` : "—"}</td>
           <td class="${effClass}">${esc(m.efficiencyText || "—")}</td>
         </tr>`;
-        })
-        .join("") +
-      (hidden
-        ? `<tr><td colspan="8" class="video-note">진행중 우선 · 상위 5개 표시 · 나머지 ${hidden}개는 JSON 편집에서 확인</td></tr>`
-        : "");
+      })
+      .join("");
+    renderPromoPagination(sorted.length, promoPage);
   }
 
   function renderVideos(videos) {
@@ -1061,8 +1125,7 @@
       els.videoGrid.innerHTML = `<p class="video-note">영상 데이터가 없습니다. YOUTUBE_API_KEY를 확인하세요.</p>`;
       return;
     }
-    const list = (videos || []).slice(0, 4);
-    els.videoGrid.innerHTML = list
+    els.videoGrid.innerHTML = (videos || [])
       .map((v) => {
         const date = v.publishedAt ? new Date(v.publishedAt).toLocaleDateString("ko-KR") : "—";
         return `
@@ -1153,6 +1216,7 @@
       renderAdsSyncStatus(overview.adsSync);
       renderStudioSyncStatus(overview.studioPromoSync);
       renderInsights(overview.insights || []);
+      promoPage = 0;
       renderPromotions(overview.promotions || []);
       renderVideos(videosData.videos || []);
       els.limitations.innerHTML = (overview.limitations || [])
@@ -1184,8 +1248,14 @@
       }
     } catch (err) {
       if (seq !== loadSeq) return;
-      els.loading.classList.add("hidden");
       showError(err.message || String(err));
+    } finally {
+      if (seq === loadSeq) {
+        els.loading.classList.add("hidden");
+        if (!els.error || els.error.classList.contains("hidden")) {
+          els.root.classList.remove("hidden");
+        }
+      }
     }
   }
 
@@ -1213,9 +1283,12 @@
         els.studioSyncStatus.textContent = "동기화 중…";
         els.studioSyncStatus.className = "status-pill";
       }
-      const result = await apiPost("/api/dddit/youtube/report/studio-promotions/sync?force=1");
+      const result = await apiPost("/api/dddit/youtube/report/studio-promotions/sync?force=1", {
+        timeoutMs: 60_000,
+      });
       setStatus(result.message || "Studio 동기화 완료", "ok");
-      await loadReport(true);
+      await refreshStudioPromoStatus();
+      await refreshPromotionsTable();
     } catch (err) {
       const msg = err.message || "Studio 동기화 실패";
       if (els.studioSyncStatus) {
@@ -1236,12 +1309,15 @@
       const curl = els.studioCurlEditor?.value?.trim() || "";
       if (curl.length < 20) throw new Error("cURL 텍스트를 붙여넣으세요");
       setStatus("캡처 저장 중…");
-      const res = await fetch(`${API_BASE}/api/dddit/youtube/report/studio-promotions/capture`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ curl }),
-      });
-      const body = await res.json().catch(() => ({}));
+      const { res, body } = await fetchJson(
+        `${API_BASE}/api/dddit/youtube/report/studio-promotions/capture`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ curl }),
+          timeoutMs: CAPTURE_TIMEOUT_MS,
+        }
+      );
       if (!res.ok || body.ok === false) {
         throw new Error(body.detail || body.message || `HTTP ${res.status}`);
       }
@@ -1251,7 +1327,7 @@
         els.studioCaptureStatus.className = body.warning ? "status-pill warn" : "status-pill ok";
       }
       setStatus(body.message || "캡처 저장됨", body.warning ? "warn" : "ok");
-      await loadReport(true);
+      await refreshStudioPromoStatus();
     } catch (err) {
       if (els.studioCaptureStatus) {
         els.studioCaptureStatus.textContent = err.message || "캡처 저장 실패";
@@ -1287,7 +1363,8 @@
         els.studioImportStatus.className = "status-pill ok";
       }
       setStatus(body.message || "Studio JSON 가져오기 완료", "ok");
-      await loadReport(true);
+      await refreshStudioPromoStatus();
+      await refreshPromotionsTable();
     } catch (err) {
       if (els.studioImportStatus) {
         els.studioImportStatus.textContent = err.message || "JSON 가져오기 실패";

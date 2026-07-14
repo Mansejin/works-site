@@ -671,6 +671,8 @@ def report_studio_promo_status() -> dict[str, Any]:
 @router.post("/studio-promotions/capture")
 def report_studio_promo_capture(body: StudioCaptureBody) -> dict[str, Any]:
     result = save_capture_from_curl(body.curl)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("message") or "캡처 저장 실패")
     _REPORT_CACHE.clear()
     return result
 
