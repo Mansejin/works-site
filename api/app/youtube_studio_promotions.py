@@ -311,8 +311,13 @@ def parse_curl_capture(curl_text: str) -> dict[str, Any]:
     cookie_match = re.search(r"-H\s+'Cookie:\s*([^']+)'", text, re.I)
     if not cookie_match:
         cookie_match = re.search(r'-H\s+"Cookie:\s*([^"]+)"', text, re.I)
+    if not cookie_match:
+        cookie_match = re.search(r"-b\s+'((?:\\'|[^'])*)'", text, re.S)
+    if not cookie_match:
+        cookie_match = re.search(r'-b\s+"((?:\\"|[^"])*)"', text, re.S)
     if cookie_match:
-        for part in cookie_match.group(1).split(";"):
+        raw_cookies = cookie_match.group(1).replace("\\'", "'").replace('\\"', '"')
+        for part in raw_cookies.split(";"):
             if "=" in part:
                 k, v = part.split("=", 1)
                 cookies[k.strip()] = v.strip()
@@ -497,11 +502,40 @@ def get_studio_promo_status() -> dict[str, Any]:
     }
 
 
+_NON_PROMO_URL_HINTS = (
+    "/att/esr",
+    "/att/get",
+    "botguard",
+    "log_event",
+    "get_survey",
+    "get_web_reauth_url",
+    "get_creator_videos",
+)
+
+
+def _capture_url_warning(url: str, body: Any) -> str | None:
+    lower = (url or "").lower()
+    for hint in _NON_PROMO_URL_HINTS:
+        if hint in lower:
+            return (
+                "이 URL은 프로모션 목록 API가 아닙니다 "
+                f"({hint}). Network에서 promotion/campaign/ypc 또는 "
+                "비용·노출이 있는 get?alt=json 요청을 다시 캡처하세요."
+            )
+    if isinstance(body, dict) and ("botguardResponse" in body or "challenge" in body):
+        return (
+            "요청 본문에 botguard/challenge가 있습니다. "
+            "attestation(봇 검증) 요청이므로 프로모션 동기화에 쓸 수 없습니다."
+        )
+    return None
+
+
 def save_capture_from_curl(curl_text: str, *, also_store_cookies: bool = True) -> dict[str, Any]:
     parsed = parse_curl_capture(curl_text)
     cookies = parsed.pop("cookies", {}) or {}
     channel_id = youtube_channel_id()
     parsed["channelId"] = channel_id
+    url_warning = _capture_url_warning(str(parsed.get("url") or ""), parsed.get("body"))
     write_capture(parsed)
 
     cookie_note = None
@@ -511,11 +545,16 @@ def save_capture_from_curl(curl_text: str, *, also_store_cookies: bool = True) -
         _write_json(cookie_path, {"cookies": cookies, "updatedAt": datetime.now(timezone.utc).isoformat()})
         cookie_note = f"쿠키 {len(cookies)}개 로컬 저장 (data/youtube/studio-cookies.json)"
 
+    message = "캡처 저장 완료" + (f" · {cookie_note}" if cookie_note else "")
+    if url_warning:
+        message = f"{message} · 경고: {url_warning}"
+
     return {
         "ok": True,
         "capture": {k: parsed.get(k) for k in ("url", "method", "capturedAt", "channelId")},
         "cookieCount": len(cookies),
-        "message": "캡처 저장 완료" + (f" · {cookie_note}" if cookie_note else ""),
+        "warning": url_warning,
+        "message": message,
     }
 
 

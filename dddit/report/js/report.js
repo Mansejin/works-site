@@ -1218,9 +1218,9 @@
       }
       if (els.studioCaptureStatus) {
         els.studioCaptureStatus.textContent = body.message || "캡처 저장됨";
-        els.studioCaptureStatus.className = "status-pill ok";
+        els.studioCaptureStatus.className = body.warning ? "status-pill warn" : "status-pill ok";
       }
-      setStatus(body.message || "캡처 저장됨", "ok");
+      setStatus(body.message || "캡처 저장됨", body.warning ? "warn" : "ok");
     } catch (err) {
       if (els.studioCaptureStatus) {
         els.studioCaptureStatus.textContent = err.message || "캡처 저장 실패";
