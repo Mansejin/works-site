@@ -28,13 +28,15 @@ SYNC_META_FILE = DATA_DIR / "studio-promo-sync.json"
 
 # Studio Network에서 확인되면 capture에 저장되어 우선 사용. 아래는 자동 탐색용 후보.
 _PROBE_PATHS = (
-    "youtubei/v1/ypc/get_cart",
-    "youtubei/v1/creator/list_creator_received_item",
-    "youtubei/v1/creator/get_creator_channels",
+    "youtubei/v1/promotions/list_promotions",
+    "youtubei/v1/ypc/list_promotions",
     "youtubei/v1/promotion/list_promotions",
     "youtubei/v1/promotion/get_promotions",
     "youtubei/v1/campaign/list_campaigns",
+    "youtubei/v1/ypc/get_cart",
     "youtubei/v1/ypc/get_offers",
+    "youtubei/v1/creator/list_creator_received_item",
+    "youtubei/v1/creator/get_creator_channels",
 )
 
 _INNERTUBE_KEY_DEFAULT = "AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w"
@@ -73,6 +75,19 @@ def _parse_int(value: Any) -> int | None:
         return None
     if isinstance(value, (int, float)):
         return int(value)
+    # Google Money / Amount: { "units": "45489", "nanos": 0, "currencyCode": "KRW" }
+    if isinstance(value, dict):
+        if "units" in value or "nanos" in value:
+            units = _parse_int(value.get("units")) or 0
+            nanos = _parse_int(value.get("nanos")) or 0
+            return units + (1 if nanos >= 500_000_000 else 0)
+        # { "simpleText": "₩45,489" } / { "value": 45489 }
+        for nested_key in ("simpleText", "text", "label", "value", "amount", "count"):
+            if nested_key in value:
+                parsed = _parse_int(value[nested_key])
+                if parsed is not None:
+                    return parsed
+        return None
     text = str(value).strip()
     # "₩44,435" / "44,435원" / "1.2만"
     text = text.replace(",", "").replace("₩", "").replace("원", "").strip()
@@ -87,15 +102,73 @@ def _parse_int(value: Any) -> int | None:
         return None
 
 
+def _flatten_promo_dict(obj: dict[str, Any]) -> dict[str, Any]:
+    """Unwrap common Studio renderer wrappers into a flat-ish dict for matching."""
+    flat: dict[str, Any] = dict(obj)
+    for wrap in (
+        "promotionRenderer",
+        "campaignRenderer",
+        "promotionCardRenderer",
+        "promotionListItemRenderer",
+        "ypcPromotionRenderer",
+    ):
+        inner = obj.get(wrap)
+        if isinstance(inner, dict):
+            flat = {**flat, **inner}
+    return flat
+
+
 def _looks_like_promo(obj: dict[str, Any]) -> bool:
     keys = {str(k).lower() for k in obj.keys()}
-    has_cost = any(k in keys for k in ("cost", "budget", "spend", "amountspent", "spentmicros", "costmicros"))
-    has_views = any(k in keys for k in ("views", "viewcount", "videoviews", "trueviewviews"))
-    has_impr = any(k in keys for k in ("impressions", "impressioncount", "reach"))
-    has_subs = any(k in keys for k in ("subscribers", "subscribersgained", "subscribercount"))
-    has_name = any(k in keys for k in ("title", "name", "campaignname", "promotionname", "videotitle"))
-    metric_hits = sum(1 for flag in (has_cost, has_views, has_impr, has_subs) if flag)
-    return has_name and metric_hits >= 2
+    # Skip botguard / attestation blobs.
+    if "botguarddata" in keys or "botguardresponse" in keys:
+        return False
+    has_cost = any(
+        k in keys
+        for k in (
+            "cost",
+            "budget",
+            "spend",
+            "amountspent",
+            "spentmicros",
+            "costmicros",
+            "totalcost",
+            "amountspentmoney",
+            "spentamount",
+            "budgetspent",
+            "spendamount",
+            "costamount",
+        )
+    )
+    # Money sometimes only appears as nested {units} under spend-like keys — also detect units sibling metric bags.
+    has_units_money = "units" in keys and any(
+        k in keys for k in ("currencycode", "currency", "nanos")
+    )
+    has_views = any(
+        k in keys
+        for k in ("views", "viewcount", "videoviews", "trueviewviews", "promotedviews", "viewedcount")
+    )
+    has_impr = any(k in keys for k in ("impressions", "impressioncount", "reach", "impression"))
+    has_subs = any(
+        k in keys
+        for k in ("subscribers", "subscribersgained", "subscribercount", "followersgained", "subs")
+    )
+    has_name = any(
+        k in keys
+        for k in (
+            "title",
+            "name",
+            "campaignname",
+            "promotionname",
+            "videotitle",
+            "displayname",
+            "campaignid",
+            "promotionid",
+            "externalcampaignid",
+        )
+    )
+    metric_hits = sum(1 for flag in (has_cost or has_units_money, has_views, has_impr, has_subs) if flag)
+    return has_name and metric_hits >= 1
 
 
 def _pick(obj: dict[str, Any], *names: str) -> Any:
@@ -106,12 +179,23 @@ def _pick(obj: dict[str, Any], *names: str) -> Any:
     return None
 
 
+def _pick_money(obj: dict[str, Any], *names: str) -> int | None:
+    """Resolve scalar or {units} money / metric fields."""
+    for name in names:
+        val = _pick(obj, name)
+        parsed = _parse_int(val)
+        if parsed is not None:
+            return parsed
+    return None
+
+
 def _walk_promos(node: Any, found: list[dict[str, Any]], depth: int = 0) -> None:
     if depth > 28:
         return
     if isinstance(node, dict):
-        if _looks_like_promo(node):
-            found.append(node)
+        flat = _flatten_promo_dict(node)
+        if _looks_like_promo(flat):
+            found.append(flat)
         for value in node.values():
             _walk_promos(value, found, depth + 1)
     elif isinstance(node, list):
@@ -125,28 +209,68 @@ def _slugify(name: str) -> str:
 
 
 def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
-    title = str(
-        _pick(raw, "title", "name", "campaignName", "promotionName", "videoTitle") or "Studio 프로모션"
+    raw = _flatten_promo_dict(raw)
+
+    def _text_field(*names: str) -> str:
+        for name in names:
+            val = _pick(raw, name)
+            if val is None:
+                continue
+            if isinstance(val, dict):
+                simple = _pick(val, "simpleText", "text", "label")
+                if simple:
+                    return str(simple)
+                runs = val.get("runs")
+                if isinstance(runs, list) and runs and isinstance(runs[0], dict) and runs[0].get("text"):
+                    return str(runs[0]["text"])
+                continue
+            text = str(val).strip()
+            if text:
+                return text
+        return ""
+
+    title = _text_field("title", "name", "campaignName", "promotionName", "videoTitle", "displayName") or (
+        "Studio 프로모션"
     )
-    video_title = str(_pick(raw, "videoTitle", "video_title") or title)
+    video_title = _text_field("videoTitle", "video_title") or title
     video_id = str(_pick(raw, "videoId", "encryptedVideoId", "externalVideoId") or "")
     campaign_id = str(
         _pick(raw, "campaignId", "promotionId", "id", "externalCampaignId", "entityId") or ""
     )
 
-    cost = _parse_int(
-        _pick(raw, "cost", "spend", "amountSpent", "budgetSpent", "costMicros", "spentMicros")
+    cost = _pick_money(
+        raw,
+        "cost",
+        "spend",
+        "amountSpent",
+        "budgetSpent",
+        "totalCost",
+        "amountSpentMoney",
+        "spentAmount",
+        "spendAmount",
+        "costAmount",
+        "costMicros",
+        "spentMicros",
     )
-    if cost is not None and abs(cost) > 1_000_000 and str(_pick(raw, "costMicros", "spentMicros") or ""):
+    # Bare {units} sibling only when parent already looks like spend metrics bag.
+    if cost is None and isinstance(_pick(raw, "units"), (str, int, float)):
+        if _pick(raw, "currencyCode", "currency", "nanos") is not None:
+            cost = _parse_int({"units": _pick(raw, "units"), "nanos": _pick(raw, "nanos")})
+
+    if cost is not None and abs(cost) > 1_000_000 and (
+        _pick(raw, "costMicros", "spentMicros") is not None
+    ):
         # micros → 원
         cost = round(cost / 1_000_000)
 
-    impressions = _parse_int(_pick(raw, "impressions", "impressionCount", "reach"))
-    views = _parse_int(_pick(raw, "views", "viewCount", "videoViews", "trueviewViews"))
-    subscribers = _parse_int(
-        _pick(raw, "subscribers", "subscribersGained", "subscriberCount", "followersGained")
+    impressions = _pick_money(raw, "impressions", "impressionCount", "reach", "impression")
+    views = _pick_money(
+        raw, "views", "viewCount", "videoViews", "trueviewViews", "promotedViews", "viewedCount"
     )
-    follow_on = _parse_int(_pick(raw, "followOnViews", "clicks", "followOnViewCount"))
+    subscribers = _pick_money(
+        raw, "subscribers", "subscribersGained", "subscriberCount", "followersGained", "subs"
+    )
+    follow_on = _pick_money(raw, "followOnViews", "clicks", "followOnViewCount")
 
     status_raw = str(_pick(raw, "status", "campaignStatus", "state") or "").upper()
     if status_raw in ("ACTIVE", "ENABLED", "RUNNING", "LIVE"):
@@ -311,8 +435,13 @@ def parse_curl_capture(curl_text: str) -> dict[str, Any]:
     cookie_match = re.search(r"-H\s+'Cookie:\s*([^']+)'", text, re.I)
     if not cookie_match:
         cookie_match = re.search(r'-H\s+"Cookie:\s*([^"]+)"', text, re.I)
+    if not cookie_match:
+        cookie_match = re.search(r"-b\s+'((?:\\'|[^'])*)'", text, re.S)
+    if not cookie_match:
+        cookie_match = re.search(r'-b\s+"((?:\\"|[^"])*)"', text, re.S)
     if cookie_match:
-        for part in cookie_match.group(1).split(";"):
+        raw_cookies = cookie_match.group(1).replace("\\'", "'").replace('\\"', '"')
+        for part in raw_cookies.split(";"):
             if "=" in part:
                 k, v = part.split("=", 1)
                 cookies[k.strip()] = v.strip()
@@ -497,11 +626,44 @@ def get_studio_promo_status() -> dict[str, Any]:
     }
 
 
+_NON_PROMO_URL_HINTS = (
+    "/att/esr",
+    "/att/get",
+    "botguard",
+    "log_event",
+    "get_survey",
+    "get_web_reauth_url",
+    "get_creator_videos",
+)
+
+
+def _capture_url_warning(url: str, body: Any) -> str | None:
+    lower = (url or "").lower()
+    # Good endpoints — never warn even if body carries eats/consistency tokens.
+    if "list_promotions" in lower or "get_promotions" in lower or "list_campaigns" in lower:
+        return None
+    for hint in _NON_PROMO_URL_HINTS:
+        if hint in lower:
+            return (
+                "이 URL은 프로모션 목록 API가 아닙니다 "
+                f"({hint}). Network에서 list_promotions / promotion/campaign/ypc 또는 "
+                "비용·노출이 있는 요청을 다시 캡처하세요."
+            )
+    if isinstance(body, dict) and ("botguardResponse" in body or "challenge" in body):
+        return (
+            "요청 본문에 botguard/challenge가 있습니다. "
+            "attestation(봇 검증) 요청이므로 프로모션 동기화에 쓸 수 없습니다. "
+            "Search에서 숫자를 찾은 list_promotions 요청을 Copy as cURL 하세요."
+        )
+    return None
+
+
 def save_capture_from_curl(curl_text: str, *, also_store_cookies: bool = True) -> dict[str, Any]:
     parsed = parse_curl_capture(curl_text)
     cookies = parsed.pop("cookies", {}) or {}
     channel_id = youtube_channel_id()
     parsed["channelId"] = channel_id
+    url_warning = _capture_url_warning(str(parsed.get("url") or ""), parsed.get("body"))
     write_capture(parsed)
 
     cookie_note = None
@@ -511,11 +673,16 @@ def save_capture_from_curl(curl_text: str, *, also_store_cookies: bool = True) -
         _write_json(cookie_path, {"cookies": cookies, "updatedAt": datetime.now(timezone.utc).isoformat()})
         cookie_note = f"쿠키 {len(cookies)}개 로컬 저장 (data/youtube/studio-cookies.json)"
 
+    message = "캡처 저장 완료" + (f" · {cookie_note}" if cookie_note else "")
+    if url_warning:
+        message = f"{message} · 경고: {url_warning}"
+
     return {
         "ok": True,
         "capture": {k: parsed.get(k) for k in ("url", "method", "capturedAt", "channelId")},
         "cookieCount": len(cookies),
-        "message": "캡처 저장 완료" + (f" · {cookie_note}" if cookie_note else ""),
+        "warning": url_warning,
+        "message": message,
     }
 
 
