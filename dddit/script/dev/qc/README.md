@@ -11,7 +11,18 @@
 |----|------|---------|
 | **톤** | 문장 리듬·담백함·솔직함 | 협찬 **실사용** 줄글 반복 QC → `anchors/tone-sponsored-prose.txt` |
 | **포맷** | 챕터·영상 구조 | 포맷별 프로필 → `formats/*.json` |
+| **챕터 제목** | 더보기 타임라인용 짧은 제목 | `checklists/chapter-titles.json` · `anchors/chapter-title-patterns.json` |
 | **카테고리** | 큰 챕터 구성·라운드업 소스 | 톤과 무관 → `formats/categories.json` |
+
+## 챕터 제목 QC
+
+채널 업로드 영상 더보기란 타임라인(YouTube Data API `snippet.description`)을 분석한 패턴:
+
+- 인트로 = **타이틀 카드 없음** (`00:00 인트로`는 더보기에만)
+- 좋은 예: `디자인`, `디자인 및 제원`, `핵심 성능 및 실사용`, `편의성 및 한계점`, `총평`
+- 나쁜 예: `오프닝(음식물 고충·언박싱·제품 소개)` — 괄호 내용은 메모로
+- 콘티 작성기는 `chapter-title-qc.js`가 기획안 structure → 짧은 제목+메모로 자동 변환
+- API: `GET /api/dddit/youtube/report/videos` 응답에 `chapters[]` 포함
 
 ## 포맷 프로필
 

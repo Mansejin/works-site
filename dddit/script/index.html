@@ -120,12 +120,16 @@
 
             <details class="fold">
               <summary>챕터 나누기 (선택) · 드래그로 순서 변경</summary>
+              <p class="hint">제목은 채널 더보기 타임라인 스타일(짧은 명사구). 인트로는 타이틀 카드 없음.</p>
               <div id="chapter-list" class="chapter-list"></div>
               <div class="chapter-add-form">
-                <label class="field">새 챕터 제목<input id="new-chapter-title" type="text" placeholder="프롤로그, 실사용…" /></label>
+                <label class="field">새 챕터 제목<input id="new-chapter-title" type="text" placeholder="디자인, 핵심 성능 및 실사용…" /></label>
                 <label class="field">메모<textarea id="new-chapter-notes" rows="2" placeholder="이 챕터에서 다룰 내용"></textarea></label>
               </div>
-              <button id="btn-add-chapter" class="btn btn-secondary btn-sm" type="button">챕터 추가</button>
+              <div class="btn-row">
+                <button id="btn-add-chapter" class="btn btn-secondary btn-sm" type="button">챕터 추가</button>
+                <button id="btn-chapter-qc" class="btn btn-ghost btn-sm" type="button">기획안→제목 QC</button>
+              </div>
             </details>
 
             <label class="field field-grow">줄글 대본<textarea id="prose-draft" class="prose-draft" rows="20" placeholder="AI 생성 또는 직접 작성…"></textarea></label>
@@ -288,9 +292,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" async></script>
   <script src="../js/plan-defaults.js"></script>
+  <script src="../js/chapter-title-qc.js"></script>
   <script src="../js/plan-brief-sync.js"></script>
   <script src="js/works-api.js"></script>
   <script src="js/sheet-sync.js"></script>
-  <script src="js/main.js?v=29"></script>
+  <script src="js/main.js?v=30"></script>
 </body>
 </html>

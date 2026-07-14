@@ -830,11 +830,20 @@ window.DIDIDIT_PIPELINE = (function () {
   };
 
   function isPrologueChapter(title) {
-    return /프롤로그|오프닝/i.test(title || '');
+    return /프롤로그|오프닝|인트로|^인트$/i.test(title || '');
   }
 
   function isClosingChapter(title) {
     return /총평|클로징|마무리/i.test(title || '');
+  }
+
+  function proseHeading(chapter) {
+    if (window.DdditChapterTitleQc?.headingForProse) {
+      return window.DdditChapterTitleQc.headingForProse(chapter);
+    }
+    if (!chapter) return '';
+    if (chapter.titleCard === false || isPrologueChapter(chapter.title)) return '';
+    return String(chapter?.title || '').trim();
   }
 
   function getNarrationRhythmBlock() {
@@ -966,10 +975,14 @@ window.DIDIDIT_PIPELINE = (function () {
         ? '- 앞 챕터와 **같은 톤·호흡·문장 리듬**을 유지하세요. 이미 쓴 내용은 반복하지 마세요.\n'
         : '- 이미 작성된 줄글이 있으면 톤·흐름을 맞춰 이어 쓰고, 반복하지 마세요.\n';
 
+    const heading = proseHeading(chapter);
+    const titleLine = heading
+      ? `- 챕터 제목은 \`## ${heading}\` 로 시작합니다. (본문에는 제목 행을 다시 쓰지 마세요)`
+      : `- 이 챕터는 **인트로**입니다. \`##\` 제목 행을 넣지 마세요. 타이틀 카드 없이 바로 오프닝 멘트로 시작합니다.`;
     return `${ctxBlock}# 작업: 줄글 대본 작성
 - 성우 내레이션 중심의 **자연스러운 줄글**만 작성합니다.
 - 표·행 분할·장면·자막·JSON은 넣지 않습니다.
-- 챕터 제목은 \`## ${title}\` 로 시작합니다.
+${titleLine}
 ${notes ? `- 챕터 메모: ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${specChapter}${designChapter}${priceChapter}${closingChapter}
 ${continuity}`;
   }
@@ -1050,6 +1063,7 @@ JSON rows 전체를 반환.`;
     splitProseChunks,
     isPrologueChapter,
     isClosingChapter,
+    proseHeading,
   };
 })();
 
@@ -1558,7 +1572,18 @@ function syncChaptersFromDOM() {
   document.querySelectorAll('#chapter-list .chapter-item').forEach((el) => {
     const title = el.querySelector('.chapter-title')?.value.trim();
     const notes = el.querySelector('.chapter-notes')?.value.trim() || '';
-    if (title) items.push({ id: el.dataset.id, title, notes });
+    if (!title) return;
+    const prev = state.chapters.find((c) => c.id === el.dataset.id);
+    const titleCard = window.DdditChapterTitleQc?.isIntroTitle?.(title)
+      ? false
+      : (prev?.titleCard !== false);
+    items.push({
+      id: el.dataset.id,
+      title,
+      notes,
+      titleCard,
+      sourceTitle: prev?.sourceTitle,
+    });
   });
   state.chapters = items;
 }
@@ -1643,21 +1668,33 @@ function renderChapters() {
     list.innerHTML = '<p class="hint muted">챕터 없이 한 번에 작성하거나, 아래에서 챕터를 추가하세요.</p>';
     return;
   }
-  list.innerHTML = state.chapters.map((ch, i) => `
+  list.innerHTML = state.chapters.map((ch, i) => {
+    const issues = window.DdditChapterTitleQc?.qcIssues?.(ch) || [];
+    const noCard = ch.titleCard === false || window.DdditChapterTitleQc?.isIntroTitle?.(ch.title);
+    const hint = noCard
+      ? '<p class="hint muted">인트로 — 영상 타이틀 카드 없음 (더보기 타임라인만)</p>'
+      : (issues.length ? `<p class="hint muted">QC: ${esc(issues.join(' · '))}</p>` : '');
+    return `
     <div class="chapter-item" data-id="${esc(ch.id)}">
       <div class="chapter-item-head" draggable="true" title="드래그하여 순서 변경">
         <span class="chapter-drag-handle" aria-hidden="true">⋮⋮</span>
-        <span class="chapter-item-num">챕터 ${i + 1}</span>
+        <span class="chapter-item-num">챕터 ${i + 1}${noCard ? ' · 인트로' : ''}</span>
         <button type="button" class="btn btn-ghost btn-sm btn-chapter-remove">삭제</button>
       </div>
       <label class="field">제목<input class="chapter-title" type="text" value="${esc(ch.title)}" /></label>
+      ${hint}
       <label class="field">메모<textarea class="chapter-notes" rows="2" placeholder="이 챕터에서 다룰 내용">${esc(ch.notes)}</textarea></label>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   list.querySelectorAll('.chapter-item').forEach((el) => {
     const id = el.dataset.id;
     el.querySelector('.chapter-title')?.addEventListener('input', (e) => {
       const ch = state.chapters.find((c) => c.id === id);
-      if (ch) ch.title = e.target.value;
+      if (ch) {
+        ch.title = e.target.value;
+        if (window.DdditChapterTitleQc?.isIntroTitle?.(ch.title)) ch.titleCard = false;
+        else if (ch.titleCard === false) ch.titleCard = true;
+      }
       saveProject();
     });
     el.querySelector('.chapter-notes')?.addEventListener('input', (e) => {
@@ -1680,11 +1717,29 @@ function renderChapters() {
 function addChapter() {
   const title = $('#new-chapter-title')?.value.trim();
   if (!title) return showToast('챕터 제목을 입력하세요.', true);
-  state.chapters.push({ id: `ch-${Date.now()}`, title, notes: $('#new-chapter-notes')?.value.trim() || '' });
+  const qc = window.DdditChapterTitleQc?.normalizeChapterSegment?.(title, state.chapters.length);
+  state.chapters.push({
+    id: `ch-${Date.now()}`,
+    title: qc?.title || title,
+    notes: ($('#new-chapter-notes')?.value.trim() || '') || (qc?.notes || ''),
+    titleCard: qc ? qc.titleCard : true,
+    sourceTitle: title,
+  });
   $('#new-chapter-title').value = '';
   $('#new-chapter-notes').value = '';
   renderChapters();
   saveProject();
+}
+
+function reloadChaptersFromPlanQc() {
+  const plan = loadPlanData();
+  if (!plan?.structure) return showToast('기획안 구성(structure)이 없습니다.', true);
+  if (state.chapters.length && !confirm('현재 챕터 목록을 기획안 기준 QC 제목으로 바꿀까요?')) return;
+  const SYNC = window.DdditPlanBriefSync;
+  state.chapters = SYNC?.parseStructureToChapters?.(plan.structure) || [];
+  renderChapters();
+  saveProject();
+  showToast(`챕터 ${state.chapters.length}개 · 제목 QC 적용`);
 }
 
 function navigatePipeline(step) {
@@ -1767,8 +1822,21 @@ async function runProseDraft() {
   setLoading(true, '줄글 초안 작성 중…');
   try {
     let prose = continueFromEdit ? existingProse : '';
-    const chapters = state.chapters.length ? state.chapters : [{ title: '전체', notes: effective.contentDirection }];
-    const startIndex = prose ? chapters.findIndex((ch) => !prose.includes(`## ${ch.title}`)) : 0;
+    const chapters = state.chapters.length ? state.chapters : [{ title: '전체', notes: effective.contentDirection, titleCard: true }];
+    const chapterMarker = (ch) => {
+      const heading = PIPE.proseHeading?.(ch) ?? (ch?.titleCard === false ? '' : ch?.title);
+      return heading ? `## ${heading}` : null;
+    };
+    const startIndex = prose
+      ? chapters.findIndex((ch) => {
+          const marker = chapterMarker(ch);
+          if (!marker) {
+            // intro: consider done if prose already has opening greeting
+            return !/안녕하세요,\s*디디딧입니다/.test(prose);
+          }
+          return !prose.includes(marker);
+        })
+      : 0;
     const from = startIndex < 0 ? chapters.length : Math.max(0, startIndex);
     if (from >= chapters.length) {
       showToast('이미 모든 챕터가 작성되어 있습니다.');
@@ -1781,8 +1849,16 @@ async function runProseDraft() {
         includeContext: i === from && !SESSION.hasHistory(),
         hasSession: SESSION.turnCount() > 0,
       });
-      const chunk = await callGeminiTextSession(prompt, 0.72, 'prose');
-      prose = prose ? `${prose}\n\n## ${chapters[i].title}\n${chunk}` : `## ${chapters[i].title}\n${chunk}`;
+      let chunk = await callGeminiTextSession(prompt, 0.72, 'prose');
+      const marker = chapterMarker(chapters[i]);
+      // model sometimes echoes ## heading — strip duplicate
+      if (marker) {
+        chunk = String(chunk || '').replace(new RegExp(`^\\s*${marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\n?`), '').trim();
+        prose = prose ? `${prose}\n\n${marker}\n${chunk}` : `${marker}\n${chunk}`;
+      } else {
+        chunk = String(chunk || '').replace(/^\s*##\s+.+\n?/, '').trim();
+        prose = prose ? `${prose}\n\n${chunk}` : chunk;
+      }
     }
     state.proseDraft = prose;
     $('#prose-draft').value = prose;
@@ -2164,6 +2240,7 @@ function bindEvents() {
   $('#btn-add-scenes')?.addEventListener('click', runAddScenes);
   $('#btn-add-captions')?.addEventListener('click', runAddCaptions);
   $('#btn-add-chapter')?.addEventListener('click', addChapter);
+  $('#btn-chapter-qc')?.addEventListener('click', reloadChaptersFromPlanQc);
   $('#btn-sheet-push')?.addEventListener('click', pushToSheet);
   $('#btn-sheet-pull')?.addEventListener('click', pullFromSheet);
   $('#btn-pipeline-next-brief')?.addEventListener('click', () => navigatePipeline(2));
@@ -2230,7 +2307,7 @@ async function boot() {
     navigatePipeline(state.pipelineStep || 1);
     renderTable();
     if (!isApiReady() && !window.DdditWorksApi?.isBackendMode?.()) {
-      $('#settings-panel')?.classList.remove('collapsed');
+      openToolModal('#settings-panel');
     }
   } catch (e) {
     $('#boot-error')?.classList.remove('hidden');

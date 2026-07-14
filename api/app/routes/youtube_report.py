@@ -88,6 +88,50 @@ def _format_duration(seconds: int) -> str:
     return f"{m}:{s:02d}"
 
 
+_CHAPTER_LINE_RE = re.compile(r"^\s*((?:\d{1,2}:)?\d{1,2}:\d{2})\s+(.+?)\s*$")
+
+
+def _timestamp_to_seconds(label: str) -> int:
+    try:
+        parts = [int(p) for p in str(label or "").split(":")]
+    except ValueError:
+        return -1
+    if len(parts) == 3:
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    if len(parts) == 2:
+        return parts[0] * 60 + parts[1]
+    return -1
+
+
+def parse_description_chapters(description: str) -> list[dict[str, Any]]:
+    """Parse YouTube description timeline chapters (`0:00 Title`)."""
+    chapters: list[dict[str, Any]] = []
+    for line in str(description or "").splitlines():
+        m = _CHAPTER_LINE_RE.match(line)
+        if not m:
+            continue
+        title = re.sub(r"^\s*[-–—]\s*", "", m.group(2) or "").strip()
+        if not title or len(title) > 40 or "→" in title or title.startswith('"'):
+            continue
+        if re.search(r"https?://", title, re.I):
+            continue
+        seconds = _timestamp_to_seconds(m.group(1))
+        if seconds < 0:
+            continue
+        intro = bool(re.search(r"인트로|인트|프롤로그|오프닝", title))
+        chapters.append(
+            {
+                "timestamp": m.group(1),
+                "seconds": seconds,
+                "title": title,
+                "titleCard": not intro,
+            }
+        )
+    if not chapters or chapters[0]["seconds"] != 0:
+        return []
+    return chapters
+
+
 def _promotion_metrics(promo: dict[str, Any]) -> dict[str, Any]:
     cost = _parse_int(promo.get("cost"))
     impressions = _parse_int(promo.get("impressions"))
@@ -200,11 +244,15 @@ async def _fetch_video_details(
             views = _parse_int(st.get("viewCount"))
             likes = _parse_int(st.get("likeCount"))
             comments = _parse_int(st.get("commentCount"))
+            description = sn.get("description") or ""
+            chapters = parse_description_chapters(description)
             videos.append(
                 {
                     "id": vid,
                     "title": sn.get("title") or "",
-                    "description": sn.get("description") or "",
+                    "description": description,
+                    "chapters": chapters,
+                    "chapterCount": len(chapters),
                     "publishedAt": sn.get("publishedAt") or "",
                     "thumbnail": thumb,
                     "url": f"https://www.youtube.com/watch?v={vid}" if vid else "",
