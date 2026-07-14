@@ -1188,43 +1188,21 @@
   }
 
   async function loadEditors() {
-    const [promo, snaps] = await Promise.all([
-      apiGet("/api/dddit/youtube/report/promotions"),
-      apiGet("/api/dddit/youtube/report/snapshots"),
-    ]);
+    const promo = await apiGet("/api/dddit/youtube/report/promotions");
     const memo =
       promo.memo ||
       (Array.isArray(promo.issues) ? promo.issues.join("\n") : "") ||
       "";
     if (els.memoEditor) els.memoEditor.value = memo;
     if (els.issuesEditor) els.issuesEditor.value = memo;
-    els.promotionsEditor.value = JSON.stringify(promo.promotions || [], null, 2);
-    els.snapshotsEditor.value = JSON.stringify(
-      { snapshots: snaps.snapshots || [], viewsTrend7d: snaps.viewsTrend7d || [] },
-      null,
-      2
-    );
   }
 
   async function saveEditors() {
     const memo = (els.memoEditor || els.issuesEditor)?.value || "";
-    const issues = [];
-    let promotions;
-    let snapshotsPayload;
-    try {
-      promotions = JSON.parse(els.promotionsEditor.value || "[]");
-      snapshotsPayload = JSON.parse(els.snapshotsEditor.value || "{}");
-    } catch {
-      throw new Error("JSON 형식이 올바르지 않습니다.");
-    }
-    if (!Array.isArray(promotions)) throw new Error("promotions는 배열이어야 합니다.");
-
-    await apiPut("/api/dddit/youtube/report/promotions", { promotions, memo, issues });
-    await apiPut("/api/dddit/youtube/report/snapshots", {
-      snapshots: snapshotsPayload.snapshots || [],
-      viewsTrend7d: snapshotsPayload.viewsTrend7d || [],
-    });
-    els.saveStatus.textContent = "저장됨 · 데이터 갱신 권장";
+    const current = await apiGet("/api/dddit/youtube/report/promotions", { timeoutMs: 15_000 });
+    const promotions = Array.isArray(current.promotions) ? current.promotions : [];
+    await apiPut("/api/dddit/youtube/report/promotions", { promotions, memo, issues: [] });
+    els.saveStatus.textContent = "메모 저장됨";
     els.saveStatus.className = "status-pill ok";
   }
 
