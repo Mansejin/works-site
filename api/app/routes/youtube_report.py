@@ -9,7 +9,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.config import google_ads_config, youtube_analytics_oauth_config, youtube_api_key, youtube_channel_handle
+from app.config import google_ads_config, google_ads_sync_enabled, youtube_analytics_oauth_config, youtube_api_key, youtube_channel_handle
 from app.google_ads import get_ads_status, sync_campaigns
 from app.routes.youtube import _fetch_via_api, _fetch_via_scrape, _format_count
 from app.youtube_analytics import (
@@ -462,7 +462,7 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
 
         analytics_overview = await fetch_analytics_overview(refresh=refresh)
         ads_status = await get_ads_status()
-        if google_ads_config() and not ads_status.get("lastSync"):
+        if google_ads_sync_enabled() and google_ads_config() and not ads_status.get("lastSync"):
             await sync_campaigns(force=False)
 
         limitations = [
@@ -473,10 +473,12 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             limitations.append(_reporting_limitation_line(analytics_overview))
         else:
             limitations.append("YouTube Analytics API (OAuth): NAS .env에 OAuth 토큰 설정 필요")
-        if google_ads_config():
+        if google_ads_sync_enabled() and google_ads_config():
             limitations.append("Google Ads API: 프로모션 비용·노출 동기화 (연동됨)")
         else:
-            limitations.append("Google Ads API: 프로모션 비용·노출 실시간 동기화 (미설정)")
+            limitations.append(
+                "Google Ads API: 동기화 꺼짐 — YouTube Studio 프로모션은 수동 입력 (promotions.json)"
+            )
 
         if analytics_overview.get("ok"):
             for video in videos:

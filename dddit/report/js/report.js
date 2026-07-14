@@ -936,7 +936,17 @@
   }
 
   function renderAdsSyncStatus(adsSync) {
+    const btn = document.getElementById("btn-ads-sync");
     if (!els.adsSyncStatus || !adsSync) return;
+    if (adsSync.enabled === false) {
+      if (btn) btn.style.display = "none";
+      els.adsSyncStatus.textContent = "Studio 수동";
+      els.adsSyncStatus.className = "status-pill";
+      els.adsSyncStatus.title =
+        adsSync.message || "Google Ads 동기화 꺼짐 — 프로모션 JSON으로 수동 관리";
+      return;
+    }
+    if (btn) btn.style.display = "";
     if (!adsSync.configured) {
       els.adsSyncStatus.textContent = "Ads 미설정";
       els.adsSyncStatus.className = "status-pill";

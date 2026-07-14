@@ -115,3 +115,9 @@ def google_ads_config() -> dict[str, str] | None:
         "customer_id": customer_id.replace("-", ""),
         "login_customer_id": login_customer_id.replace("-", "") if login_customer_id else "",
     }
+
+
+def google_ads_sync_enabled() -> bool:
+    """Studio 프로모션은 Ads API에 없을 수 있어 기본 꺼짐. 1/true/yes/on 일 때만 동기화."""
+    raw = os.getenv("GOOGLE_ADS_SYNC_ENABLED", "0").strip().lower()
+    return raw in ("1", "true", "yes", "on")
