@@ -225,6 +225,8 @@ function applyChaptersFromPlan(options = {}) {
     return { ok: true, skipped: true, chapters: state.chapters };
   }
   state.chapters = next;
+  // DOM 동기화 전에 렌더해야 saveProject가 챕터를 지우지 않음
+  renderChapters();
   saveProject();
   return { ok: true, chapters: next };
 }
@@ -235,13 +237,26 @@ function renderChapterQcPreview(chapters) {
   const panel = $('#chapter-qc-panel');
   if (!list) return;
   const plan = loadPlanData();
-  const preview = (chapters && chapters.length)
-    ? chapters
-    : chaptersFromPlanStructure(plan?.structure);
+  const preview = Array.isArray(chapters) ? chapters : state.chapters;
   if (!preview.length) {
+    // 제안 미리보기: 아직 적용 전이면 구성에서 계산한 단축안을 보여 줌
+    const proposed = chaptersFromPlanStructure(plan?.structure);
+    if (proposed.length) {
+      empty?.classList.add('hidden');
+      panel?.classList.remove('hidden');
+      list.innerHTML = proposed.map((ch) => {
+        const noCard = ch.titleCard === false || window.DdditChapterTitleQc?.isIntroTitle?.(ch.title);
+        const notes = String(ch.notes || '').trim();
+        return `<li>
+          <span class="chapter-qc-title">${esc(ch.title)}${noCard ? '<span class="chapter-qc-badge">타이틀 카드 없음</span>' : ''}</span>
+          ${notes ? `<span class="chapter-qc-notes">${esc(notes)}</span>` : ''}
+        </li>`;
+      }).join('');
+      return;
+    }
     list.innerHTML = '';
     empty?.classList.remove('hidden');
-    panel?.classList.toggle('hidden', !plan);
+    panel?.classList.toggle('hidden', !plan?.structure);
     return;
   }
   empty?.classList.add('hidden');
@@ -272,7 +287,11 @@ function reloadChaptersFromPlanQc(options = {}) {
   renderChapterQcPreview(state.chapters);
   renderChapters();
   saveProject();
-  if (!options.silent) showToast(`챕터 ${state.chapters.length}개 · 짧은 제목 적용`);
+  const count = state.chapters.length;
+  if (!options.silent) {
+    showToast(`챕터 ${count}개 · 짧은 제목 적용`);
+    if (count > 0 && options.goNext !== false) navigatePipeline(2);
+  }
 }
 
 function renderPlanSummary() {
@@ -495,8 +514,12 @@ function syncSupplementsFromDOM() {
 }
 
 function syncChaptersFromDOM() {
+  const nodes = document.querySelectorAll('#chapter-list .chapter-item');
+  // 1단계에서는 챕터 목록이 display:none + 미렌더라 항목이 없음.
+  // 빈 DOM으로 state.chapters를 []로 덮어쓰지 않는다.
+  if (!nodes.length) return;
   const items = [];
-  document.querySelectorAll('#chapter-list .chapter-item').forEach((el) => {
+  nodes.forEach((el) => {
     const title = el.querySelector('.chapter-title')?.value.trim();
     const notes = el.querySelector('.chapter-notes')?.value.trim() || '';
     if (!title) return;
