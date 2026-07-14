@@ -971,6 +971,20 @@ td.empty {
 
 .loading-overlay.hidden { display: none; }
 
+.loading-model {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.01em;
+}
+.loading-model.hidden { display: none; }
+
+#script-table tr.chapter-marker-row td {
+  background: rgba(37, 99, 235, 0.08);
+  font-weight: 600;
+}
+
 .loading-cancel-btn {
   margin-top: 4px;
   background: rgba(255, 255, 255, 0.12);

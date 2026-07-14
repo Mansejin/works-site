@@ -34,6 +34,8 @@ const state = {
 
 /** 진행 중인 AI 작업 취소 */
 let jobAbort = null;
+/** 현재 호출 중인 Gemini 모델 id (로딩 오버레이에 표시) */
+let activeJobModel = '';
 let selectedProseHistoryId = null;
 const PROSE_HISTORY_MAX = 8;
 
@@ -487,11 +489,43 @@ function setLoading(on, text, options = {}) {
   el.classList.toggle('hidden', !on);
   el.setAttribute('aria-hidden', on ? 'false' : 'true');
   if (text) $('#loading-text').textContent = text;
+  const modelEl = $('#loading-model');
+  if (modelEl) {
+    if (on) {
+      const model = options.model || activeJobModel || '';
+      if (model) {
+        modelEl.textContent = `모델: ${model}`;
+        modelEl.classList.remove('hidden');
+      } else {
+        modelEl.textContent = '';
+        modelEl.classList.add('hidden');
+      }
+    } else {
+      modelEl.textContent = '';
+      modelEl.classList.add('hidden');
+      activeJobModel = '';
+    }
+  }
   const cancelBtn = $('#btn-cancel-job');
   if (cancelBtn) {
     const showCancel = Boolean(on && options.cancellable !== false && jobAbort);
     cancelBtn.classList.toggle('hidden', !showCancel);
     cancelBtn.disabled = !showCancel;
+  }
+}
+
+function setActiveJobModel(model) {
+  activeJobModel = String(model || '').trim();
+  const overlay = $('#loading-overlay');
+  if (!overlay || overlay.classList.contains('hidden')) return;
+  const modelEl = $('#loading-model');
+  if (!modelEl) return;
+  if (activeJobModel) {
+    modelEl.textContent = `모델: ${activeJobModel}`;
+    modelEl.classList.remove('hidden');
+  } else {
+    modelEl.textContent = '';
+    modelEl.classList.add('hidden');
   }
 }
 
@@ -521,6 +555,7 @@ function beginJob() {
     try { jobAbort.abort(); } catch { /* ignore */ }
   }
   jobAbort = new AbortController();
+  activeJobModel = '';
   return jobAbort.signal;
 }
 
@@ -750,6 +785,7 @@ async function callGeminiTextSession(userPrompt, temperature = 0.75, stage = 'pr
   throwIfCancelled();
   SESSION.push('user', userPrompt);
   const model = state.modelPro;
+  setActiveJobModel(model);
   const signal = getJobSignal();
   const body = {
     systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
@@ -864,6 +900,7 @@ async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') 
   for (let mi = 0; mi < models.length; mi++) {
     const model = models[mi];
     throwIfCancelled();
+    setActiveJobModel(model);
     const body = {
       ...bodyBase,
       generationConfig: buildFastGenerationConfig({ temperature, json: true, model }),
@@ -1172,13 +1209,13 @@ function navigatePipeline(step) {
 }
 
 function updatePipelineUI() {
-  const labels = ['', '기획안', '대본', '시트 변환', '장면·사이즈', '자막·공유'];
+  const labels = ['', '기획안', '대본', '시트 변환', '장면', '자막·공유'];
   const hints = [
     '',
     '기획안 확인 후 대본 단계로',
     '챕터 지정 후 AI 생성, 또는 직접 작성',
-    '대본을 시트 5열로 변환',
-    '장면·사이즈 열 자동 생성',
+    '대본을 시트 4열로 변환',
+    '장면 열 자동 생성 · 챕터명 행 유지',
     '자막·코멘트 추가 후 시트 전송',
   ];
   const effective = getEffectiveState();
@@ -1335,31 +1372,50 @@ async function runConvertToSheet() {
   beginJob();
   setLoading(true, '시트 변환 중…');
   try {
-    const chunks = PIPE.splitProseChunks(prose, 14000);
+    const sections = PIPE.splitProseByChapters
+      ? PIPE.splitProseByChapters(prose)
+      : [{ title: '', body: prose }];
     let rows = [];
-    for (let i = 0; i < chunks.length; i++) {
-      throwIfCancelled();
-      setLoading(true, `시트 변환 중… (${i + 1}/${chunks.length})`);
-      let part = [];
-      let retryHint = '';
-      // At most 2 API attempts; heal locally instead of soft-issue retries.
-      for (let attempt = 0; attempt < 2; attempt++) {
+    let doneChunks = 0;
+    const totalChunks = sections.reduce(
+      (n, s) => n + PIPE.splitProseChunks(s.body || '', 14000).length,
+      0,
+    ) || 1;
+    for (let si = 0; si < sections.length; si++) {
+      const section = sections[si];
+      const chunks = PIPE.splitProseChunks(section.body || '', 14000);
+      let sectionRows = [];
+      for (let i = 0; i < chunks.length; i++) {
         throwIfCancelled();
-        part = await callGeminiJson(
-          PIPE.buildConvertPrompt(ctx, chunks[i], retryHint),
-          attempt > 0 ? 0.2 : 0.3,
-          'convert',
-        );
-        part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
-        const hard = PIPE.validateHardIssues(part);
-        if (!hard.length) break;
-        retryHint = PIPE.buildConvertRetryHint(hard);
-        if (attempt === 1) {
-          reportError('runConvertToSheet.validate', new Error(hard.join('; ')), { chunk: i + 1 });
+        doneChunks += 1;
+        setLoading(true, `시트 변환 중… (${doneChunks}/${totalChunks})`);
+        let part = [];
+        let retryHint = '';
+        for (let attempt = 0; attempt < 2; attempt++) {
+          throwIfCancelled();
+          part = await callGeminiJson(
+            PIPE.buildConvertPrompt(ctx, chunks[i], retryHint),
+            attempt > 0 ? 0.2 : 0.3,
+            'convert',
+          );
+          part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
+          const hard = PIPE.validateHardIssues(part);
+          if (!hard.length) break;
+          retryHint = PIPE.buildConvertRetryHint(hard);
+          if (attempt === 1) {
+            reportError('runConvertToSheet.validate', new Error(hard.join('; ')), {
+              chunk: doneChunks,
+              chapter: section.title || '(intro)',
+            });
+          }
         }
+        part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
+        sectionRows = sectionRows.concat(part);
       }
-      part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
-      rows = rows.concat(part);
+      if (section.title && PIPE.makeChapterMarkerRow) {
+        sectionRows = [PIPE.makeChapterMarkerRow(section.title), ...sectionRows];
+      }
+      rows = rows.concat(sectionRows);
     }
     state.allRows = PIPE.normalizeRows(rows);
     renderTable();
@@ -1386,7 +1442,7 @@ async function runAddScenes() {
   if (!requireApiReady() || !state.allRows.length) return;
   if (jobAbort) return showToast('이미 작성 중입니다. 취소 후 다시 시도하세요.', true);
   beginJob();
-  setLoading(true, '장면·사이즈 추가 중…');
+  setLoading(true, '장면 추가 중…');
   try {
     const plan = loadPlanData();
     const guide = window.DdditBrandGuideQc?.extractFromPlan?.(plan) || {};
@@ -1394,15 +1450,22 @@ async function runAddScenes() {
       shootChecklist: plan?.shootChecklist || (guide.mustScenes || []).map((s) => `□ ${s}`).join('\n'),
       allowUnboxing: Boolean(guide.allowUnboxing),
     };
-    state.allRows = await callGeminiJson(
-      PIPE.buildScenePrompt(buildProductContext(), state.allRows, sceneOpts),
+    const prev = state.allRows.slice();
+    const contentRows = PIPE.isChapterMarkerRow
+      ? prev.filter((r) => !PIPE.isChapterMarkerRow(r))
+      : prev;
+    const generated = await callGeminiJson(
+      PIPE.buildScenePrompt(buildProductContext(), contentRows, sceneOpts),
       0.4,
       'scene',
     );
+    state.allRows = PIPE.preserveChapterMarkers
+      ? PIPE.preserveChapterMarkers(prev, generated)
+      : PIPE.normalizeRows(generated);
     renderTable();
     renderGuideCoverageQc();
     const miss = ($('#guide-qc-fail-count')?.textContent || '').trim();
-    showToast(miss && miss !== '0' ? `장면 반영 · 가이드 미커버 ${miss}항 확인` : '장면·사이즈를 반영했습니다.');
+    showToast(miss && miss !== '0' ? `장면 반영 · 가이드 미커버 ${miss}항 확인` : '장면을 반영했습니다.');
     navigatePipeline(5);
   } catch (e) {
     if (isAbortError(e)) {
@@ -1422,8 +1485,20 @@ async function runAddCaptions() {
   beginJob();
   setLoading(true, '자막·코멘트 추가 중…');
   try {
-    state.allRows = await callGeminiJson(PIPE.buildCaptionPrompt(buildProductContext(), state.allRows), 0.4, 'caption');
+    const prev = state.allRows.slice();
+    const contentRows = PIPE.isChapterMarkerRow
+      ? prev.filter((r) => !PIPE.isChapterMarkerRow(r))
+      : prev;
+    const generated = await callGeminiJson(
+      PIPE.buildCaptionPrompt(buildProductContext(), contentRows),
+      0.4,
+      'caption',
+    );
+    state.allRows = PIPE.preserveChapterMarkers
+      ? PIPE.preserveChapterMarkers(prev, generated)
+      : PIPE.normalizeRows(generated);
     renderTable();
+    saveProject();
     showToast('자막·코멘트를 반영했습니다.');
   } catch (e) {
     if (isAbortError(e)) {
@@ -1444,17 +1519,17 @@ function renderTable() {
   if (!state.allRows.length) {
     tbody.innerHTML = `<tr><td colspan="${cols.length}" class="empty">아직 표 데이터가 없습니다</td></tr>`;
     $('#stat-rows').textContent = '0';
+    updateTableHead(mode);
     return;
   }
   tbody.innerHTML = state.allRows.map((r) => {
+    const marker = PIPE.isChapterMarkerRow?.(r);
     if (mode === 'full') {
-      return `<tr>${PIPE.HEADERS.map((h) => `<td><span class="cell-preview">${esc(r[h]) || '<span class="is-empty">—</span>'}</span></td>`).join('')}</tr>`;
+      return `<tr class="${marker ? 'chapter-marker-row' : ''}">${PIPE.HEADERS.map((h) => `<td><span class="cell-preview">${esc(r[h]) || '<span class="is-empty">—</span>'}</span></td>`).join('')}</tr>`;
     }
-    return `<tr><td><span class="cell-preview">${esc(r.대본)}</span></td><td><span class="cell-preview">${esc(r.장면) || '—'}</span></td></tr>`;
+    return `<tr class="${marker ? 'chapter-marker-row' : ''}"><td><span class="cell-preview">${esc(r.대본)}</span></td><td><span class="cell-preview">${esc(r.장면) || '—'}</span></td></tr>`;
   }).join('');
   $('#stat-rows').textContent = state.allRows.length;
-  const bytes = state.allRows.reduce((s, r) => s + new TextEncoder().encode(r.대본).length, 0);
-  $('#stat-bytes').textContent = bytes.toLocaleString();
   updateTableHead(mode);
 }
 
@@ -1502,9 +1577,6 @@ function rememberSheetUrl(project, url) {
     store.projects[project] = { url, updatedAt: new Date().toISOString() };
     localStorage.setItem(SHEET_SETTINGS_KEY, JSON.stringify(store));
     state.sheetOpenUrl = url;
-    const bar = $('#sheet-link-bar');
-    const link = $('#sheet-open-link');
-    if (bar && link) { bar.classList.remove('hidden'); link.href = url; link.textContent = '시트 열기'; }
   } catch { /* ignore */ }
 }
 
@@ -1514,6 +1586,11 @@ async function pushToSheet() {
   setLoading(true, '시트로 보내는 중…');
   try {
     const project = getSheetSlug();
+    if (PIPE.ensureChapterMarkersFromProse && state.proseDraft) {
+      state.allRows = PIPE.ensureChapterMarkersFromProse(state.proseDraft, state.allRows);
+      renderTable();
+      saveProject();
+    }
     const result = await sync.exportToSheet(getSheetConfig(), state.allRows, project);
     if (result.spreadsheetUrl) rememberSheetUrl(project, result.spreadsheetUrl);
     showToast('시트에 반영했습니다. 브랜드 페이지에서 대본을 공유할 수 있습니다.');

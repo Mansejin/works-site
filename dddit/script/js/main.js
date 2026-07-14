@@ -54,7 +54,7 @@
   const STAGE_RULES = {
     prose: `# 현재 작업 단계: 줄글 작성 (최우선)
 - 성우 내레이션 **줄글(연속 텍스트)** 만 작성합니다.
-- 행 분할·글자 수·바이트·표·JSON·장면·사이즈·자막·코멘트 규칙은 **이 단계에서 적용하지 않습니다**.
+- 행 분할·글자 수·바이트·표·JSON·장면·자막·코멘트 규칙은 **이 단계에서 적용하지 않습니다**.
 - **내용 가중치**: 기획안 구성·챕터 메모·필수 장면/소구/멘션 > 일반 시스템 프롬프트 관례.
 - 챕터마다 **범위가 다릅니다**. 다른 챕터에 배정된 소구·시연을 반복하지 마세요.
 - 스펙·수치는 문장 속에 자연스럽게 녹이고, 나열형 낭독은 피합니다.
@@ -67,26 +67,26 @@
 - 출력: 마크다운·JSON·표 없이 줄글 본문만`,
 
     convert: `# 현재 작업 단계: 줄글 → 대본 열 변환 (최우선)
-- 줄글을 JSON \`rows\` 배열로 변환합니다. **대본 열만** 채우고 장면·사이즈·자막·코멘트는 빈 문자열.
+- 줄글을 JSON \`rows\` 배열로 변환합니다. **대본 열만** 채우고 장면·자막·코멘트는 빈 문자열.
 - 1행 = 성우가 **한 호흡에 말하기 좋은 단위** (문장 단위 ≠ 기계적 마침표 분할).
 - 행당 공백 포함 목표 **20~40자**, 권장 상한 **48자**. 그 이상이면 자막이 길어지므로 호흡 쉼에서 나눕니다.
 - 긴 문장은 연결 어미·쉼표(고/서/는데/지만/,)에서 나누고, **조사만 남은 미완성**(은/는/이/가/을/를…)으로 끊지 마세요.
 - 15자 미만 초단문만 연속 나열 금지. 의미 없이 한 호흡을 억지로 합치지 마세요.
 - 대본에 제품을 '이 녀석'이라 지칭하지 말 것.
-- 출력: 유효한 JSON만. {"rows":[{"대본":"...","장면":"","사이즈":"","자막":"","코멘트":""}]}`,
+- 출력: 유효한 JSON만. {"rows":[{"대본":"...","장면":"","자막":"","코멘트":""}]}`,
 
-    scene: `# 현재 작업 단계: 장면·사이즈 추가 (최우선)
+    scene: `# 현재 작업 단계: 장면 추가 (최우선)
 - 대본 열은 **한 글자도 수정하지 않습니다**.
-- 장면: 모델 행동·카메라 구도. 연속 호흡은 '컷 유지'.
-- 사이즈: 와이드/미디엄/클로즈업/탑뷰 등.
+- 장면: 모델 행동·카메라 구도(와이드/미디엄/클로즈업/탑뷰 등 구도 힌트 포함). 연속 호흡은 '컷 유지'.
 - 자막·코멘트는 빈 문자열 유지.
 - 팀 **촬영 체크리스트·필수 장면**이 있으면 대본 흐름에 맞게 장면 열에 반영하세요.
 - 고가 비교 세팅·작위적 감정 연기 장면 금지.
 - 언박싱: 가이드/체크리스트에 있으면 **허용**, 없으면 넣지 마세요.
+- 챕터 구분 행은 입력에 없습니다. 행 수를 유지하세요.
 - 출력: JSON rows 전체`,
 
     caption: `# 현재 작업 단계: 자막·코멘트 추가 (최우선)
-- 대본·장면·사이즈는 **수정하지 않습니다**.
+- 대본·장면은 **수정하지 않습니다**.
 - 자막: 대본에 수치·스펙이 나올 때만 요약 (예: "무게 406g").
 - 코멘트: 준비물·앱 세팅 등 촬영 메모가 필요할 때만.
 - 출력: JSON rows 전체`,
@@ -143,7 +143,7 @@ ${MANDATORY_OPENING.map((l) => `- ${l}`).join('\n')}
 ${closingBlock}
 
 ## 파이프라인 안내
-줄글 → 대본 분할 → 장면·사이즈 → 자막·코멘트 순으로 작성합니다.
+줄글 → 대본 분할 → 장면 → 자막·코멘트 순으로 작성합니다.
 **행 분할·JSON·표 형식 규칙은 요청 메시지 상단의 [현재 작업 단계] 지침만 따릅니다.**`;
   }
 
@@ -896,10 +896,107 @@ ${briefBlock}${refBlock ? `\n${refBlock}` : ''}`.trim();
 })();
 
 /**
- * 시나리오 파이프라인 — 줄글 초안 → 5열 시트 변환 (단계별)
+ * 시나리오 파이프라인 — 줄글 초안 → 4열 시트 변환 (단계별)
  */
 window.DIDIDIT_PIPELINE = (function () {
-  const HEADERS = ['대본', '장면', '사이즈', '자막', '코멘트'];
+  const HEADERS = ['대본', '장면', '자막', '코멘트'];
+
+  function makeEmptyRow() {
+    return { 대본: '', 장면: '', 자막: '', 코멘트: '' };
+  }
+
+  function isChapterMarkerRow(row) {
+    const script = String((row && row['대본']) || '').trim();
+    const scene = String((row && row['장면']) || '').trim();
+    if (!script) return false;
+    if (/^【.+】$/.test(script)) return true;
+    if (scene === '챕터' || scene === 'CHAPTER') return true;
+    if (/^##\s+\S/.test(script)) return true;
+    return false;
+  }
+
+  function makeChapterMarkerRow(title) {
+    const raw = String(title || '')
+      .replace(/^#+\s*/, '')
+      .trim()
+      .replace(/^【\s*|\s*】$/g, '');
+    if (!raw) return makeEmptyRow();
+    return { 대본: `【${raw}】`, 장면: '챕터', 자막: '', 코멘트: '' };
+  }
+
+  /** Split prose on ## headings into [{ title, body }] (title empty for intro). */
+  function splitProseByChapters(prose) {
+    const text = String(prose || '').replace(/\r\n/g, '\n');
+    if (!text.trim()) return [];
+    const re = /^##\s+(.+)$/gm;
+    const matches = [...text.matchAll(re)];
+    if (!matches.length) return [{ title: '', body: text.trim() }];
+    const sections = [];
+    if (matches[0].index > 0) {
+      const intro = text.slice(0, matches[0].index).trim();
+      if (intro) sections.push({ title: '', body: intro });
+    }
+    for (let i = 0; i < matches.length; i += 1) {
+      const title = String(matches[i][1] || '').trim();
+      const start = matches[i].index + matches[i][0].length;
+      const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+      const body = text.slice(start, end).trim();
+      sections.push({ title, body });
+    }
+    return sections.filter((s) => s.body || s.title);
+  }
+
+  function preserveChapterMarkers(prevRows, nextRows) {
+    const prev = Array.isArray(prevRows) ? prevRows : [];
+    const next = Array.isArray(nextRows) ? nextRows : [];
+    if (!prev.some(isChapterMarkerRow)) return normalizeRows(next);
+    const out = [];
+    let ni = 0;
+    for (let i = 0; i < prev.length; i += 1) {
+      if (isChapterMarkerRow(prev[i])) {
+        out.push(makeChapterMarkerRow(String(prev[i]['대본'] || '').replace(/^【|】$/g, '') || prev[i]['대본']));
+        // Prefer exact prior marker text
+        out[out.length - 1] = {
+          대본: String(prev[i]['대본'] || '').trim(),
+          장면: String(prev[i]['장면'] || '챕터').trim() || '챕터',
+          자막: '',
+          코멘트: String(prev[i]['코멘트'] || ''),
+        };
+        continue;
+      }
+      out.push(next[ni] || makeEmptyRow());
+      ni += 1;
+    }
+    while (ni < next.length) {
+      out.push(next[ni]);
+      ni += 1;
+    }
+    return normalizeRows(out);
+  }
+
+  /** If rows lack chapter markers, insert from prose ## headings by proportional slots. */
+  function ensureChapterMarkersFromProse(prose, rows) {
+    const list = normalizeRows(rows);
+    if (!list.length) return list;
+    if (list.some(isChapterMarkerRow)) return list;
+    const sections = splitProseByChapters(prose).filter((s) => s.title);
+    if (!sections.length) return list;
+    const step = Math.max(1, Math.floor(list.length / sections.length));
+    const out = [];
+    let si = 0;
+    for (let i = 0; i < list.length; i += 1) {
+      if (si < sections.length && (i === 0 || i % step === 0)) {
+        out.push(makeChapterMarkerRow(sections[si].title));
+        si += 1;
+      }
+      out.push(list[i]);
+    }
+    while (si < sections.length) {
+      out.push(makeChapterMarkerRow(sections[si].title));
+      si += 1;
+    }
+    return normalizeRows(out);
+  }
 
   const ROW_CHARS_MIN = 16;
   /** Comfortable spoken breath + on-screen caption length */
@@ -920,7 +1017,6 @@ window.DIDIDIT_PIPELINE = (function () {
           properties: {
             대본: { type: 'string' },
             장면: { type: 'string' },
-            사이즈: { type: 'string' },
             자막: { type: 'string' },
             코멘트: { type: 'string' },
           },
@@ -1028,16 +1124,17 @@ window.DIDIDIT_PIPELINE = (function () {
   }
 
   function detectChoppyRhythm(rows) {
-    if (rows.length < 6) return null;
-    const shortRows = rows.filter((r) => r.대본.length < ROW_CHARS_MIN);
-    if (shortRows.length / rows.length > 0.35) {
+    const content = (rows || []).filter((r) => !isChapterMarkerRow(r));
+    if (content.length < 6) return null;
+    const shortRows = content.filter((r) => r.대본.length < ROW_CHARS_MIN);
+    if (shortRows.length / content.length > 0.35) {
       return `${shortRows.length}행이 ${ROW_CHARS_MIN}자 미만 — 너무 잘게 쪼갬`;
     }
     return null;
   }
 
   function detectOverlongRows(rows) {
-    const longRows = rows.filter((r) => r.대본.length > ROW_CHARS_FORCE_SPLIT);
+    const longRows = (rows || []).filter((r) => !isChapterMarkerRow(r) && r.대본.length > ROW_CHARS_FORCE_SPLIT);
     if (longRows.length) {
       return `${longRows.length}행이 ${ROW_CHARS_FORCE_SPLIT}자 초과 — 호흡 경계에서 분할`;
     }
@@ -1045,10 +1142,11 @@ window.DIDIDIT_PIPELINE = (function () {
   }
 
   function detectBadBreathCuts(rows) {
-    if (rows.length < 2) return null;
+    const content = (rows || []).filter((r) => !isChapterMarkerRow(r));
+    if (content.length < 2) return null;
     let cuts = 0;
-    for (let i = 0; i < rows.length - 1; i++) {
-      if (isIncompleteCut(rows[i].대본) || isDanglingFragment(rows[i].대본)) cuts += 1;
+    for (let i = 0; i < content.length - 1; i++) {
+      if (isIncompleteCut(content[i].대본) || isDanglingFragment(content[i].대본)) cuts += 1;
     }
     if (cuts > 0) return `${cuts}행이 미완성·조사 중간 절단`;
     return null;
@@ -1057,19 +1155,23 @@ window.DIDIDIT_PIPELINE = (function () {
   /** Soft checklist (logging). Soft issues alone do not force API retry. */
   function validateScriptRows(rows) {
     const issues = [];
-    if (!rows.length) issues.push('행이 없습니다');
-    rows.forEach((r, i) => {
+    const list = rows || [];
+    if (!list.length) issues.push('행이 없습니다');
+    list.forEach((r, i) => {
+      if (isChapterMarkerRow(r)) return;
       if (!r.대본.trim()) issues.push(`${i + 1}행 대본 누락`);
       const len = r.대본.length;
       if (len > ROW_CHARS_FORCE_SPLIT) issues.push(`${i + 1}행 ${len}자 (${ROW_CHARS_FORCE_SPLIT}자 초과)`);
       else if (len > ROW_CHARS_HARD_MAX) issues.push(`${i + 1}행 ${len}자 (권장 ${ROW_CHARS_HARD_MAX}자 초과 · 자막 과다)`);
-      else if (len < ROW_CHARS_MIN && rows.length >= 6) issues.push(`${i + 1}행 ${len}자 (너무 짧음)`);
+      else if (len < ROW_CHARS_MIN && list.filter((x) => !isChapterMarkerRow(x)).length >= 6) {
+        issues.push(`${i + 1}행 ${len}자 (너무 짧음)`);
+      }
     });
-    const choppy = detectChoppyRhythm(rows);
+    const choppy = detectChoppyRhythm(list);
     if (choppy) issues.push(choppy);
-    const overlong = detectOverlongRows(rows);
+    const overlong = detectOverlongRows(list);
     if (overlong) issues.push(overlong);
-    const bad = detectBadBreathCuts(rows);
+    const bad = detectBadBreathCuts(list);
     if (bad) issues.push(bad);
     return issues;
   }
@@ -1077,14 +1179,16 @@ window.DIDIDIT_PIPELINE = (function () {
   /** Only these trigger another Gemini convert attempt. */
   function validateHardIssues(rows) {
     const issues = [];
-    if (!rows.length) issues.push('행이 없습니다');
-    rows.forEach((r, i) => {
+    const list = rows || [];
+    if (!list.length) issues.push('행이 없습니다');
+    list.forEach((r, i) => {
+      if (isChapterMarkerRow(r)) return;
       if (!r.대본.trim()) issues.push(`${i + 1}행 대본 누락`);
       if (r.대본.length > ROW_CHARS_FORCE_SPLIT) {
         issues.push(`${i + 1}행 ${r.대본.length}자 (${ROW_CHARS_FORCE_SPLIT}자 초과)`);
       }
     });
-    const bad = detectBadBreathCuts(rows);
+    const bad = detectBadBreathCuts(list);
     if (bad) issues.push(bad);
     return issues;
   }
@@ -1110,7 +1214,6 @@ window.DIDIDIT_PIPELINE = (function () {
     return {
       대본: script,
       장면: a.장면 || b.장면,
-      사이즈: a.사이즈 || b.사이즈,
       자막: [a.자막, b.자막].filter(Boolean).join(' · '),
       코멘트: [a.코멘트, b.코멘트].filter(Boolean).join(' · '),
     };
@@ -1164,7 +1267,6 @@ window.DIDIDIT_PIPELINE = (function () {
         out.push({
           대본: rest,
           장면: out.length ? '컷 유지' : row.장면,
-          사이즈: row.사이즈,
           자막: out.length ? '' : row.자막,
           코멘트: out.length ? '' : row.코멘트,
         });
@@ -1180,7 +1282,6 @@ window.DIDIDIT_PIPELINE = (function () {
         out.push({
           대본: rest,
           장면: out.length ? '컷 유지' : row.장면,
-          사이즈: row.사이즈,
           자막: out.length ? '' : row.자막,
           코멘트: out.length ? '' : row.코멘트,
         });
@@ -1190,7 +1291,6 @@ window.DIDIDIT_PIPELINE = (function () {
       out.push({
         대본: head,
         장면: out.length ? '컷 유지' : row.장면,
-        사이즈: row.사이즈,
         자막: out.length ? '' : row.자막,
         코멘트: out.length ? '' : row.코멘트,
       });
@@ -1200,7 +1300,6 @@ window.DIDIDIT_PIPELINE = (function () {
       out.push({
         대본: rest,
         장면: out.length ? '컷 유지' : row.장면,
-        사이즈: row.사이즈,
         자막: out.length ? '' : row.자막,
         코멘트: out.length ? '' : row.코멘트,
       });
@@ -1217,6 +1316,7 @@ window.DIDIDIT_PIPELINE = (function () {
 
     const shouldGlue = (left, right) => {
       if (!left || !right) return false;
+      if (isChapterMarkerRow(left) || isChapterMarkerRow(right)) return false;
       // Completed breath/sentence units must stay separate
       if (endsCompleteSentence(left.대본) || endsBreathUnit(left.대본)) return false;
       const incomplete = isIncompleteCut(left.대본) || isDanglingFragment(left.대본);
@@ -1231,6 +1331,11 @@ window.DIDIDIT_PIPELINE = (function () {
     let buf = { ...list[0] };
     for (let i = 1; i < list.length; i++) {
       const next = list[i];
+      if (isChapterMarkerRow(buf) || isChapterMarkerRow(next)) {
+        merged.push(buf);
+        buf = { ...next };
+        continue;
+      }
       if (shouldGlue(buf, next)) {
         buf = mergeRowPair(buf, next);
         continue;
@@ -1253,6 +1358,7 @@ window.DIDIDIT_PIPELINE = (function () {
 
     // Split rows that would make captions too long — but never leave incomplete heads
     return glued.flatMap((row) => {
+      if (isChapterMarkerRow(row)) return [row];
       const parts = forceSplitRow(row, ROW_CHARS_HARD_MAX);
       if (parts.length <= 1) return parts;
       // re-glue any accidental incomplete cut introduced by force split
@@ -1418,10 +1524,11 @@ ${continuity}`;
 
 # 작업: 대본 → 시트(대본 열) 변환
 아래 대본을 JSON \`rows\` 배열로 변환하세요.
-- **대본 열만** 채우고 장면·사이즈·자막·코멘트는 빈 문자열.
+- **대본 열만** 채우고 장면·자막·코멘트는 빈 문자열.
 - 대본 내용을 삭제·왜곡하지 말고 **말하기 호흡 단위**로만 나눕니다.
 - 목표 ${ROW_CHARS_TARGET_MIN}~${ROW_CHARS_TARGET_MAX}자 / 상한 ${ROW_CHARS_HARD_MAX}자. 긴 문장은 호흡 쉼에서 분할.
 - **금지**: "버리러" / "안내해"처럼 목적·연결 어미만 남기고 끊기. 다음 절이 이어지면 한 행으로 유지.
+- 챕터 구분 행(【…】)은 넣지 마세요. (시스템이 별도로 넣습니다)
 ${productHint}${retryHint || ''}
 
 ## 대본 원문
@@ -1429,7 +1536,8 @@ ${prose}`;
   }
 
   function buildScenePrompt(ctx, rows, options = {}) {
-    const scriptOnly = rows.map((r) => r.대본).join('\n');
+    const contentRows = (rows || []).filter((r) => !isChapterMarkerRow(r));
+    const scriptOnly = contentRows.map((r) => r.대본).join('\n');
     const checklist = String(options.shootChecklist || '').trim();
     const allowUnbox =
       options.allowUnboxing === true ||
@@ -1439,32 +1547,33 @@ ${prose}`;
       : '';
     return `${ctx}
 ${checklistBlock}
-# 작업: 장면·사이즈 추가
-대본은 **수정하지 마세요**. 장면·사이즈 열만 채우세요. 자막·코멘트는 빈 문자열.
-- 연속 호흡: 장면에 '컷 유지'
-- 사이즈: 와이드/미디엄/클로즈업/탑뷰 등
+# 작업: 장면 추가
+대본은 **수정하지 마세요**. 장면 열만 채우세요. 자막·코멘트는 빈 문자열.
+- 연속 호흡: 장면에 '컷 유지' (구도 힌트는 장면 문장에 포함: 와이드/미디엄/클로즈업/탑뷰 등)
 - 체크리스트·필수 장면이 대본에 대응되면 장면 설명에 구체적으로 적으세요. (예: 가루 부어 보이기, 내솥 클로즈업)
 - 고가 비교 세팅·작위적 감정 연기 장면 금지
 - 언박싱: ${allowUnbox ? '가이드에 있으므로 **허용** (택배 개봉·제품 전경)' : '가이드에 없으면 넣지 마세요'}
+- 입력에 챕터 구분 행은 없습니다. 행 수를 늘 말고 대본→장면만 채우세요.
 
 ## 현재 대본 (행 순서)
 ${scriptOnly}
 
-JSON rows 전체를 반환 (대본·장면·사이즈·자막·코멘트 키 필수).`;
+JSON rows 전체를 반환 (대본·장면·자막·코멘트 키 필수).`;
   }
 
   function buildCaptionPrompt(ctx, rows) {
+    const contentRows = (rows || []).filter((r) => !isChapterMarkerRow(r));
     return `${ctx}
 
 # 작업: 자막·코멘트 추가
-대본·장면·사이즈는 **수정하지 마세요**. 자막·코멘트만 채우세요.
+대본·장면은 **수정하지 마세요**. 자막·코멘트만 채우세요.
 - 자막: 대본에 수치·스펙이 나올 때만 요약
 - 코멘트: 준비물·앱 세팅 등 촬영 메모가 필요할 때만
 
 ## 현재 표 (JSON)
-${JSON.stringify(rows, null, 0)}
+${JSON.stringify(contentRows, null, 0)}
 
-JSON rows 전체를 반환.`;
+JSON rows 전체를 반환 (대본·장면·자막·코멘트).`;
   }
 
   function splitProseChunks(prose, maxChars) {
@@ -1499,6 +1608,12 @@ JSON rows 전체를 반환.`;
     endsBreathUnit,
     isDanglingFragment,
     isIncompleteCut,
+    isChapterMarkerRow,
+    makeChapterMarkerRow,
+    makeEmptyRow,
+    splitProseByChapters,
+    preserveChapterMarkers,
+    ensureChapterMarkersFromProse,
     buildConvertRetryHint,
     buildProsePrompt,
     buildConvertPrompt,
@@ -1639,6 +1754,8 @@ const state = {
 
 /** 진행 중인 AI 작업 취소 */
 let jobAbort = null;
+/** 현재 호출 중인 Gemini 모델 id (로딩 오버레이에 표시) */
+let activeJobModel = '';
 let selectedProseHistoryId = null;
 const PROSE_HISTORY_MAX = 8;
 
@@ -2092,11 +2209,43 @@ function setLoading(on, text, options = {}) {
   el.classList.toggle('hidden', !on);
   el.setAttribute('aria-hidden', on ? 'false' : 'true');
   if (text) $('#loading-text').textContent = text;
+  const modelEl = $('#loading-model');
+  if (modelEl) {
+    if (on) {
+      const model = options.model || activeJobModel || '';
+      if (model) {
+        modelEl.textContent = `모델: ${model}`;
+        modelEl.classList.remove('hidden');
+      } else {
+        modelEl.textContent = '';
+        modelEl.classList.add('hidden');
+      }
+    } else {
+      modelEl.textContent = '';
+      modelEl.classList.add('hidden');
+      activeJobModel = '';
+    }
+  }
   const cancelBtn = $('#btn-cancel-job');
   if (cancelBtn) {
     const showCancel = Boolean(on && options.cancellable !== false && jobAbort);
     cancelBtn.classList.toggle('hidden', !showCancel);
     cancelBtn.disabled = !showCancel;
+  }
+}
+
+function setActiveJobModel(model) {
+  activeJobModel = String(model || '').trim();
+  const overlay = $('#loading-overlay');
+  if (!overlay || overlay.classList.contains('hidden')) return;
+  const modelEl = $('#loading-model');
+  if (!modelEl) return;
+  if (activeJobModel) {
+    modelEl.textContent = `모델: ${activeJobModel}`;
+    modelEl.classList.remove('hidden');
+  } else {
+    modelEl.textContent = '';
+    modelEl.classList.add('hidden');
   }
 }
 
@@ -2126,6 +2275,7 @@ function beginJob() {
     try { jobAbort.abort(); } catch { /* ignore */ }
   }
   jobAbort = new AbortController();
+  activeJobModel = '';
   return jobAbort.signal;
 }
 
@@ -2355,6 +2505,7 @@ async function callGeminiTextSession(userPrompt, temperature = 0.75, stage = 'pr
   throwIfCancelled();
   SESSION.push('user', userPrompt);
   const model = state.modelPro;
+  setActiveJobModel(model);
   const signal = getJobSignal();
   const body = {
     systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
@@ -2469,6 +2620,7 @@ async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') 
   for (let mi = 0; mi < models.length; mi++) {
     const model = models[mi];
     throwIfCancelled();
+    setActiveJobModel(model);
     const body = {
       ...bodyBase,
       generationConfig: buildFastGenerationConfig({ temperature, json: true, model }),
@@ -2777,13 +2929,13 @@ function navigatePipeline(step) {
 }
 
 function updatePipelineUI() {
-  const labels = ['', '기획안', '대본', '시트 변환', '장면·사이즈', '자막·공유'];
+  const labels = ['', '기획안', '대본', '시트 변환', '장면', '자막·공유'];
   const hints = [
     '',
     '기획안 확인 후 대본 단계로',
     '챕터 지정 후 AI 생성, 또는 직접 작성',
-    '대본을 시트 5열로 변환',
-    '장면·사이즈 열 자동 생성',
+    '대본을 시트 4열로 변환',
+    '장면 열 자동 생성 · 챕터명 행 유지',
     '자막·코멘트 추가 후 시트 전송',
   ];
   const effective = getEffectiveState();
@@ -2940,31 +3092,50 @@ async function runConvertToSheet() {
   beginJob();
   setLoading(true, '시트 변환 중…');
   try {
-    const chunks = PIPE.splitProseChunks(prose, 14000);
+    const sections = PIPE.splitProseByChapters
+      ? PIPE.splitProseByChapters(prose)
+      : [{ title: '', body: prose }];
     let rows = [];
-    for (let i = 0; i < chunks.length; i++) {
-      throwIfCancelled();
-      setLoading(true, `시트 변환 중… (${i + 1}/${chunks.length})`);
-      let part = [];
-      let retryHint = '';
-      // At most 2 API attempts; heal locally instead of soft-issue retries.
-      for (let attempt = 0; attempt < 2; attempt++) {
+    let doneChunks = 0;
+    const totalChunks = sections.reduce(
+      (n, s) => n + PIPE.splitProseChunks(s.body || '', 14000).length,
+      0,
+    ) || 1;
+    for (let si = 0; si < sections.length; si++) {
+      const section = sections[si];
+      const chunks = PIPE.splitProseChunks(section.body || '', 14000);
+      let sectionRows = [];
+      for (let i = 0; i < chunks.length; i++) {
         throwIfCancelled();
-        part = await callGeminiJson(
-          PIPE.buildConvertPrompt(ctx, chunks[i], retryHint),
-          attempt > 0 ? 0.2 : 0.3,
-          'convert',
-        );
-        part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
-        const hard = PIPE.validateHardIssues(part);
-        if (!hard.length) break;
-        retryHint = PIPE.buildConvertRetryHint(hard);
-        if (attempt === 1) {
-          reportError('runConvertToSheet.validate', new Error(hard.join('; ')), { chunk: i + 1 });
+        doneChunks += 1;
+        setLoading(true, `시트 변환 중… (${doneChunks}/${totalChunks})`);
+        let part = [];
+        let retryHint = '';
+        for (let attempt = 0; attempt < 2; attempt++) {
+          throwIfCancelled();
+          part = await callGeminiJson(
+            PIPE.buildConvertPrompt(ctx, chunks[i], retryHint),
+            attempt > 0 ? 0.2 : 0.3,
+            'convert',
+          );
+          part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
+          const hard = PIPE.validateHardIssues(part);
+          if (!hard.length) break;
+          retryHint = PIPE.buildConvertRetryHint(hard);
+          if (attempt === 1) {
+            reportError('runConvertToSheet.validate', new Error(hard.join('; ')), {
+              chunk: doneChunks,
+              chapter: section.title || '(intro)',
+            });
+          }
         }
+        part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
+        sectionRows = sectionRows.concat(part);
       }
-      part = PIPE.healBreathRows ? PIPE.healBreathRows(part) : PIPE.healSentenceRows(part);
-      rows = rows.concat(part);
+      if (section.title && PIPE.makeChapterMarkerRow) {
+        sectionRows = [PIPE.makeChapterMarkerRow(section.title), ...sectionRows];
+      }
+      rows = rows.concat(sectionRows);
     }
     state.allRows = PIPE.normalizeRows(rows);
     renderTable();
@@ -2991,7 +3162,7 @@ async function runAddScenes() {
   if (!requireApiReady() || !state.allRows.length) return;
   if (jobAbort) return showToast('이미 작성 중입니다. 취소 후 다시 시도하세요.', true);
   beginJob();
-  setLoading(true, '장면·사이즈 추가 중…');
+  setLoading(true, '장면 추가 중…');
   try {
     const plan = loadPlanData();
     const guide = window.DdditBrandGuideQc?.extractFromPlan?.(plan) || {};
@@ -2999,15 +3170,22 @@ async function runAddScenes() {
       shootChecklist: plan?.shootChecklist || (guide.mustScenes || []).map((s) => `□ ${s}`).join('\n'),
       allowUnboxing: Boolean(guide.allowUnboxing),
     };
-    state.allRows = await callGeminiJson(
-      PIPE.buildScenePrompt(buildProductContext(), state.allRows, sceneOpts),
+    const prev = state.allRows.slice();
+    const contentRows = PIPE.isChapterMarkerRow
+      ? prev.filter((r) => !PIPE.isChapterMarkerRow(r))
+      : prev;
+    const generated = await callGeminiJson(
+      PIPE.buildScenePrompt(buildProductContext(), contentRows, sceneOpts),
       0.4,
       'scene',
     );
+    state.allRows = PIPE.preserveChapterMarkers
+      ? PIPE.preserveChapterMarkers(prev, generated)
+      : PIPE.normalizeRows(generated);
     renderTable();
     renderGuideCoverageQc();
     const miss = ($('#guide-qc-fail-count')?.textContent || '').trim();
-    showToast(miss && miss !== '0' ? `장면 반영 · 가이드 미커버 ${miss}항 확인` : '장면·사이즈를 반영했습니다.');
+    showToast(miss && miss !== '0' ? `장면 반영 · 가이드 미커버 ${miss}항 확인` : '장면을 반영했습니다.');
     navigatePipeline(5);
   } catch (e) {
     if (isAbortError(e)) {
@@ -3027,8 +3205,20 @@ async function runAddCaptions() {
   beginJob();
   setLoading(true, '자막·코멘트 추가 중…');
   try {
-    state.allRows = await callGeminiJson(PIPE.buildCaptionPrompt(buildProductContext(), state.allRows), 0.4, 'caption');
+    const prev = state.allRows.slice();
+    const contentRows = PIPE.isChapterMarkerRow
+      ? prev.filter((r) => !PIPE.isChapterMarkerRow(r))
+      : prev;
+    const generated = await callGeminiJson(
+      PIPE.buildCaptionPrompt(buildProductContext(), contentRows),
+      0.4,
+      'caption',
+    );
+    state.allRows = PIPE.preserveChapterMarkers
+      ? PIPE.preserveChapterMarkers(prev, generated)
+      : PIPE.normalizeRows(generated);
     renderTable();
+    saveProject();
     showToast('자막·코멘트를 반영했습니다.');
   } catch (e) {
     if (isAbortError(e)) {
@@ -3049,17 +3239,17 @@ function renderTable() {
   if (!state.allRows.length) {
     tbody.innerHTML = `<tr><td colspan="${cols.length}" class="empty">아직 표 데이터가 없습니다</td></tr>`;
     $('#stat-rows').textContent = '0';
+    updateTableHead(mode);
     return;
   }
   tbody.innerHTML = state.allRows.map((r) => {
+    const marker = PIPE.isChapterMarkerRow?.(r);
     if (mode === 'full') {
-      return `<tr>${PIPE.HEADERS.map((h) => `<td><span class="cell-preview">${esc(r[h]) || '<span class="is-empty">—</span>'}</span></td>`).join('')}</tr>`;
+      return `<tr class="${marker ? 'chapter-marker-row' : ''}">${PIPE.HEADERS.map((h) => `<td><span class="cell-preview">${esc(r[h]) || '<span class="is-empty">—</span>'}</span></td>`).join('')}</tr>`;
     }
-    return `<tr><td><span class="cell-preview">${esc(r.대본)}</span></td><td><span class="cell-preview">${esc(r.장면) || '—'}</span></td></tr>`;
+    return `<tr class="${marker ? 'chapter-marker-row' : ''}"><td><span class="cell-preview">${esc(r.대본)}</span></td><td><span class="cell-preview">${esc(r.장면) || '—'}</span></td></tr>`;
   }).join('');
   $('#stat-rows').textContent = state.allRows.length;
-  const bytes = state.allRows.reduce((s, r) => s + new TextEncoder().encode(r.대본).length, 0);
-  $('#stat-bytes').textContent = bytes.toLocaleString();
   updateTableHead(mode);
 }
 
@@ -3107,9 +3297,6 @@ function rememberSheetUrl(project, url) {
     store.projects[project] = { url, updatedAt: new Date().toISOString() };
     localStorage.setItem(SHEET_SETTINGS_KEY, JSON.stringify(store));
     state.sheetOpenUrl = url;
-    const bar = $('#sheet-link-bar');
-    const link = $('#sheet-open-link');
-    if (bar && link) { bar.classList.remove('hidden'); link.href = url; link.textContent = '시트 열기'; }
   } catch { /* ignore */ }
 }
 
@@ -3119,6 +3306,11 @@ async function pushToSheet() {
   setLoading(true, '시트로 보내는 중…');
   try {
     const project = getSheetSlug();
+    if (PIPE.ensureChapterMarkersFromProse && state.proseDraft) {
+      state.allRows = PIPE.ensureChapterMarkersFromProse(state.proseDraft, state.allRows);
+      renderTable();
+      saveProject();
+    }
     const result = await sync.exportToSheet(getSheetConfig(), state.allRows, project);
     if (result.spreadsheetUrl) rememberSheetUrl(project, result.spreadsheetUrl);
     showToast('시트에 반영했습니다. 브랜드 페이지에서 대본을 공유할 수 있습니다.');

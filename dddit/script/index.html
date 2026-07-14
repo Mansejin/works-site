@@ -10,7 +10,7 @@
   <style>html.team-gate-pending body { visibility: hidden; }</style>
   <script src="../js/team-gate.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="css/style.css?v=14" />
+  <link rel="stylesheet" href="css/style.css?v=15" />
   <script>
     window.__earlyErrors = window.__earlyErrors || [];
     window.addEventListener('error', function (e) {
@@ -28,6 +28,7 @@
   <div id="loading-overlay" class="loading-overlay hidden" aria-hidden="true">
     <div class="spinner"></div>
     <p id="loading-text">생성 중…</p>
+    <p id="loading-model" class="loading-model hidden"></p>
     <button id="btn-cancel-job" class="btn btn-secondary btn-sm loading-cancel-btn hidden" type="button">작성 취소</button>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite" aria-hidden="true"></div>
@@ -178,20 +179,20 @@
             </div>
           </div>
           <div class="block-body">
-            <p class="hint">대본 → 시트 5열 형식. 이 단계에서는 <strong>대본 열만</strong> 채웁니다.</p>
+            <p class="hint">대본 → 시트 4열 형식. 이 단계에서는 <strong>대본 열만</strong> 채웁니다.</p>
             <p class="hint muted">긴 원고는 자동 분할 변환 · 오른쪽 미리보기에서 행 수 확인</p>
           </div>
         </section>
 
         <section class="block step-section step-collapsed" data-step="4" id="step-scenes">
           <div class="block-head">
-            <h2><span class="step-num-badge">4</span> 장면 · 사이즈</h2>
+            <h2><span class="step-num-badge">4</span> 장면</h2>
             <div class="block-head-actions">
-              <button id="btn-add-scenes" class="btn btn-primary btn-sm" type="button">장면·사이즈 생성</button>
+              <button id="btn-add-scenes" class="btn btn-primary btn-sm" type="button">장면 생성</button>
             </div>
           </div>
           <div class="block-body">
-            <p class="hint">대본 유지 · 장면·사이즈 열만 AI로 채웁니다.</p>
+            <p class="hint">대본 유지 · 장면 열만 AI로 채웁니다. 챕터명 행은 그대로 유지됩니다.</p>
           </div>
         </section>
 
@@ -214,7 +215,6 @@
             <h2>미리보기</h2>
             <div class="preview-stats">
               <span class="stat-chip"><strong id="stat-rows">0</strong>행</span>
-              <span class="stat-chip"><strong id="stat-bytes">0</strong>B</span>
             </div>
           </div>
           <div class="block-body compact">
@@ -223,9 +223,6 @@
               <button id="btn-sheet-open" class="btn btn-secondary btn-sm" type="button">열기</button>
               <button id="btn-sheet-pull" class="btn btn-secondary btn-sm" type="button">불러오기</button>
             </div>
-            <p id="sheet-link-bar" class="sheet-link hidden">
-              <a id="sheet-open-link" href="#" target="_blank" rel="noopener noreferrer">시트 열기</a>
-            </p>
             <div class="table-wrap">
               <table id="script-table">
                 <thead><tr><th>대본</th><th>장면</th></tr></thead>
@@ -356,7 +353,7 @@
   <script src="../js/brand-guide-qc.js?v=1"></script>
   <script src="../js/plan-brief-sync.js?v=2"></script>
   <script src="js/works-api.js?v=4"></script>
-  <script src="js/sheet-sync.js?v=2"></script>
-  <script src="js/main.js?v=43"></script>
+  <script src="js/sheet-sync.js?v=3"></script>
+  <script src="js/main.js?v=44"></script>
 </body>
 </html>

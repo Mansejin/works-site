@@ -10,7 +10,7 @@
  * 브랜드(프로젝트)마다 스프레드시트 파일 1개 · 탭 이름「콘티」고정
  */
 
-var HEADERS = ['대본', '장면', '사이즈', '자막', '코멘트'];
+var HEADERS = ['대본', '장면', '자막', '코멘트'];
 var CONTI_TAB = '콘티';
 
 var PROJECT_LABELS = {
@@ -202,12 +202,11 @@ function normalizeRows_(rows) {
   return rows
     .map(function (r) {
       if (Array.isArray(r)) {
-        return rowFromArray_(r);
+        return rowFromHeaderArray_(HEADERS, r);
       }
       return {
         대본: String(r.대본 != null ? r.대본 : ''),
         장면: String(r.장면 != null ? r.장면 : ''),
-        사이즈: String(r.사이즈 != null ? r.사이즈 : ''),
         자막: String(r.자막 != null ? r.자막 : ''),
         코멘트: String(r.코멘트 != null ? r.코멘트 : ''),
       };
@@ -219,13 +218,23 @@ function normalizeRows_(rows) {
     });
 }
 
+function rowFromHeaderArray_(header, arr) {
+  var obj = { 대본: '', 장면: '', 자막: '', 코멘트: '' };
+  header.forEach(function (h, i) {
+    if (HEADERS.indexOf(h) >= 0) {
+      obj[h] = String(arr[i] != null ? arr[i] : '');
+    }
+  });
+  return obj;
+}
+
 function rowFromArray_(arr) {
+  // Positional fallback for 4-col layout
   return {
     대본: String(arr[0] != null ? arr[0] : ''),
     장면: String(arr[1] != null ? arr[1] : ''),
-    사이즈: String(arr[2] != null ? arr[2] : ''),
-    자막: String(arr[3] != null ? arr[3] : ''),
-    코멘트: String(arr[4] != null ? arr[4] : ''),
+    자막: String(arr[2] != null ? arr[2] : ''),
+    코멘트: String(arr[3] != null ? arr[3] : ''),
   };
 }
 
@@ -242,10 +251,14 @@ function getRows_(project) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
 
-  var values = sheet.getRange(2, 1, lastRow, HEADERS.length).getValues();
+  var lastCol = Math.max(HEADERS.length, sheet.getLastColumn());
+  var header = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) {
+    return String(h || '').trim();
+  });
+  var values = sheet.getRange(2, 1, lastRow, lastCol).getValues();
   return values
     .map(function (arr) {
-      return rowFromArray_(arr);
+      return rowFromHeaderArray_(header, arr);
     })
     .filter(function (r) {
       return HEADERS.some(function (h) {

@@ -48,7 +48,32 @@ async def _token(client: httpx.AsyncClient) -> str:
 
 def _range_path(cells: str) -> str:
     """A1 notation with URL-encoded sheet tab name (한글 콘티)."""
-    return quote(f"{CONTI_TAB}!{cells}", safe="")
+    return f"{quote(CONTI_TAB)}!{cells}"
+
+
+def _col_letter(n: int) -> str:
+    """1-based column index → A, B, … Z, AA …"""
+    out = ""
+    while n > 0:
+        n, rem = divmod(n - 1, 26)
+        out = chr(65 + rem) + out
+    return out or "A"
+
+
+def _rows_from_values(values: list[list[Any]]) -> list[dict[str, str]]:
+    """Map sheet grid by header names (supports legacy 사이즈 column)."""
+    if not values:
+        return []
+    header = [str(h or "").strip() for h in values[0]]
+    idx = {h: header.index(h) if h in header else -1 for h in HEADERS}
+    rows: list[dict[str, Any]] = []
+    for line in values[1:]:
+        row: dict[str, str] = {}
+        for h in HEADERS:
+            i = idx[h]
+            row[h] = str(line[i]) if i >= 0 and i < len(line) else ""
+        rows.append(row)
+    return normalize_rows(rows)
 
 
 def _values_url(spreadsheet_id: str, cells: str, action: str = "") -> str:
@@ -153,7 +178,7 @@ async def _ensure_conti_tab(client: httpx.AsyncClient, spreadsheet_id: str) -> N
             raise _google_error(rename, "Sheets tab rename")
 
     header_res = await client.get(
-        _values_url(spreadsheet_id, "A1:E1"),
+        _values_url(spreadsheet_id, "A1:Z1"),
         headers={"Authorization": f"Bearer {token}"},
     )
     if header_res.status_code >= 400:
@@ -163,7 +188,7 @@ async def _ensure_conti_tab(client: httpx.AsyncClient, spreadsheet_id: str) -> N
         return
 
     put_res = await client.put(
-        _values_url(spreadsheet_id, "A1:E1"),
+        _values_url(spreadsheet_id, f"A1:{_col_letter(len(HEADERS))}1"),
         headers={"Authorization": f"Bearer {token}"},
         params={"valueInputOption": "USER_ENTERED"},
         json={"values": [list(HEADERS)]},
@@ -232,18 +257,14 @@ async def ensure_project_sheet(client: httpx.AsyncClient, project: str) -> tuple
 async def read_project_rows(client: httpx.AsyncClient, spreadsheet_id: str) -> list[dict[str, str]]:
     token = await _token(client)
     res = await client.get(
-        _values_url(spreadsheet_id, "A2:E"),
+        _values_url(spreadsheet_id, "A1:Z"),
         headers={"Authorization": f"Bearer {token}"},
     )
     if res.status_code == 400:
         return []
     res.raise_for_status()
     values = res.json().get("values") or []
-    rows: list[dict[str, Any]] = []
-    for line in values:
-        padded = list(line) + [""] * (len(HEADERS) - len(line))
-        rows.append(dict(zip(HEADERS, padded[: len(HEADERS)])))
-    return normalize_rows(rows)
+    return _rows_from_values(values)
 
 
 async def write_project_rows(
@@ -253,10 +274,12 @@ async def write_project_rows(
 ) -> int:
     token = await _token(client)
     data = normalize_rows(rows)
+    end_col = _col_letter(len(HEADERS))
     values = [list(HEADERS)] + [[row[h] for h in HEADERS] for row in data]
 
     # NOTE: await binds weaker than attribute access —
     # `await client.post(...).raise_for_status()` would call raise_for_status on the coroutine.
+    # Clear through E so a legacy 사이즈 column does not linger.
     clear_res = await client.post(
         _values_url(spreadsheet_id, "A:E", "clear"),
         headers={"Authorization": f"Bearer {token}"},
@@ -267,7 +290,7 @@ async def write_project_rows(
 
     if values:
         put_res = await client.put(
-            _values_url(spreadsheet_id, f"A1:E{len(values)}"),
+            _values_url(spreadsheet_id, f"A1:{end_col}{len(values)}"),
             headers={"Authorization": f"Bearer {token}"},
             params={"valueInputOption": "USER_ENTERED"},
             json={"values": values},
@@ -286,9 +309,10 @@ async def append_project_rows(
     data = normalize_rows(rows)
     if not data:
         return 0
+    end_col = _col_letter(len(HEADERS))
     values = [[row[h] for h in HEADERS] for row in data]
     append_res = await client.post(
-        _values_url(spreadsheet_id, "A:E", "append"),
+        _values_url(spreadsheet_id, f"A:{end_col}", "append"),
         headers={"Authorization": f"Bearer {token}"},
         params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},
         json={"values": values},

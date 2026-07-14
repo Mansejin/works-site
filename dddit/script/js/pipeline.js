@@ -1,8 +1,105 @@
 /**
- * 시나리오 파이프라인 — 줄글 초안 → 5열 시트 변환 (단계별)
+ * 시나리오 파이프라인 — 줄글 초안 → 4열 시트 변환 (단계별)
  */
 window.DIDIDIT_PIPELINE = (function () {
-  const HEADERS = ['대본', '장면', '사이즈', '자막', '코멘트'];
+  const HEADERS = ['대본', '장면', '자막', '코멘트'];
+
+  function makeEmptyRow() {
+    return { 대본: '', 장면: '', 자막: '', 코멘트: '' };
+  }
+
+  function isChapterMarkerRow(row) {
+    const script = String((row && row['대본']) || '').trim();
+    const scene = String((row && row['장면']) || '').trim();
+    if (!script) return false;
+    if (/^【.+】$/.test(script)) return true;
+    if (scene === '챕터' || scene === 'CHAPTER') return true;
+    if (/^##\s+\S/.test(script)) return true;
+    return false;
+  }
+
+  function makeChapterMarkerRow(title) {
+    const raw = String(title || '')
+      .replace(/^#+\s*/, '')
+      .trim()
+      .replace(/^【\s*|\s*】$/g, '');
+    if (!raw) return makeEmptyRow();
+    return { 대본: `【${raw}】`, 장면: '챕터', 자막: '', 코멘트: '' };
+  }
+
+  /** Split prose on ## headings into [{ title, body }] (title empty for intro). */
+  function splitProseByChapters(prose) {
+    const text = String(prose || '').replace(/\r\n/g, '\n');
+    if (!text.trim()) return [];
+    const re = /^##\s+(.+)$/gm;
+    const matches = [...text.matchAll(re)];
+    if (!matches.length) return [{ title: '', body: text.trim() }];
+    const sections = [];
+    if (matches[0].index > 0) {
+      const intro = text.slice(0, matches[0].index).trim();
+      if (intro) sections.push({ title: '', body: intro });
+    }
+    for (let i = 0; i < matches.length; i += 1) {
+      const title = String(matches[i][1] || '').trim();
+      const start = matches[i].index + matches[i][0].length;
+      const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+      const body = text.slice(start, end).trim();
+      sections.push({ title, body });
+    }
+    return sections.filter((s) => s.body || s.title);
+  }
+
+  function preserveChapterMarkers(prevRows, nextRows) {
+    const prev = Array.isArray(prevRows) ? prevRows : [];
+    const next = Array.isArray(nextRows) ? nextRows : [];
+    if (!prev.some(isChapterMarkerRow)) return normalizeRows(next);
+    const out = [];
+    let ni = 0;
+    for (let i = 0; i < prev.length; i += 1) {
+      if (isChapterMarkerRow(prev[i])) {
+        out.push(makeChapterMarkerRow(String(prev[i]['대본'] || '').replace(/^【|】$/g, '') || prev[i]['대본']));
+        // Prefer exact prior marker text
+        out[out.length - 1] = {
+          대본: String(prev[i]['대본'] || '').trim(),
+          장면: String(prev[i]['장면'] || '챕터').trim() || '챕터',
+          자막: '',
+          코멘트: String(prev[i]['코멘트'] || ''),
+        };
+        continue;
+      }
+      out.push(next[ni] || makeEmptyRow());
+      ni += 1;
+    }
+    while (ni < next.length) {
+      out.push(next[ni]);
+      ni += 1;
+    }
+    return normalizeRows(out);
+  }
+
+  /** If rows lack chapter markers, insert from prose ## headings by proportional slots. */
+  function ensureChapterMarkersFromProse(prose, rows) {
+    const list = normalizeRows(rows);
+    if (!list.length) return list;
+    if (list.some(isChapterMarkerRow)) return list;
+    const sections = splitProseByChapters(prose).filter((s) => s.title);
+    if (!sections.length) return list;
+    const step = Math.max(1, Math.floor(list.length / sections.length));
+    const out = [];
+    let si = 0;
+    for (let i = 0; i < list.length; i += 1) {
+      if (si < sections.length && (i === 0 || i % step === 0)) {
+        out.push(makeChapterMarkerRow(sections[si].title));
+        si += 1;
+      }
+      out.push(list[i]);
+    }
+    while (si < sections.length) {
+      out.push(makeChapterMarkerRow(sections[si].title));
+      si += 1;
+    }
+    return normalizeRows(out);
+  }
 
   const ROW_CHARS_MIN = 16;
   /** Comfortable spoken breath + on-screen caption length */
@@ -23,7 +120,6 @@ window.DIDIDIT_PIPELINE = (function () {
           properties: {
             대본: { type: 'string' },
             장면: { type: 'string' },
-            사이즈: { type: 'string' },
             자막: { type: 'string' },
             코멘트: { type: 'string' },
           },
@@ -131,16 +227,17 @@ window.DIDIDIT_PIPELINE = (function () {
   }
 
   function detectChoppyRhythm(rows) {
-    if (rows.length < 6) return null;
-    const shortRows = rows.filter((r) => r.대본.length < ROW_CHARS_MIN);
-    if (shortRows.length / rows.length > 0.35) {
+    const content = (rows || []).filter((r) => !isChapterMarkerRow(r));
+    if (content.length < 6) return null;
+    const shortRows = content.filter((r) => r.대본.length < ROW_CHARS_MIN);
+    if (shortRows.length / content.length > 0.35) {
       return `${shortRows.length}행이 ${ROW_CHARS_MIN}자 미만 — 너무 잘게 쪼갬`;
     }
     return null;
   }
 
   function detectOverlongRows(rows) {
-    const longRows = rows.filter((r) => r.대본.length > ROW_CHARS_FORCE_SPLIT);
+    const longRows = (rows || []).filter((r) => !isChapterMarkerRow(r) && r.대본.length > ROW_CHARS_FORCE_SPLIT);
     if (longRows.length) {
       return `${longRows.length}행이 ${ROW_CHARS_FORCE_SPLIT}자 초과 — 호흡 경계에서 분할`;
     }
@@ -148,10 +245,11 @@ window.DIDIDIT_PIPELINE = (function () {
   }
 
   function detectBadBreathCuts(rows) {
-    if (rows.length < 2) return null;
+    const content = (rows || []).filter((r) => !isChapterMarkerRow(r));
+    if (content.length < 2) return null;
     let cuts = 0;
-    for (let i = 0; i < rows.length - 1; i++) {
-      if (isIncompleteCut(rows[i].대본) || isDanglingFragment(rows[i].대본)) cuts += 1;
+    for (let i = 0; i < content.length - 1; i++) {
+      if (isIncompleteCut(content[i].대본) || isDanglingFragment(content[i].대본)) cuts += 1;
     }
     if (cuts > 0) return `${cuts}행이 미완성·조사 중간 절단`;
     return null;
@@ -160,19 +258,23 @@ window.DIDIDIT_PIPELINE = (function () {
   /** Soft checklist (logging). Soft issues alone do not force API retry. */
   function validateScriptRows(rows) {
     const issues = [];
-    if (!rows.length) issues.push('행이 없습니다');
-    rows.forEach((r, i) => {
+    const list = rows || [];
+    if (!list.length) issues.push('행이 없습니다');
+    list.forEach((r, i) => {
+      if (isChapterMarkerRow(r)) return;
       if (!r.대본.trim()) issues.push(`${i + 1}행 대본 누락`);
       const len = r.대본.length;
       if (len > ROW_CHARS_FORCE_SPLIT) issues.push(`${i + 1}행 ${len}자 (${ROW_CHARS_FORCE_SPLIT}자 초과)`);
       else if (len > ROW_CHARS_HARD_MAX) issues.push(`${i + 1}행 ${len}자 (권장 ${ROW_CHARS_HARD_MAX}자 초과 · 자막 과다)`);
-      else if (len < ROW_CHARS_MIN && rows.length >= 6) issues.push(`${i + 1}행 ${len}자 (너무 짧음)`);
+      else if (len < ROW_CHARS_MIN && list.filter((x) => !isChapterMarkerRow(x)).length >= 6) {
+        issues.push(`${i + 1}행 ${len}자 (너무 짧음)`);
+      }
     });
-    const choppy = detectChoppyRhythm(rows);
+    const choppy = detectChoppyRhythm(list);
     if (choppy) issues.push(choppy);
-    const overlong = detectOverlongRows(rows);
+    const overlong = detectOverlongRows(list);
     if (overlong) issues.push(overlong);
-    const bad = detectBadBreathCuts(rows);
+    const bad = detectBadBreathCuts(list);
     if (bad) issues.push(bad);
     return issues;
   }
@@ -180,14 +282,16 @@ window.DIDIDIT_PIPELINE = (function () {
   /** Only these trigger another Gemini convert attempt. */
   function validateHardIssues(rows) {
     const issues = [];
-    if (!rows.length) issues.push('행이 없습니다');
-    rows.forEach((r, i) => {
+    const list = rows || [];
+    if (!list.length) issues.push('행이 없습니다');
+    list.forEach((r, i) => {
+      if (isChapterMarkerRow(r)) return;
       if (!r.대본.trim()) issues.push(`${i + 1}행 대본 누락`);
       if (r.대본.length > ROW_CHARS_FORCE_SPLIT) {
         issues.push(`${i + 1}행 ${r.대본.length}자 (${ROW_CHARS_FORCE_SPLIT}자 초과)`);
       }
     });
-    const bad = detectBadBreathCuts(rows);
+    const bad = detectBadBreathCuts(list);
     if (bad) issues.push(bad);
     return issues;
   }
@@ -213,7 +317,6 @@ window.DIDIDIT_PIPELINE = (function () {
     return {
       대본: script,
       장면: a.장면 || b.장면,
-      사이즈: a.사이즈 || b.사이즈,
       자막: [a.자막, b.자막].filter(Boolean).join(' · '),
       코멘트: [a.코멘트, b.코멘트].filter(Boolean).join(' · '),
     };
@@ -267,7 +370,6 @@ window.DIDIDIT_PIPELINE = (function () {
         out.push({
           대본: rest,
           장면: out.length ? '컷 유지' : row.장면,
-          사이즈: row.사이즈,
           자막: out.length ? '' : row.자막,
           코멘트: out.length ? '' : row.코멘트,
         });
@@ -283,7 +385,6 @@ window.DIDIDIT_PIPELINE = (function () {
         out.push({
           대본: rest,
           장면: out.length ? '컷 유지' : row.장면,
-          사이즈: row.사이즈,
           자막: out.length ? '' : row.자막,
           코멘트: out.length ? '' : row.코멘트,
         });
@@ -293,7 +394,6 @@ window.DIDIDIT_PIPELINE = (function () {
       out.push({
         대본: head,
         장면: out.length ? '컷 유지' : row.장면,
-        사이즈: row.사이즈,
         자막: out.length ? '' : row.자막,
         코멘트: out.length ? '' : row.코멘트,
       });
@@ -303,7 +403,6 @@ window.DIDIDIT_PIPELINE = (function () {
       out.push({
         대본: rest,
         장면: out.length ? '컷 유지' : row.장면,
-        사이즈: row.사이즈,
         자막: out.length ? '' : row.자막,
         코멘트: out.length ? '' : row.코멘트,
       });
@@ -320,6 +419,7 @@ window.DIDIDIT_PIPELINE = (function () {
 
     const shouldGlue = (left, right) => {
       if (!left || !right) return false;
+      if (isChapterMarkerRow(left) || isChapterMarkerRow(right)) return false;
       // Completed breath/sentence units must stay separate
       if (endsCompleteSentence(left.대본) || endsBreathUnit(left.대본)) return false;
       const incomplete = isIncompleteCut(left.대본) || isDanglingFragment(left.대본);
@@ -334,6 +434,11 @@ window.DIDIDIT_PIPELINE = (function () {
     let buf = { ...list[0] };
     for (let i = 1; i < list.length; i++) {
       const next = list[i];
+      if (isChapterMarkerRow(buf) || isChapterMarkerRow(next)) {
+        merged.push(buf);
+        buf = { ...next };
+        continue;
+      }
       if (shouldGlue(buf, next)) {
         buf = mergeRowPair(buf, next);
         continue;
@@ -356,6 +461,7 @@ window.DIDIDIT_PIPELINE = (function () {
 
     // Split rows that would make captions too long — but never leave incomplete heads
     return glued.flatMap((row) => {
+      if (isChapterMarkerRow(row)) return [row];
       const parts = forceSplitRow(row, ROW_CHARS_HARD_MAX);
       if (parts.length <= 1) return parts;
       // re-glue any accidental incomplete cut introduced by force split
@@ -521,10 +627,11 @@ ${continuity}`;
 
 # 작업: 대본 → 시트(대본 열) 변환
 아래 대본을 JSON \`rows\` 배열로 변환하세요.
-- **대본 열만** 채우고 장면·사이즈·자막·코멘트는 빈 문자열.
+- **대본 열만** 채우고 장면·자막·코멘트는 빈 문자열.
 - 대본 내용을 삭제·왜곡하지 말고 **말하기 호흡 단위**로만 나눕니다.
 - 목표 ${ROW_CHARS_TARGET_MIN}~${ROW_CHARS_TARGET_MAX}자 / 상한 ${ROW_CHARS_HARD_MAX}자. 긴 문장은 호흡 쉼에서 분할.
 - **금지**: "버리러" / "안내해"처럼 목적·연결 어미만 남기고 끊기. 다음 절이 이어지면 한 행으로 유지.
+- 챕터 구분 행(【…】)은 넣지 마세요. (시스템이 별도로 넣습니다)
 ${productHint}${retryHint || ''}
 
 ## 대본 원문
@@ -532,7 +639,8 @@ ${prose}`;
   }
 
   function buildScenePrompt(ctx, rows, options = {}) {
-    const scriptOnly = rows.map((r) => r.대본).join('\n');
+    const contentRows = (rows || []).filter((r) => !isChapterMarkerRow(r));
+    const scriptOnly = contentRows.map((r) => r.대본).join('\n');
     const checklist = String(options.shootChecklist || '').trim();
     const allowUnbox =
       options.allowUnboxing === true ||
@@ -542,32 +650,33 @@ ${prose}`;
       : '';
     return `${ctx}
 ${checklistBlock}
-# 작업: 장면·사이즈 추가
-대본은 **수정하지 마세요**. 장면·사이즈 열만 채우세요. 자막·코멘트는 빈 문자열.
-- 연속 호흡: 장면에 '컷 유지'
-- 사이즈: 와이드/미디엄/클로즈업/탑뷰 등
+# 작업: 장면 추가
+대본은 **수정하지 마세요**. 장면 열만 채우세요. 자막·코멘트는 빈 문자열.
+- 연속 호흡: 장면에 '컷 유지' (구도 힌트는 장면 문장에 포함: 와이드/미디엄/클로즈업/탑뷰 등)
 - 체크리스트·필수 장면이 대본에 대응되면 장면 설명에 구체적으로 적으세요. (예: 가루 부어 보이기, 내솥 클로즈업)
 - 고가 비교 세팅·작위적 감정 연기 장면 금지
 - 언박싱: ${allowUnbox ? '가이드에 있으므로 **허용** (택배 개봉·제품 전경)' : '가이드에 없으면 넣지 마세요'}
+- 입력에 챕터 구분 행은 없습니다. 행 수를 늘 말고 대본→장면만 채우세요.
 
 ## 현재 대본 (행 순서)
 ${scriptOnly}
 
-JSON rows 전체를 반환 (대본·장면·사이즈·자막·코멘트 키 필수).`;
+JSON rows 전체를 반환 (대본·장면·자막·코멘트 키 필수).`;
   }
 
   function buildCaptionPrompt(ctx, rows) {
+    const contentRows = (rows || []).filter((r) => !isChapterMarkerRow(r));
     return `${ctx}
 
 # 작업: 자막·코멘트 추가
-대본·장면·사이즈는 **수정하지 마세요**. 자막·코멘트만 채우세요.
+대본·장면은 **수정하지 마세요**. 자막·코멘트만 채우세요.
 - 자막: 대본에 수치·스펙이 나올 때만 요약
 - 코멘트: 준비물·앱 세팅 등 촬영 메모가 필요할 때만
 
 ## 현재 표 (JSON)
-${JSON.stringify(rows, null, 0)}
+${JSON.stringify(contentRows, null, 0)}
 
-JSON rows 전체를 반환.`;
+JSON rows 전체를 반환 (대본·장면·자막·코멘트).`;
   }
 
   function splitProseChunks(prose, maxChars) {
@@ -602,6 +711,12 @@ JSON rows 전체를 반환.`;
     endsBreathUnit,
     isDanglingFragment,
     isIncompleteCut,
+    isChapterMarkerRow,
+    makeChapterMarkerRow,
+    makeEmptyRow,
+    splitProseByChapters,
+    preserveChapterMarkers,
+    ensureChapterMarkersFromProse,
     buildConvertRetryHint,
     buildProsePrompt,
     buildConvertPrompt,
