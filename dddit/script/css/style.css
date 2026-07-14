@@ -898,6 +898,11 @@ td.empty {
   font-size: 0.8rem;
 }
 
+.error-log-item.is-quota {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
 .error-log-head {
   display: flex;
   justify-content: space-between;

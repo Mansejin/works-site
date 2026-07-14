@@ -653,16 +653,20 @@ ${blocks.join('\n\n')}`.trim();
       .reverse()
       .map((e) => {
         const metaBits = [];
-        if (e.meta.model) metaBits.push(`모델: ${esc(e.meta.model)}`);
+        if (e.meta.kind === 'quota_billing') metaBits.push('유형: 지출 한도·쿼터');
+        else if (e.meta.kind === 'transient_overload') metaBits.push('유형: 일시 과부하');
+        else if (e.meta.kind === 'model_not_found') metaBits.push('유형: 모델 없음');
+        if (e.meta.apiModel || e.meta.model) metaBits.push(`모델: ${esc(e.meta.apiModel || e.meta.model)}`);
         if (e.meta.part) metaBits.push(`파트: ${esc(e.meta.part)}`);
-        if (e.meta.status) metaBits.push(`HTTP ${esc(e.meta.status)}`);
+        if (e.meta.apiStatus || e.meta.status) metaBits.push(`HTTP ${esc(e.meta.apiStatus || e.meta.status)}`);
         const metaHtml = metaBits.length
           ? `<div class="error-log-meta">${metaBits.join(' · ')}</div>`
           : '';
         const stackHtml = e.stack
           ? `<details class="error-log-stack"><summary>스택</summary><pre>${esc(e.stack)}</pre></details>`
           : '';
-        return `<li class="error-log-item">
+        const kindCls = e.meta.kind === 'quota_billing' ? ' is-quota' : '';
+        return `<li class="error-log-item${kindCls}">
         <div class="error-log-head">
           <time>${esc(formatTime(e.time))}</time>
           <span class="error-log-ctx">${esc(e.context)}</span>
@@ -2159,12 +2163,28 @@ function deleteProseHistory(id) {
   showToast('히스토리에서 삭제했습니다.');
 }
 
-function isTransientGeminiError(err) {
-  const status = Number(err?.apiStatus || err?.status || 0);
-  if (status === 429 || status === 503 || status === 502 || status === 504) return true;
+function isQuotaOrBillingError(err) {
   const msg = String(err?.message || err || '');
-  // bare "unavailable"/"quota"는 모델 미지원·설정 오류와 혼동되므로 제외
-  return /high demand|try again later|resource.?exhausted|overloaded|rate.?limit|quota.?exceeded|too many requests|temporar(?:y|ily)|현재.*지연|사용량이 많/i.test(
+  // Google AI Studio spend limit / billing / hard quota (≠ temporary high demand)
+  return /quota.?exceeded|exceed(?:ed|ing).{0,40}quota|billing|spend\s*limit|spending\s*limit|budget|결제|청구|한도|크레딧|insufficient.+fund|payment|consumer.*(suspend|disabled)|RESOURCE_EXHAUSTED.*quota/i.test(
+    msg,
+  );
+}
+
+function isTransientGeminiError(err) {
+  if (isQuotaOrBillingError(err)) return false; // 한도는 기다려도 안 풀림 → 재시도·과부하 문구 금지
+  const status = Number(err?.apiStatus || err?.status || 0);
+  if (status === 429 || status === 503 || status === 502 || status === 504) {
+    // 429만으로 과부하 단정하지 않음 — 메시지에 수요/레이트리밋 신호가 있을 때
+    if (status === 429) {
+      const msg = String(err?.message || err || '');
+      return /high demand|try again later|overloaded|rate.?limit|too many requests|temporar(?:y|ily)/i.test(msg)
+        || !/quota|billing|spend|budget|한도/i.test(msg);
+    }
+    return true;
+  }
+  const msg = String(err?.message || err || '');
+  return /high demand|try again later|resource.?exhausted|overloaded|rate.?limit|too many requests|temporar(?:y|ily)|현재.*지연|사용량이 많/i.test(
     msg,
   );
 }
@@ -2178,6 +2198,9 @@ function isModelNotFoundError(err) {
 
 function friendlyGeminiError(err) {
   const raw = String(err?.message || err || 'API 오류');
+  if (isQuotaOrBillingError(err)) {
+    return `API 지출 한도·쿼터에 걸렸습니다. Google AI Studio/Cloud 결제·한도를 확인하세요. (${raw})`;
+  }
   if (isModelNotFoundError(err)) {
     return `모델을 사용할 수 없습니다 (${err?.apiModel || 'unknown'}). ${raw}`;
   }
@@ -2966,12 +2989,20 @@ function updateTableHead(mode) {
 }
 
 function reportError(tag, err, extra) {
-  if (extra) {
-    const wrapped = new Error(`${err?.message || err} | ${JSON.stringify(extra)}`);
+  const kind = isQuotaOrBillingError(err)
+    ? 'quota_billing'
+    : isTransientGeminiError(err)
+      ? 'transient_overload'
+      : isModelNotFoundError(err)
+        ? 'model_not_found'
+        : 'other';
+  const meta = { ...(extra && typeof extra === 'object' ? extra : {}), kind, apiStatus: err?.apiStatus, apiModel: err?.apiModel };
+  if (meta) {
+    const wrapped = new Error(`${err?.message || err} | ${JSON.stringify(meta)}`);
     wrapped.cause = err;
     wrapped.apiStatus = err?.apiStatus;
     wrapped.apiModel = err?.apiModel;
-    LOG?.log(tag, wrapped);
+    LOG?.log(tag, wrapped, meta);
     return;
   }
   LOG?.log(tag, err);

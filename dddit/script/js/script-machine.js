@@ -640,12 +640,28 @@ function deleteProseHistory(id) {
   showToast('히스토리에서 삭제했습니다.');
 }
 
-function isTransientGeminiError(err) {
-  const status = Number(err?.apiStatus || err?.status || 0);
-  if (status === 429 || status === 503 || status === 502 || status === 504) return true;
+function isQuotaOrBillingError(err) {
   const msg = String(err?.message || err || '');
-  // bare "unavailable"/"quota"는 모델 미지원·설정 오류와 혼동되므로 제외
-  return /high demand|try again later|resource.?exhausted|overloaded|rate.?limit|quota.?exceeded|too many requests|temporar(?:y|ily)|현재.*지연|사용량이 많/i.test(
+  // Google AI Studio spend limit / billing / hard quota (≠ temporary high demand)
+  return /quota.?exceeded|exceed(?:ed|ing).{0,40}quota|billing|spend\s*limit|spending\s*limit|budget|결제|청구|한도|크레딧|insufficient.+fund|payment|consumer.*(suspend|disabled)|RESOURCE_EXHAUSTED.*quota/i.test(
+    msg,
+  );
+}
+
+function isTransientGeminiError(err) {
+  if (isQuotaOrBillingError(err)) return false; // 한도는 기다려도 안 풀림 → 재시도·과부하 문구 금지
+  const status = Number(err?.apiStatus || err?.status || 0);
+  if (status === 429 || status === 503 || status === 502 || status === 504) {
+    // 429만으로 과부하 단정하지 않음 — 메시지에 수요/레이트리밋 신호가 있을 때
+    if (status === 429) {
+      const msg = String(err?.message || err || '');
+      return /high demand|try again later|overloaded|rate.?limit|too many requests|temporar(?:y|ily)/i.test(msg)
+        || !/quota|billing|spend|budget|한도/i.test(msg);
+    }
+    return true;
+  }
+  const msg = String(err?.message || err || '');
+  return /high demand|try again later|resource.?exhausted|overloaded|rate.?limit|too many requests|temporar(?:y|ily)|현재.*지연|사용량이 많/i.test(
     msg,
   );
 }
@@ -659,6 +675,9 @@ function isModelNotFoundError(err) {
 
 function friendlyGeminiError(err) {
   const raw = String(err?.message || err || 'API 오류');
+  if (isQuotaOrBillingError(err)) {
+    return `API 지출 한도·쿼터에 걸렸습니다. Google AI Studio/Cloud 결제·한도를 확인하세요. (${raw})`;
+  }
   if (isModelNotFoundError(err)) {
     return `모델을 사용할 수 없습니다 (${err?.apiModel || 'unknown'}). ${raw}`;
   }
@@ -1447,12 +1466,20 @@ function updateTableHead(mode) {
 }
 
 function reportError(tag, err, extra) {
-  if (extra) {
-    const wrapped = new Error(`${err?.message || err} | ${JSON.stringify(extra)}`);
+  const kind = isQuotaOrBillingError(err)
+    ? 'quota_billing'
+    : isTransientGeminiError(err)
+      ? 'transient_overload'
+      : isModelNotFoundError(err)
+        ? 'model_not_found'
+        : 'other';
+  const meta = { ...(extra && typeof extra === 'object' ? extra : {}), kind, apiStatus: err?.apiStatus, apiModel: err?.apiModel };
+  if (meta) {
+    const wrapped = new Error(`${err?.message || err} | ${JSON.stringify(meta)}`);
     wrapped.cause = err;
     wrapped.apiStatus = err?.apiStatus;
     wrapped.apiModel = err?.apiModel;
-    LOG?.log(tag, wrapped);
+    LOG?.log(tag, wrapped, meta);
     return;
   }
   LOG?.log(tag, err);

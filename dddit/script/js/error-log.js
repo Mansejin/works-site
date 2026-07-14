@@ -105,16 +105,20 @@
       .reverse()
       .map((e) => {
         const metaBits = [];
-        if (e.meta.model) metaBits.push(`모델: ${esc(e.meta.model)}`);
+        if (e.meta.kind === 'quota_billing') metaBits.push('유형: 지출 한도·쿼터');
+        else if (e.meta.kind === 'transient_overload') metaBits.push('유형: 일시 과부하');
+        else if (e.meta.kind === 'model_not_found') metaBits.push('유형: 모델 없음');
+        if (e.meta.apiModel || e.meta.model) metaBits.push(`모델: ${esc(e.meta.apiModel || e.meta.model)}`);
         if (e.meta.part) metaBits.push(`파트: ${esc(e.meta.part)}`);
-        if (e.meta.status) metaBits.push(`HTTP ${esc(e.meta.status)}`);
+        if (e.meta.apiStatus || e.meta.status) metaBits.push(`HTTP ${esc(e.meta.apiStatus || e.meta.status)}`);
         const metaHtml = metaBits.length
           ? `<div class="error-log-meta">${metaBits.join(' · ')}</div>`
           : '';
         const stackHtml = e.stack
           ? `<details class="error-log-stack"><summary>스택</summary><pre>${esc(e.stack)}</pre></details>`
           : '';
-        return `<li class="error-log-item">
+        const kindCls = e.meta.kind === 'quota_billing' ? ' is-quota' : '';
+        return `<li class="error-log-item${kindCls}">
         <div class="error-log-head">
           <time>${esc(formatTime(e.time))}</time>
           <span class="error-log-ctx">${esc(e.context)}</span>
