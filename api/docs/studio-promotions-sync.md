@@ -3,6 +3,34 @@
 Studio 「프로모션」탭 데이터를 **공식 API가 아니라 Studio 내부(youtubei) 요청을 재생**해서
 `promotions.json`에 반영합니다.
 
+## Network 필터에 `list_promotions`가 안 뜰 때
+
+정상입니다. Network **이름**은 URL 마지막만 보여서 `get?alt=json`처럼 나옵니다.
+Search 탭의 `list_promotions`는 **응답 JSON 안 경로**이지 Network 필터 문자열이 아닙니다.
+
+### 순서 (스크린샷 기준 Preserve log가 꺼져 있음 → 반드시 켜기)
+
+1. DevTools **Network** → **Preserve log** 체크
+2. **Fetch/XHR** 버튼 클릭 (XHR만 보기)
+3. 프로모션 탭에서 **F5** 새로고침
+4. 필터에 순서대로 시도:
+   - `youtubei` (가장 많이 잡힘)
+   - `ypc`
+   - `promotion`
+   - `get?alt=json` + Size **20kB 이상**인 것
+
+5. Search에서 `45489` 검색 → 줄 번호 클릭 → Network에서 해당 요청 선택 → **Copy as cURL**
+
+### 콘솔 훅 (필터가 전부 0일 때)
+
+Console에 붙여넣기 → **Preserve log ON** → **F5**:
+
+```javascript
+(function(){function s(u,t){if(!t||t.length<200)return;if(!/"\s*units\s*"\s*:\s*"\d+"/.test(t))return;if(!/(promotion|campaign|ypc|impression|subscriber)/i.test(t))return;window.__studioPromoJson=t;window.__studioPromoUrl=u;console.log("저장",u);console.log("copy(__studioPromoJson)");}const f=fetch;fetch=async(...a)=>{const r=await f(...a);const u=String(a[0]||"");if(u.includes("youtubei"))r.clone().text().then(t=>s(u,t));return r;};const o=XMLHttpRequest.prototype.open,send=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.open=function(m,u){this._u=u;return o.apply(this,arguments)};XMLHttpRequest.prototype.send=function(){this.addEventListener("load",function(){if(this._u&&String(this._u).includes("youtubei"))s(String(this._u),this.responseText)});return send.apply(this,arguments)};console.log("훅 설치 — Preserve log ON 후 F5");})();
+```
+
+`copy(__studioPromoJson)` → 보고 페이지 **JSON 가져오기**.
+
 ## Response가 안 보일 때 (challenge만 보임)
 
 **Response 내용을 읽을 필요 없습니다.** Search로 `45489` 같은 숫자가 `list_promotions`에 있다면 이미 맞는 요청입니다.
