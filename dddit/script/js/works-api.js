@@ -68,10 +68,18 @@ window.DdditWorksApi = (function () {
 
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      const msg = errBody?.detail || errBody?.error?.message || `API 오류 (${res.status})`;
+      let msg = errBody?.detail || errBody?.error?.message || errBody?.message || `API 오류 (${res.status})`;
+      if (Array.isArray(msg)) {
+        msg = msg
+          .map((x) => (typeof x === "string" ? x : x?.msg || JSON.stringify(x)))
+          .join("; ");
+      } else if (msg && typeof msg === "object") {
+        msg = msg.message || JSON.stringify(msg);
+      }
       const e = new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
       e.apiStatus = res.status;
       e.apiModel = model;
+      e.apiBody = errBody;
       throw e;
     }
 

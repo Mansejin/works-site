@@ -98,8 +98,17 @@ const GEMINI_MODELS = [
 ];
 
 const PRO_GEMINI_MODEL = 'gemini-3.1-pro-preview';
-/** Fast path for convert / scene / caption stages */
-const FAST_GEMINI_MODEL = 'gemini-3.5-flash';
+/**
+ * Fast path for convert / scene / caption.
+ * Flash-Lite 우선 — 3.5 Flash는 수요·thinking 부담이 커서 변환 단계에서
+ * high-demand/빈 응답이 잦음. 실패 시 아래 체인으로 폴백.
+ */
+const FAST_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const FAST_GEMINI_FALLBACKS = [
+  'gemini-3.1-flash-lite',
+  'gemini-3-flash-preview',
+  'gemini-3.5-flash',
+];
 
 function isSupportedGeminiModel(id) {
   return GEMINI_MODELS.some((m) => m.id === id);
@@ -111,6 +120,7 @@ window.DIDIDIT_CONFIG = {
   GEMINI_MODELS,
   PRO_GEMINI_MODEL,
   FAST_GEMINI_MODEL,
+  FAST_GEMINI_FALLBACKS,
   isSupportedGeminiModel,
   isRoundupFormat,
   hasRoundupQuantity,

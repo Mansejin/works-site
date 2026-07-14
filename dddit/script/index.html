@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
-  <meta name="description" content="디디딧 콘티 작성기 — 기획안 · 줄글 · Google 시트" />
+  <meta name="description" content="디디딧 콘티 작성기 — 기획안 · 대본 · Google 시트" />
   <link rel="canonical" href="https://works.mansejin.com/dddit/script/" />
   <title>콘티 작성기 · 디디딧</title>
   <style>html.team-gate-pending body { visibility: hidden; }</style>
@@ -50,8 +50,8 @@
 
     <nav class="tab-bar step-rail" aria-label="작성 단계">
       <button class="step-rail-item tab-btn active" type="button" data-rail="1"><span>1</span> 기획안</button>
-      <button class="step-rail-item tab-btn" type="button" data-rail="2"><span>2</span> 줄글</button>
-      <button class="step-rail-item tab-btn" type="button" data-rail="3"><span>3</span> 변환</button>
+      <button class="step-rail-item tab-btn" type="button" data-rail="2"><span>2</span> 대본</button>
+      <button class="step-rail-item tab-btn" type="button" data-rail="3"><span>3</span> 시트 변환</button>
       <button class="step-rail-item tab-btn" type="button" data-rail="4"><span>4</span> 장면</button>
       <button class="step-rail-item tab-btn" type="button" data-rail="5"><span>5</span> 공유</button>
     </nav>
@@ -63,7 +63,7 @@
             <h2><span class="step-num-badge">1</span> 기획안</h2>
             <div class="block-head-actions">
               <a id="plan-edit-link" class="btn btn-secondary btn-sm" href="#" target="_blank" rel="noopener">기획안 편집</a>
-              <button id="btn-pipeline-next-brief" class="btn btn-primary btn-sm step-next-btn" type="button" data-goto="2">다음: 줄글 →</button>
+              <button id="btn-pipeline-next-brief" class="btn btn-primary btn-sm step-next-btn" type="button" data-goto="2">다음: 대본 →</button>
             </div>
           </div>
           <div class="block-body form-stack">
@@ -113,7 +113,7 @@
                 <span class="guide-qc-badge">미커버 <strong id="guide-qc-fail-count">0</strong></span>
                 <button id="btn-guide-qc-refresh" class="btn btn-secondary btn-sm" type="button">다시 검사</button>
               </div>
-              <p class="hint">필수 멘션·소구·장면·제원이 기획안·줄글·장면에 반영됐는지 형식에 구애받지 않고 검사합니다. 줄글/장면 생성 후에도 갱신됩니다.</p>
+              <p class="hint">필수 멘션·소구·장면·제원이 기획안·대본·장면에 반영됐는지 형식에 구애받지 않고 검사합니다. 대본/장면 생성 후에도 갱신됩니다.</p>
               <ul id="guide-qc-list" class="guide-qc-list"></ul>
               <p id="guide-qc-empty" class="empty-hint hidden">가이드 항목을 인식하지 못했습니다. 기획안 필수 언급·리뷰 가이드를 확인하세요.</p>
             </div>
@@ -143,10 +143,10 @@
 
         <section class="block step-section step-collapsed" data-step="2" id="step-prose">
           <div class="block-head">
-            <h2><span class="step-num-badge">2</span> 줄글 초안</h2>
+            <h2><span class="step-num-badge">2</span> 대본</h2>
             <div class="block-head-actions">
-              <button id="btn-prose-history" class="btn btn-ghost btn-sm" type="button" title="이전에 저장·생성했던 줄글">이전 줄글</button>
-              <button id="btn-gen-prose" class="btn btn-primary btn-sm" type="button">AI 줄글 생성</button>
+              <button id="btn-prose-history" class="btn btn-ghost btn-sm" type="button" title="이전에 저장·생성했던 대본">이전 대본</button>
+              <button id="btn-gen-prose" class="btn btn-primary btn-sm" type="button">AI 대본 생성</button>
             </div>
           </div>
           <div class="block-body form-stack">
@@ -166,19 +166,19 @@
               </div>
             </details>
 
-            <label class="field field-grow">줄글 대본<textarea id="prose-draft" class="prose-draft" rows="20" placeholder="AI 생성 또는 직접 작성…"></textarea></label>
+            <label class="field field-grow">대본<textarea id="prose-draft" class="prose-draft" rows="20" placeholder="AI 생성 또는 직접 작성…"></textarea></label>
           </div>
         </section>
 
         <section class="block step-section step-collapsed" data-step="3" id="step-convert">
           <div class="block-head">
-            <h2><span class="step-num-badge">3</span> 5열 변환</h2>
+            <h2><span class="step-num-badge">3</span> 시트 변환</h2>
             <div class="block-head-actions">
-              <button id="btn-convert-sheet" class="btn btn-primary btn-sm" type="button">대본 열로 변환</button>
+              <button id="btn-convert-sheet" class="btn btn-primary btn-sm" type="button">시트 변환</button>
             </div>
           </div>
           <div class="block-body">
-            <p class="hint">줄글 → 시트 5열 형식. 이 단계에서는 <strong>대본 열만</strong> 채웁니다.</p>
+            <p class="hint">대본 → 시트 5열 형식. 이 단계에서는 <strong>대본 열만</strong> 채웁니다.</p>
             <p class="hint muted">긴 원고는 자동 분할 변환 · 오른쪽 미리보기에서 행 수 확인</p>
           </div>
         </section>
@@ -241,7 +241,7 @@
 
     <footer class="step-toolbar">
       <button id="btn-pipeline-prev" class="btn btn-ghost btn-sm" type="button" disabled>← 이전</button>
-      <span class="toolbar-stage" id="toolbar-stage-hint">기획안 확인 후 줄글 단계로</span>
+      <span class="toolbar-stage" id="toolbar-stage-hint">기획안 확인 후 대본 단계로</span>
       <button id="btn-pipeline-next" class="btn btn-secondary btn-sm" type="button">다음 →</button>
     </footer>
   </div>
@@ -250,7 +250,7 @@
     <div class="tool-modal-backdrop" data-close-tool-modal tabindex="-1"></div>
     <div class="tool-modal-dialog block tool-modal-dialog-wide">
       <div class="block-head">
-        <h2 id="prose-history-title">이전 줄글</h2>
+        <h2 id="prose-history-title">이전 대본</h2>
         <div class="block-head-actions">
           <button class="btn btn-ghost btn-sm tool-modal-close" type="button" data-close-tool-modal aria-label="닫기">닫기</button>
         </div>
@@ -355,8 +355,8 @@
   <script src="../js/chapter-title-qc.js?v=3"></script>
   <script src="../js/brand-guide-qc.js?v=1"></script>
   <script src="../js/plan-brief-sync.js?v=2"></script>
-  <script src="js/works-api.js?v=2"></script>
+  <script src="js/works-api.js?v=3"></script>
   <script src="js/sheet-sync.js"></script>
-  <script src="js/main.js?v=40"></script>
+  <script src="js/main.js?v=41"></script>
 </body>
 </html>
