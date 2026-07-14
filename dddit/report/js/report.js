@@ -1133,11 +1133,17 @@
       .map((p) => {
         const m = p.metrics || {};
         const effClass = m.cpv && m.cpv <= 30 ? "metric-good" : m.cps && m.cps <= 400 ? "metric-good" : "";
+        const statusLabel = String(p.status || "—");
+        const statusClass =
+          statusLabel === "완료" || /ENDED|COMPLETED|FINISHED/i.test(statusLabel)
+            ? " done"
+            : statusLabel === "진행중" || /ACTIVE/i.test(statusLabel)
+              ? " active"
+              : "";
         return `
         <tr>
-          <td>
-            <strong>${esc(p.title)}</strong>${sourceBadge(p.source)}
-            <div><span class="badge${p.status === "완료" ? " done" : ""}">${esc(p.status || "—")}</span></div>
+          <td class="promo-name-cell">
+            <strong>${esc(p.title)}</strong><span class="badge${statusClass}">${esc(statusLabel)}</span>${sourceBadge(p.source)}
           </td>
           <td>${formatWon(p.cost)}</td>
           <td>${formatNum(p.impressions)}</td>
@@ -1150,12 +1156,6 @@
       })
       .join("");
     renderPromoPagination(sorted.length, promoPage);
-    const list = document.getElementById("promo-title-list");
-    if (list) {
-      list.innerHTML = sorted
-        .map((p) => `<option value="${esc(p.title || "")}"></option>`)
-        .join("");
-    }
   }
 
   function renderVideos(videos) {
@@ -1386,69 +1386,6 @@
       showError(err.message || "동기화 코드 복사 실패");
     }
   });
-
-  document.getElementById("btn-promo-quick-save")?.addEventListener("click", async () => {
-    const msg = document.getElementById("promo-form-status-msg");
-    try {
-      const title = document.getElementById("promo-form-title")?.value?.trim() || "";
-      if (!title) throw new Error("캠페인 이름을 입력하세요");
-      const cost = Number(document.getElementById("promo-form-cost")?.value || 0);
-      const impressions = Number(document.getElementById("promo-form-impressions")?.value || 0);
-      const views = Number(document.getElementById("promo-form-views")?.value || 0);
-      const subscribers = Number(document.getElementById("promo-form-subscribers")?.value || 0);
-      const status = document.getElementById("promo-form-status")?.value || "진행중";
-      if (!(cost || impressions || views || subscribers)) {
-        throw new Error("비용·노출·조회·구독 중 하나 이상 입력하세요");
-      }
-
-      const data = await apiGet("/api/dddit/youtube/report/promotions", { timeoutMs: 15_000 });
-      const promotions = Array.isArray(data.promotions) ? [...data.promotions] : [];
-      const memo =
-        data.memo ||
-        (Array.isArray(data.issues) ? data.issues.join("\n") : "") ||
-        "";
-      const idx = promotions.findIndex((p) => String(p.title || "").trim() === title);
-      const patch = {
-        title,
-        cost,
-        impressions,
-        views,
-        subscribers,
-        status,
-        source: "manual",
-        syncedAt: new Date().toISOString(),
-        notes: [`수동 입력 ${new Date().toLocaleDateString("ko-KR")}`],
-      };
-      if (idx >= 0) {
-        promotions[idx] = {
-          ...promotions[idx],
-          ...patch,
-          notes: listUnique([...(promotions[idx].notes || []), ...patch.notes]),
-        };
-      } else {
-        promotions.unshift({
-          id: `manual-${Date.now()}`,
-          videoTitle: title,
-          videoId: "",
-          goal: null,
-          followOnViews: 0,
-          ...patch,
-        });
-      }
-      await apiPut("/api/dddit/youtube/report/promotions", { promotions, memo, issues });
-      promoPage = 0;
-      await refreshPromotionsTable();
-      if (msg) msg.textContent = `"${title}" 저장됨`;
-      setStatus("프로모션 숫자 저장됨", "ok");
-    } catch (err) {
-      if (msg) msg.textContent = err.message || "저장 실패";
-      showError(err.message || "프로모션 저장 실패");
-    }
-  });
-
-  function listUnique(items) {
-    return [...new Set(items.filter(Boolean))];
-  }
 
   void bootReport();
 })();
