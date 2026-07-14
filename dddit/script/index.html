@@ -10,7 +10,7 @@
   <style>html.team-gate-pending body { visibility: hidden; }</style>
   <script src="../js/team-gate.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="css/style.css?v=10" />
+  <link rel="stylesheet" href="css/style.css?v=11" />
   <script>
     window.__earlyErrors = window.__earlyErrors || [];
     window.addEventListener('error', function (e) {
@@ -40,7 +40,7 @@
       </div>
       <div class="header-tools">
         <span id="workspace-project-badge" class="project-pill hidden"></span>
-        <span id="ad-mode-badge" class="pill pill-warn hidden">광고</span>
+        <button id="ad-mode-toggle" class="ad-mode-toggle is-on" type="button" aria-pressed="true" title="광고 모드 켜기/끄기">광고 ON</button>
         <button id="toggle-error-log" class="tool-btn" type="button" aria-expanded="false" aria-controls="error-log-panel">로그<span id="error-log-badge" class="badge-dot hidden"></span></button>
         <button id="toggle-prompt" class="tool-btn" type="button" aria-expanded="false" aria-controls="prompt-panel">프롬프트</button>
         <button id="toggle-settings" class="tool-btn" type="button" aria-expanded="false" aria-controls="settings-panel">설정</button>
@@ -67,6 +67,17 @@
           </div>
           <div class="block-body form-stack">
             <p class="hint">브랜드 <strong>기획안</strong>이 원본입니다. 여기서는 확인만 하고, 수정은 기획안 페이지에서 합니다.</p>
+
+            <div class="ad-mode-panel" id="ad-mode-panel">
+              <label class="ad-mode-switch">
+                <input id="ad-mode-check" type="checkbox" checked />
+                <span class="ad-mode-switch-ui" aria-hidden="true"></span>
+                <span class="ad-mode-switch-copy">
+                  <strong>광고 모드</strong>
+                  <span class="hint">ON이면 단점·한계·비추천 표현을 지양하고, 협찬·유료광고 톤으로 작성합니다.</span>
+                </span>
+              </label>
+            </div>
 
             <div class="plan-load-panel" id="plan-load-panel">
               <label class="field">
@@ -306,6 +317,6 @@
   <script src="../js/plan-brief-sync.js"></script>
   <script src="js/works-api.js"></script>
   <script src="js/sheet-sync.js"></script>
-  <script src="js/main.js?v=34"></script>
+  <script src="js/main.js?v=36"></script>
 </body>
 </html>

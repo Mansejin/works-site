@@ -56,7 +56,9 @@
 - 성우 내레이션 **줄글(연속 텍스트)** 만 작성합니다.
 - 행 분할·글자 수·바이트·표·JSON·장면·사이즈·자막·코멘트 규칙은 **이 단계에서 적용하지 않습니다**.
 - 스펙·수치는 문장 속에 자연스럽게 녹이고, 나열형 낭독은 피합니다.
-- 브리프·기획안의 mustHighlight는 빠뜨리지 말고, carefulPoints는 솔직히 다룹니다.
+- 브리프·기획안의 mustHighlight는 빠뜨리지 마세요.
+- **광고 모드 ON**: 단점·한계·비추천 표현 지양. carefulPoints는 고지용만.
+- **광고 모드 OFF**: carefulPoints·단점을 솔직히 다룹니다.
 - 첫 챕터(프롤로그)에는 [오프닝] 고정 멘트를 포함합니다.
 - 마지막·총평 챕터 클로징: 요청 메시지의 역할 힌트와 아래 **[이 영상 클로징]** 만 사용. 단일/라운드업을 섞지 마세요.
 - 출력: 마크다운·JSON·표 없이 줄글 본문만`,
@@ -161,23 +163,38 @@ ${closingBlock}
     return buildBaseSystemRules(options);
   }
 
+  function buildAdModePin(adMode) {
+    if (adMode) {
+      return `# 광고·협찬 모드 (최우선)
+- **단점·한계·아쉬운 점·불편·부족·비추천** 등 비판적 표현을 쓰지 마세요.
+- brandAvoid/carefulPoints는 제품 단점이 아니라 **법적·필수 고지**(협찬 고지·보조금·시연 주의)로만 다루세요.
+- 총평·편의성 챕터에서도 단점 요약·한계 나열·솔직한 비추천을 넣지 마세요.
+- 허위 과장·「무조건 추천」은 금지. 체감 장점·사용 장면 중심으로 담백하게.`;
+    }
+    return `# 일반 리뷰 모드
+- 장점과 단점·주의점을 왜곡 없이 균형 있게 다룹니다.
+- carefulPoints는 솔직히 반영합니다.`;
+  }
+
   /**
    * API 호출용 — 기본 프롬프트 + 단계 규칙.
    * 커스텀 프롬프트를 쓰더라도 단계 규칙이 최우선으로 앞에 붙어 패러독스를 방지합니다.
    * @param {string} stage
-   * @param {{ format?: 'single'|'roundup'|'both' }} [options]
+   * @param {{ format?: 'single'|'roundup'|'both', adMode?: boolean }} [options]
    */
   function getSystemRulesForStage(stage, options = {}) {
     const format = options.format || 'both';
     const stageBlock = STAGE_RULES[stage];
     const base = getActiveSystemRules({ format });
-    // Custom saved prompts still get an explicit closing pin for prose.
-    let closingPin = '';
+    let pins = '';
     if (stage === 'prose' && format !== 'both') {
-      closingPin = `\n\n# 이 영상 클로징 (필수·최우선)\n${formatClosingBlock(format === 'roundup')}\n- 위 클로징만 사용. 다른 포맷 클로징 금지.\n`;
+      pins += `\n\n# 이 영상 클로징 (필수·최우선)\n${formatClosingBlock(format === 'roundup')}\n- 위 클로징만 사용. 다른 포맷 클로징 금지.\n`;
     }
-    if (!stageBlock) return `${closingPin}${base}`.trim();
-    return `${stageBlock}${closingPin}\n\n---\n\n${base}`;
+    if (stage === 'prose') {
+      pins += `\n\n${buildAdModePin(Boolean(options.adMode))}\n`;
+    }
+    if (!stageBlock) return `${pins}${base}`.trim();
+    return `${stageBlock}${pins}\n\n---\n\n${base}`;
   }
 
   function getActivePromptSource() {

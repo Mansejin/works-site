@@ -97,22 +97,42 @@
     return lines.length ? lines.join('\n') : '(구조화 제원 없음)';
   }
 
-  function formatReviewBriefBlock(brief) {
+  function formatReviewBriefBlock(brief, options = {}) {
     const b = brief || {};
+    const adMode = Boolean(options.adMode);
+    const carefulLabel = adMode
+      ? '- 필수 고지·주의 (단점 서술 금지, 고지용만):'
+      : '- 단점·주의 (왜곡 없이):';
     const lines = [
       b.thesis && `- 한 줄 테제: ${b.thesis}`,
       b.targetScenario && `- 타깃 사용 시나리오: ${b.targetScenario}`,
       b.mustHighlight && `- 반드시 다룰 포인트: ${b.mustHighlight}`,
-      b.carefulPoints && `- 단점·주의 (왜곡 없이): ${b.carefulPoints}`,
+      b.carefulPoints && `${carefulLabel} ${b.carefulPoints}`,
       b.compareWith && `- 비교·경쟁 모델: ${b.compareWith}`,
     ].filter(Boolean);
     return lines.length ? lines.join('\n') : '(리뷰 방향 미입력)';
   }
 
+  function buildAdModeBlock(adMode) {
+    if (adMode) {
+      return `
+## 광고·협찬 모드 (최우선)
+- 이 콘텐츠는 유료광고·협찬입니다.
+- **단점·한계·아쉬운 점·불편·부족·비추천 표현을 하지 마세요.**
+- carefulPoints/브랜드 주의는 제품 비하가 아니라 **필수 고지**(협찬 고지·보조금·시연 주의 등)로만 다루세요.
+- 총평에서도 단점 요약·솔직한 비추천을 넣지 마세요.
+- 허위 과장·「무조건 사라」식 과잉 홍보는 금지. 체감 장점·사용 장면 중심으로 담백하게.`;
+    }
+    return `
+## 일반 리뷰 모드
+- 장점과 함께 단점·주의점도 왜곡 없이 균형 있게 다룹니다.`;
+  }
+
   function buildPromptContext(state, category, refBlock) {
     const cat = category || {};
+    const adMode = Boolean(state.adMode);
     const specsBlock = formatSpecsBlock(state.productSpecs, state.categoryId);
-    const briefBlock = formatReviewBriefBlock(state.reviewBrief);
+    const briefBlock = formatReviewBriefBlock(state.reviewBrief, { adMode });
     const extraNotes = String(state.productNotes || '').trim();
     const teamNotes = String(state.teamBriefNotes || '').trim();
     const teamBlock = teamNotes ? `\n## 팀 제공 자료 (최우선 반영)\n${teamNotes}` : '';
@@ -120,13 +140,16 @@
       state.briefSource === 'team'
         ? '\n- 브리프 출처: 팀 제공 (자동 서치 생략). 팀 자료·구조화 제원·리뷰 방향을 함께 반영.'
         : '';
+    const adBrand = String(state.adBrand || '').trim();
 
     return `
 # 제품 브리프
 제품명: ${state.productName}
 카테고리: ${cat.name || '기타'} — ${cat.focusHints || ''}
 콘텐츠 방향: ${state.contentDirection || '(미입력)'}
-가격·라인업: ${state.priceInfo || '(미입력)'}${sourceNote}
+가격·라인업: ${state.priceInfo || '(미입력)'}
+광고 모드: ${adMode ? 'ON' : 'OFF'}${adBrand ? `\n광고 브랜드: ${adBrand}` : ''}${sourceNote}
+${buildAdModeBlock(adMode)}
 ${teamBlock}
 
 ## 구조화 제원
@@ -143,6 +166,7 @@ ${briefBlock}${refBlock ? `\n${refBlock}` : ''}`.trim();
     emptyReviewBrief,
     formatSpecsBlock,
     formatReviewBriefBlock,
+    buildAdModeBlock,
     buildPromptContext,
   };
 })();

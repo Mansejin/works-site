@@ -17,6 +17,8 @@ const state = {
   modelPro: 'gemini-3.1-pro-preview',
   /** 'single' | 'roundup' | 'both' — 줄글 단계에서 클로징 멘트 선택 */
   scriptFormat: 'both',
+  /** 광고·협찬 톤 (단점 표현 지양). 프로젝트별로 저장 */
+  adMode: true,
   productSpecs: {},
   priceInfo: '',
   categoryId: 'other',
@@ -66,7 +68,10 @@ function bindModules() {
 
 function getSystemRules(stage) {
   if (stage && PM.getSystemRulesForStage) {
-    return PM.getSystemRulesForStage(stage, { format: state.scriptFormat || 'both' });
+    return PM.getSystemRulesForStage(stage, {
+      format: state.scriptFormat || 'both',
+      adMode: Boolean(state.adMode),
+    });
   }
   return PM?.getActiveSystemRules?.() || '';
 }
@@ -373,6 +378,7 @@ function getEffectiveState() {
   const chapters = state.chapters.length ? state.chapters : (fromPlan.chapters || []);
   return {
     ...fromPlan,
+    adMode: Boolean(state.adMode),
     productSpecs: state.productSpecs,
     priceInfo: state.priceInfo,
     categoryId: state.categoryId,
@@ -483,6 +489,7 @@ function saveProject() {
     syncChaptersFromDOM();
     state.proseDraft = $('#prose-draft')?.value || state.proseDraft;
     localStorage.setItem(projectStorageKey(), JSON.stringify({
+      adMode: Boolean(state.adMode),
       productSpecs: state.productSpecs,
       priceInfo: state.priceInfo,
       categoryId: state.categoryId,
@@ -495,6 +502,11 @@ function saveProject() {
   } catch { /* quota */ }
 }
 
+function defaultAdModeForProject() {
+  // 브랜드 기획안이 있는 프로젝트는 광고 모드 기본 ON
+  return Boolean(loadPlanData());
+}
+
 function loadProject() {
   try {
     const saved = JSON.parse(localStorage.getItem(projectStorageKey()) || '{}');
@@ -505,6 +517,7 @@ function loadProject() {
     state.chapters = saved.chapters || [];
     state.proseDraft = saved.proseDraft || '';
     state.pipelineStep = saved.pipelineStep || 1;
+    state.adMode = typeof saved.adMode === 'boolean' ? saved.adMode : defaultAdModeForProject();
   } catch { /* ignore */ }
 }
 
@@ -524,6 +537,30 @@ function applyBriefToDOM() {
   renderSpecFields();
   renderChapters();
   renderReferenceList();
+  syncAdModeUI();
+}
+
+function syncAdModeUI() {
+  const on = Boolean(state.adMode);
+  const check = $('#ad-mode-check');
+  if (check) check.checked = on;
+  const btn = $('#ad-mode-toggle');
+  if (btn) {
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.classList.toggle('is-on', on);
+    btn.classList.toggle('is-off', !on);
+    btn.textContent = on ? '광고 ON' : '광고 OFF';
+  }
+}
+
+function setAdMode(on, options = {}) {
+  state.adMode = Boolean(on);
+  syncAdModeUI();
+  updateProjectChrome();
+  if (!options.silent) {
+    saveProject();
+    showToast(state.adMode ? '광고 모드 ON — 단점·한계 표현 지양' : '광고 모드 OFF — 솔직한 장단점');
+  }
 }
 
 function syncSupplementsFromDOM() {
@@ -813,6 +850,7 @@ async function runProseDraft() {
         hasSession: SESSION.turnCount() > 0,
         roundup: isRoundup,
         roundupDetectText: ctx,
+        adMode: Boolean(state.adMode),
       });
       let chunk = await callGeminiTextSession(prompt, 0.72, 'prose');
       const marker = chapterMarker(chapters[i]);
@@ -1004,7 +1042,6 @@ async function pullFromSheet() {
 }
 
 function updateProjectChrome() {
-  const effective = getEffectiveState();
   const project = getSheetSlug();
   const badge = $('#workspace-project-badge');
   if (badge) {
@@ -1016,7 +1053,7 @@ function updateProjectChrome() {
       badge.classList.add('hidden');
     }
   }
-  $('#ad-mode-badge')?.classList.toggle('hidden', !effective.adMode);
+  syncAdModeUI();
 }
 
 async function initSheetIntegration() {
@@ -1214,6 +1251,8 @@ function bindEvents() {
   $('#btn-sheet-pull')?.addEventListener('click', pullFromSheet);
   $('#btn-pipeline-next-brief')?.addEventListener('click', () => navigatePipeline(2));
   $('#btn-plan-load')?.addEventListener('click', loadSelectedPlanProject);
+  $('#ad-mode-check')?.addEventListener('change', (e) => setAdMode(e.target.checked));
+  $('#ad-mode-toggle')?.addEventListener('click', () => setAdMode(!state.adMode));
   $('#plan-project-select')?.addEventListener('change', () => {
     const slug = $('#plan-project-select')?.value || '';
     if (slug) switchToProject(slug);
