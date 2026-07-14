@@ -10,7 +10,7 @@
   <style>html.team-gate-pending body { visibility: hidden; }</style>
   <script src="../js/team-gate.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="css/style.css?v=6" />
+  <link rel="stylesheet" href="css/style.css?v=7" />
   <script>
     window.__earlyErrors = window.__earlyErrors || [];
     window.addEventListener('error', function (e) {
@@ -127,8 +127,23 @@
           </div>
           <div class="block-body form-stack">
             <p class="hint">브랜드 <strong>기획안</strong>이 원본입니다. 여기서는 확인만 하고, 수정은 기획안 페이지에서 합니다.</p>
+
+            <div class="plan-load-panel" id="plan-load-panel">
+              <label class="field">
+                기존 프로젝트에서 불러오기
+                <select id="plan-project-select">
+                  <option value="">프로젝트 선택…</option>
+                </select>
+              </label>
+              <div class="btn-row plan-load-actions">
+                <button id="btn-plan-load" class="btn btn-primary btn-sm" type="button">기획안 불러오기</button>
+              </div>
+              <p id="plan-load-hint" class="hint muted"></p>
+              <ul id="plan-project-list" class="plan-project-list" aria-label="프로젝트 기획안 목록"></ul>
+            </div>
+
             <div id="plan-summary" class="plan-summary"></div>
-            <p id="plan-missing" class="empty-hint hidden">기획안이 없습니다. 위 「기획안 편집」에서 작성하세요.</p>
+            <p id="plan-missing" class="empty-hint hidden">기획안이 없습니다. 위에서 프로젝트를 고르거나 「기획안 편집」에서 작성하세요.</p>
 
             <details class="fold">
               <summary>생성 보조 (선택) · 카테고리·제원</summary>
@@ -254,9 +269,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" async></script>
+  <script src="../js/plan-defaults.js"></script>
   <script src="../js/plan-brief-sync.js"></script>
   <script src="js/works-api.js"></script>
   <script src="js/sheet-sync.js"></script>
-  <script src="js/main.js?v=27"></script>
+  <script src="js/main.js?v=28"></script>
 </body>
 </html>
