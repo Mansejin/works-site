@@ -349,6 +349,8 @@ function renderPlanSummary() {
     ['구성', plan.structure],
     ['필수 언급', plan.brandMust],
     ['지양', plan.brandAvoid],
+    ['리뷰 가이드', plan.reviewGuide],
+    ['촬영 체크리스트', plan.shootChecklist],
   ].filter(([, v]) => String(v || '').trim());
 
   const envelope = SYNC?.loadPlanEnvelope?.(project);
@@ -367,6 +369,59 @@ function renderPlanSummary() {
     applyChaptersFromPlan({ force: true });
   }
   renderChapterQcPreview(state.chapters);
+  renderGuideCoverageQc();
+}
+
+function renderGuideCoverageQc() {
+  const panel = $('#guide-qc-panel');
+  const list = $('#guide-qc-list');
+  const empty = $('#guide-qc-empty');
+  const failEl = $('#guide-qc-fail-count');
+  if (!panel || !list || !window.DdditBrandGuideQc?.checkCoverage) return;
+
+  const plan = loadPlanData();
+  if (!plan) {
+    panel.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+  const prose = ($('#prose-draft')?.value || state.proseDraft || '').trim();
+  const sceneText = (state.allRows || []).map((r) => `${r.대본 || ''} ${r.장면 || ''} ${r.자막 || ''}`).join('\n');
+  const report = window.DdditBrandGuideQc.checkCoverage(plan, prose, sceneText);
+  const guide = report.guide || {};
+
+  const sections = [
+    { title: '제품·제원 (기획안)', items: report.productChecks, note: '기획안 반영 여부' },
+    { title: '필수 멘션', items: report.mustMentions },
+    { title: '필수 소구', items: report.mustSell },
+    { title: '서브 소구', items: report.subSell },
+    { title: '필수 장면·촬영', items: report.scenes },
+  ];
+
+  const hasAny = sections.some((s) => s.items?.length);
+  empty?.classList.toggle('hidden', hasAny);
+  if (failEl) failEl.textContent = String(report.summary?.failCount ?? 0);
+
+  const meta = [];
+  if (guide.allowUnboxing) meta.push('<li class="guide-qc-meta">언박싱: 가이드 허용 → 장면 단계에서 반영</li>');
+  if (guide.productSpecs?.model) meta.push(`<li class="guide-qc-meta">인식 제원: ${esc(Object.entries(guide.productSpecs).map(([k, v]) => `${k}=${v}`).join(' · '))}</li>`);
+
+  list.innerHTML =
+    meta.join('') +
+    sections
+      .filter((s) => s.items?.length)
+      .map((sec) => {
+        const items = sec.items
+          .map((it) => {
+            const cls = it.severity === 'fail' ? 'is-fail' : it.severity === 'warn' ? 'is-warn' : 'is-pass';
+            const mark = it.ok ? '✓' : it.severity === 'fail' ? '✗' : '·';
+            const scope = it.inPlan != null ? (it.inPlan ? '기획안' : '미기재') : prose || sceneText ? '대본' : '대기';
+            return `<li class="guide-qc-item ${cls}"><span class="guide-qc-mark">${mark}</span><span class="guide-qc-text">${esc(it.item)}</span><span class="guide-qc-scope">${esc(scope)}</span></li>`;
+          })
+          .join('');
+        return `<li class="guide-qc-group"><strong>${esc(sec.title)}</strong><ul>${items}</ul></li>`;
+      })
+      .join('');
 }
 
 function getEffectiveState() {
@@ -430,7 +485,11 @@ async function callGeminiTextSession(userPrompt, temperature = 0.75, stage = 'pr
   const body = {
     systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
     contents: SESSION.getContents(),
-    generationConfig: { temperature },
+    generationConfig: {
+      temperature,
+      // Single-response budget only (prevents context blow-ups). Body chapters have no soft word-cap in prompts.
+      maxOutputTokens: stage === 'prose' ? 8192 : 4096,
+    },
   };
   const text = await postGeminiAndExtractText(model, body);
   SESSION.push('model', text);
@@ -867,7 +926,13 @@ async function runProseDraft() {
     $('#prose-draft').value = prose;
     SESSION.save(getSheetSlug());
     saveProject();
-    showToast(`줄글 완성 (대화 ${SESSION.turnCount()}턴 — 스타일 맥락 유지)`);
+    renderGuideCoverageQc();
+    const fail = Number($('#guide-qc-fail-count')?.textContent || 0);
+    showToast(
+      fail > 0
+        ? `줄글 완성 · 가이드 미커버 ${fail}항 (1단계 QC 확인)`
+        : `줄글 완성 (대화 ${SESSION.turnCount()}턴 — 스타일 맥락 유지)`,
+    );
     navigatePipeline(3);
   } catch (e) {
     reportError('runProseDraft', e);
@@ -926,9 +991,21 @@ async function runAddScenes() {
   if (!requireApiReady() || !state.allRows.length) return;
   setLoading(true, '장면·사이즈 추가 중…');
   try {
-    state.allRows = await callGeminiJson(PIPE.buildScenePrompt(buildProductContext(), state.allRows), 0.4, 'scene');
+    const plan = loadPlanData();
+    const guide = window.DdditBrandGuideQc?.extractFromPlan?.(plan) || {};
+    const sceneOpts = {
+      shootChecklist: plan?.shootChecklist || (guide.mustScenes || []).map((s) => `□ ${s}`).join('\n'),
+      allowUnboxing: Boolean(guide.allowUnboxing),
+    };
+    state.allRows = await callGeminiJson(
+      PIPE.buildScenePrompt(buildProductContext(), state.allRows, sceneOpts),
+      0.4,
+      'scene',
+    );
     renderTable();
-    showToast('장면·사이즈를 반영했습니다.');
+    renderGuideCoverageQc();
+    const miss = ($('#guide-qc-fail-count')?.textContent || '').trim();
+    showToast(miss && miss !== '0' ? `장면 반영 · 가이드 미커버 ${miss}항 확인` : '장면·사이즈를 반영했습니다.');
     navigatePipeline(5);
   } catch (e) {
     reportError('runAddScenes', e);
@@ -1247,6 +1324,10 @@ function bindEvents() {
   $('#btn-add-chapter')?.addEventListener('click', addChapter);
   $('#btn-chapter-qc')?.addEventListener('click', () => reloadChaptersFromPlanQc());
   $('#btn-chapter-qc-step2')?.addEventListener('click', () => reloadChaptersFromPlanQc());
+  $('#btn-guide-qc-refresh')?.addEventListener('click', () => {
+    renderGuideCoverageQc();
+    showToast('가이드 QC를 갱신했습니다.');
+  });
   $('#btn-sheet-push')?.addEventListener('click', pushToSheet);
   $('#btn-sheet-pull')?.addEventListener('click', pullFromSheet);
   $('#btn-pipeline-next-brief')?.addEventListener('click', () => navigatePipeline(2));
@@ -1269,7 +1350,13 @@ function bindEvents() {
     btn.addEventListener('click', () => navigatePipeline(Number(btn.dataset.goto)));
   });
   $('#btn-sheet-open')?.addEventListener('click', openSheetUrl);
-  $('#prose-draft')?.addEventListener('input', (e) => { state.proseDraft = e.target.value; saveProject(); updatePipelineUI(); });
+  $('#prose-draft')?.addEventListener('input', (e) => {
+    state.proseDraft = e.target.value;
+    saveProject();
+    updatePipelineUI();
+    clearTimeout(renderGuideCoverageQc._t);
+    renderGuideCoverageQc._t = setTimeout(() => renderGuideCoverageQc(), 400);
+  });
   $('#price-info')?.addEventListener('input', (e) => { state.priceInfo = e.target.value; saveProject(); });
   $('#category')?.addEventListener('change', (e) => { state.categoryId = e.target.value; renderSpecFields(); saveProject(); });
   $('#api-key')?.addEventListener('input', (e) => { state.apiKey = e.target.value.trim(); saveSettings(); updatePipelineUI(); });

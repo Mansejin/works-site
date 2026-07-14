@@ -107,8 +107,14 @@ window.DdditPlanBriefSync = (function () {
 
   function buildTeamBriefNotes(plan) {
     const blocks = [];
+    const structured =
+      typeof window !== 'undefined' && window.DdditBrandGuideQc?.buildPromptGuideBlock
+        ? window.DdditBrandGuideQc.buildPromptGuideBlock(plan)
+        : '';
+    if (structured) blocks.push(structured);
     if (plan.reviewGuide) blocks.push(`## 리뷰 가이드\n${plan.reviewGuide}`);
     if (plan.brandMust) blocks.push(`## 필수 언급·준수\n${plan.brandMust}`);
+    if (plan.brandAvoid) blocks.push(`## 주의·지양·촬영 금지\n${plan.brandAvoid}`);
     if (plan.shootChecklist) blocks.push(`## 촬영 체크리스트\n${plan.shootChecklist}`);
     if (plan.tags) blocks.push(`## 태그\n${plan.tags}`);
     if (plan.descriptionDraft) blocks.push(`## 설명란 초안\n${plan.descriptionDraft}`);
