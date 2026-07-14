@@ -861,12 +861,49 @@ function syncModelSelect() {
   select.value = value;
 }
 
-function togglePanel(panelSel, btnSel) {
+const TOOL_MODALS = [
+  { panel: '#error-log-panel', btn: '#toggle-error-log' },
+  { panel: '#settings-panel', btn: '#toggle-settings' },
+  { panel: '#prompt-panel', btn: '#toggle-prompt' },
+];
+
+function syncToolModalChrome() {
+  const anyOpen = TOOL_MODALS.some(({ panel }) => {
+    const el = $(panel);
+    return el && !el.classList.contains('collapsed');
+  });
+  document.body.classList.toggle('tool-modal-open', anyOpen);
+  TOOL_MODALS.forEach(({ panel, btn }) => {
+    const el = $(panel);
+    const open = Boolean(el && !el.classList.contains('collapsed'));
+    $(btn)?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (el) {
+      el.hidden = !open;
+      el.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
+  });
+}
+
+function closeAllToolModals() {
+  TOOL_MODALS.forEach(({ panel }) => $(panel)?.classList.add('collapsed'));
+  syncToolModalChrome();
+}
+
+function openToolModal(panelSel) {
+  TOOL_MODALS.forEach(({ panel }) => {
+    const el = $(panel);
+    if (!el) return;
+    el.classList.toggle('collapsed', panel !== panelSel);
+  });
+  syncToolModalChrome();
+}
+
+function togglePanel(panelSel) {
   const panel = $(panelSel);
-  const btn = $(btnSel);
   if (!panel) return;
-  const collapsed = panel.classList.toggle('collapsed');
-  btn?.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  const isOpen = !panel.classList.contains('collapsed');
+  if (isOpen) closeAllToolModals();
+  else openToolModal(panelSel);
 }
 
 async function addReferenceFromPaste() {
@@ -898,9 +935,18 @@ function clearReferences() {
 }
 
 function bindDrawerPanels() {
-  $('#toggle-settings')?.addEventListener('click', () => togglePanel('#settings-panel', '#toggle-settings'));
-  $('#toggle-prompt')?.addEventListener('click', () => togglePanel('#prompt-panel', '#toggle-prompt'));
-  $('#toggle-error-log')?.addEventListener('click', () => togglePanel('#error-log-panel', '#toggle-error-log'));
+  $('#toggle-settings')?.addEventListener('click', () => togglePanel('#settings-panel'));
+  $('#toggle-prompt')?.addEventListener('click', () => togglePanel('#prompt-panel'));
+  $('#toggle-error-log')?.addEventListener('click', () => togglePanel('#error-log-panel'));
+  document.querySelectorAll('[data-close-tool-modal]').forEach((el) => {
+    el.addEventListener('click', closeAllToolModals);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('tool-modal-open')) {
+      closeAllToolModals();
+    }
+  });
+  syncToolModalChrome();
   $('#btn-log-clear')?.addEventListener('click', () => LOG?.clear());
   $('#btn-log-copy')?.addEventListener('click', async () => {
     const text = LOG?.toExportText?.();
@@ -1037,7 +1083,7 @@ async function boot() {
     navigatePipeline(state.pipelineStep || 1);
     renderTable();
     if (!isApiReady() && !window.DdditWorksApi?.isBackendMode?.()) {
-      $('#settings-panel')?.classList.remove('collapsed');
+      openToolModal('#settings-panel');
     }
   } catch (e) {
     $('#boot-error')?.classList.remove('hidden');
