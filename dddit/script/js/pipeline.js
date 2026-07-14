@@ -357,18 +357,34 @@ window.DIDIDIT_PIPELINE = (function () {
     const roundup = isRoundup
         ? `\n- **N개 아이템 라운드업**: 제품마다 \`[제품명]\` 단독 행 후 4~8호흡. 심층 리뷰보다 짧고 빠르게.\n${roundupCategoryHint}`
         : '';
+    const exclusiveScope =
+      '\n- **챕터 범위 고정**: 이 챕터 제목·메모에 적힌 범위만 다룹니다. 다른 챕터에 배정된 소구·시연·편의/공간 설명을 반복하지 마세요.\n';
+    // 챕터 유형은 제목 기준으로만 판별 (메모의 '중간투입' 등이 시연으로 오인되지 않게)
+    const diffChapter = /차별/.test(title)
+        ? `\n- 제품 차별점 챕터: 내솥·칼날 등 **구조·재질·첫인상**만. 투입·가루·건조 시연은 성능 챕터로 넘기세요.\n`
+        : '';
+    const demoChapter = /시연/.test(title)
+        ? `\n- 성능 시연 챕터: 투입→결과(가루)·건조·살균·탈취 체감. UI·세척·모드는 편의 챕터로, 배치·소음은 공간 챕터로 넘기세요.\n`
+        : '';
+    const convenienceChapter =
+      /사용\s*편의|편의성/.test(title) && !/한계/.test(title)
+        ? `\n- 사용 편의성 챕터: 디스플레이·세척·모드·중간투입(센서)만. 분쇄 시연·공간 배치를 다시 펼치지 마세요.\n`
+        : '';
+    const spaceChapter = /공간|설치|라이프/.test(title)
+        ? `\n- 공간·설치 챕터: 배치·용량·야간 소음만. 편의 UI·성능 시연 재설명 금지.\n`
+        : '';
     const specChapter =
-      /성능|제원|스펙|디스플레이/i.test(title) || /성능|제원|스펙/i.test(notes)
+      /제원|스펙/.test(title) || (/성능/.test(title) && !/시연/.test(title))
         ? `\n- 성능·제원 챕터: 스펙을 화면/칩·저장/배터리 등 **덩어리로 묶어** 문장 속에 녹이세요. \`무게는 X, Y는 Z\` 식 나열 금지. 짧은 해석·판단 한 줄 포함.\n`
         : '';
     const designChapter =
-      /디자인|외관|첫인상/i.test(title) || /디자인|외관/i.test(notes)
+      /디자인|외관|첫인상/.test(title) || /디자인|외관/.test(notes)
         ? adMode
           ? `\n- 디자인 챕터: 형태·크기·재질·조작부 중심의 긍정적 체감. 단점·트레이드오프 나열 금지.\n`
           : `\n- 디자인 챕터: 형태·크기·재질·조작부 중심. 실사용 시나리오(빨래·퇴근 후 등) 반복 금지. 외관 vs 실용성 트레이드오프 한 줄.\n`
         : '';
     const limitChapter =
-      /한계|단점|주의/i.test(title) || /한계|단점/i.test(notes)
+      /한계|단점/.test(title) || /한계|단점/.test(notes)
         ? adMode
           ? `\n- 제목에 한계·단점이 있어도 **광고 모드**에서는 사용 편의·관리 팁만 다루고 단점·한계 서술은 피하세요.\n`
           : `\n- 편의와 함께 한계·아쉬운 점을 왜곡 없이 짧게 다룹니다.\n`
@@ -387,14 +403,16 @@ window.DIDIDIT_PIPELINE = (function () {
     const closingChapter =
       /총평|마무리|정리/i.test(title) || chapterIndex === chapterTotal - 1
         ? adMode
-          ? `\n- 총평(광고 모드): 잘 맞는 사용 장면·추천 대상·가격 안내 중심. **단점 요약·한계 나열·솔직한 비추천 금지.** \`적극 추천\`·\`확신\` 과잉도 금지.\n`
-          : `\n- 총평: 가격 적정성 판단 + 추천 대상 + 앞 챕터 단점 요약. 가격 중점이 낮으면 가격을 총평에 엮음. 가격이 핵심이면 타사·라인업 비교·솔직한 비추천 포함. \`적극 추천\`·\`확신\` 금지.\n`
+          ? `\n- 총평(광고 모드): 잘 맞는 사용 장면·추천 대상·구매/보조금 안내 중심. **단점 요약·한계 나열·솔직한 비추천 금지.** 앞 챕터 시연 재방송 금지. \`적극 추천\`·\`확신\` 과잉도 금지.\n`
+          : `\n- 총평: 가격 적정성 판단 + 추천 대상 + 앞 챕터 핵심만 한 줄 요약. 새 스펙 장황 나열 금지. \`적극 추천\`·\`확신\` 금지.\n`
         : '';
     const ctxBlock = includeContext && ctx ? `${ctx}\n\n` : '';
     const continuity =
       options.hasSession && chapterIndex > 0
-        ? '- 앞 챕터와 **같은 톤·호흡·문장 리듬**을 유지하세요. 이미 쓴 내용은 반복하지 마세요.\n'
+        ? '- 앞 챕터와 **같은 톤·호흡·문장 리듬**을 유지하세요. 이미 쓴 내용·다른 챕터 범위는 반복하지 마세요.\n'
         : '- 이미 작성된 줄글이 있으면 톤·흐름을 맞춰 이어 쓰고, 반복하지 마세요.\n';
+    const planWeight =
+      '- **내용 우선순위**: 기획안 구성·챕터 메모·필수 장면/소구 > 일반 시스템 프롬프트 관례.\n';
 
     const heading = proseHeading(chapter);
     const titleLine = heading
@@ -405,12 +423,12 @@ window.DIDIDIT_PIPELINE = (function () {
         ? '- **분량**: 오프닝·인트로는 짧게 (훅 + 고정 오프닝 멘트). 본문 내용 선행 나열 금지.\n'
         : chapterIndex === chapterTotal - 1 || isClosingChapter(title)
           ? '- **분량**: 총평·클로징은 핵심만 압축. 새 스펙 장황 나열 금지.\n'
-          : '- **분량**: 본문 챕터는 **상한 없음**. 필수·서브 소구·필수 멘션을 충분히 녹이세요. (이 응답에는 이 챕터만)\n';
+          : '- **분량**: 본문 챕터는 **상한 없음**. 이 챕터 범위의 필수·서브 소구만 충분히. (이 응답에는 이 챕터만)\n';
     return `${ctxBlock}# 작업: 줄글 대본 작성
 - 성우 내레이션 중심의 **자연스러운 줄글**만 작성합니다.
 - 표·행 분할·장면·자막·JSON은 넣지 않습니다.
-${titleLine}
-${lengthRule}${notes ? `- 챕터 메모: ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${specChapter}${designChapter}${limitChapter}${priceChapter}${closingChapter}
+${planWeight}${titleLine}
+${lengthRule}${exclusiveScope}${notes ? `- 챕터 메모(범위): ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${diffChapter}${demoChapter}${convenienceChapter}${spaceChapter}${specChapter}${designChapter}${limitChapter}${priceChapter}${closingChapter}
 ${continuity}`;
   }
 

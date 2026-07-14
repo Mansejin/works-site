@@ -1,6 +1,6 @@
 /** 프롬프트 — txt 파일 기반 관리 (단계별 시스템 규칙 분리) */
 (function () {
-  const PROMPT_VERSION = '1.1.0';
+  const PROMPT_VERSION = '1.1.1';
   const DEFAULT_PROMPT_FILE = `prompts/default-v${PROMPT_VERSION}.txt`;
   const STYLE_ANCHOR_FILE = 'prompts/style-anchor.txt';
   const FORMAT_ITEM_ROUNDUP_FILE = 'prompts/format-item-roundup.txt';
@@ -55,9 +55,11 @@
     prose: `# 현재 작업 단계: 줄글 작성 (최우선)
 - 성우 내레이션 **줄글(연속 텍스트)** 만 작성합니다.
 - 행 분할·글자 수·바이트·표·JSON·장면·사이즈·자막·코멘트 규칙은 **이 단계에서 적용하지 않습니다**.
+- **내용 가중치**: 기획안 구성·챕터 메모·필수 장면/소구/멘션 > 일반 시스템 프롬프트 관례.
+- 챕터마다 **범위가 다릅니다**. 다른 챕터에 배정된 소구·시연을 반복하지 마세요.
 - 스펙·수치는 문장 속에 자연스럽게 녹이고, 나열형 낭독은 피합니다.
-- 브리프·기획안의 mustHighlight·**필수 소구·필수 멘션**은 빠뜨리지 마세요. 서브 소구는 적절히 포함합니다.
-- **분량**: 오프닝·인트로와 총평·클로징만 짧게. **그 외 본문 챕터는 분량 상한 없음** — 필수 내용을 충분히. (한 응답 = 해당 챕터만)
+- 기획안의 mustHighlight·**필수 소구·필수 멘션**은 빠뜨리지 마세요. 서브 소구는 적절한 챕터에만.
+- **분량**: 오프닝·인트로와 총평·클로징만 짧게. **그 외 본문 챕터는 분량 상한 없음**.
 - **광고 모드 ON**: 단점·한계·비추천 표현 지양. carefulPoints는 고지용만.
 - **광고 모드 OFF**: carefulPoints·단점을 솔직히 다룹니다.
 - 첫 챕터(프롤로그)에는 [오프닝] 고정 멘트를 포함합니다.
@@ -118,10 +120,12 @@ Content Format: 모델 실사용 연기(화면) + 성우 내레이션(음성)
 Tone & Manner: 솔직 담백, 과장 없는 팩트, 실생활 밀착형 공감 화법
 
 ## 콘텐츠 원칙
+- **기획안 우선**: 챕터 구성·필수 장면·소구·주의는 기획안/팀 가이드를 따릅니다. 일반 IT리뷰 골격과 충돌하면 기획안이 우선입니다.
 - 스펙·기능 설명 시 기본 구성품과 별매품을 구분합니다.
 - 제품 지칭: '이 녀석' 사용 금지.
 - 사실 왜곡·허위 장점 금지. 리뷰 가이드·브리프 우선 반영.
 - 진행자 등장 배제. 모델의 담백한 행동 묘사 중심.
+- 챕터 간 내용 중복 금지 (각 챕터 메모 범위만).
 
 ## 촬영 제약
 - 렌탈 스튜디오·최소 장비 기준. 고가 비교 제품 세팅 배제.
@@ -834,10 +838,17 @@ ${blocks.join('\n\n')}`.trim();
     const briefBlock = formatReviewBriefBlock(state.reviewBrief, { adMode });
     const extraNotes = String(state.productNotes || '').trim();
     const teamNotes = String(state.teamBriefNotes || '').trim();
-    const teamBlock = teamNotes ? `\n## 팀 제공 자료 (최우선 반영)\n${teamNotes}` : '';
+    const teamBlock = teamNotes
+      ? `\n## 기획안·팀 가이드 (내용 최우선)
+- 챕터 구성·필수 장면·필수/서브 소구·주의사항·제품 제원은 **기획안을 따릅니다.**
+- 일반 IT리뷰 관례(디자인/실사용/한계 고정 골격 등)와 충돌하면 **기획안 구성·범위를 우선**합니다.
+- 시스템 프롬프트는 톤·고정 멘트·형식만, **내용 판단은 기획안 가중치가 더 큽니다.**
+
+${teamNotes}`
+      : '';
     const sourceNote =
       state.briefSource === 'team'
-        ? '\n- 브리프 출처: 팀 제공 (자동 서치 생략). 팀 자료·구조화 제원·리뷰 방향을 함께 반영.'
+        ? '\n- 브리프 출처: 팀 기획안 (자동 서치 생략). **내용·챕터 범위는 기획안 최우선.**'
         : '';
     const adBrand = String(state.adBrand || '').trim();
 
@@ -1229,18 +1240,34 @@ window.DIDIDIT_PIPELINE = (function () {
     const roundup = isRoundup
         ? `\n- **N개 아이템 라운드업**: 제품마다 \`[제품명]\` 단독 행 후 4~8호흡. 심층 리뷰보다 짧고 빠르게.\n${roundupCategoryHint}`
         : '';
+    const exclusiveScope =
+      '\n- **챕터 범위 고정**: 이 챕터 제목·메모에 적힌 범위만 다룹니다. 다른 챕터에 배정된 소구·시연·편의/공간 설명을 반복하지 마세요.\n';
+    // 챕터 유형은 제목 기준으로만 판별 (메모의 '중간투입' 등이 시연으로 오인되지 않게)
+    const diffChapter = /차별/.test(title)
+        ? `\n- 제품 차별점 챕터: 내솥·칼날 등 **구조·재질·첫인상**만. 투입·가루·건조 시연은 성능 챕터로 넘기세요.\n`
+        : '';
+    const demoChapter = /시연/.test(title)
+        ? `\n- 성능 시연 챕터: 투입→결과(가루)·건조·살균·탈취 체감. UI·세척·모드는 편의 챕터로, 배치·소음은 공간 챕터로 넘기세요.\n`
+        : '';
+    const convenienceChapter =
+      /사용\s*편의|편의성/.test(title) && !/한계/.test(title)
+        ? `\n- 사용 편의성 챕터: 디스플레이·세척·모드·중간투입(센서)만. 분쇄 시연·공간 배치를 다시 펼치지 마세요.\n`
+        : '';
+    const spaceChapter = /공간|설치|라이프/.test(title)
+        ? `\n- 공간·설치 챕터: 배치·용량·야간 소음만. 편의 UI·성능 시연 재설명 금지.\n`
+        : '';
     const specChapter =
-      /성능|제원|스펙|디스플레이/i.test(title) || /성능|제원|스펙/i.test(notes)
+      /제원|스펙/.test(title) || (/성능/.test(title) && !/시연/.test(title))
         ? `\n- 성능·제원 챕터: 스펙을 화면/칩·저장/배터리 등 **덩어리로 묶어** 문장 속에 녹이세요. \`무게는 X, Y는 Z\` 식 나열 금지. 짧은 해석·판단 한 줄 포함.\n`
         : '';
     const designChapter =
-      /디자인|외관|첫인상/i.test(title) || /디자인|외관/i.test(notes)
+      /디자인|외관|첫인상/.test(title) || /디자인|외관/.test(notes)
         ? adMode
           ? `\n- 디자인 챕터: 형태·크기·재질·조작부 중심의 긍정적 체감. 단점·트레이드오프 나열 금지.\n`
           : `\n- 디자인 챕터: 형태·크기·재질·조작부 중심. 실사용 시나리오(빨래·퇴근 후 등) 반복 금지. 외관 vs 실용성 트레이드오프 한 줄.\n`
         : '';
     const limitChapter =
-      /한계|단점|주의/i.test(title) || /한계|단점/i.test(notes)
+      /한계|단점/.test(title) || /한계|단점/.test(notes)
         ? adMode
           ? `\n- 제목에 한계·단점이 있어도 **광고 모드**에서는 사용 편의·관리 팁만 다루고 단점·한계 서술은 피하세요.\n`
           : `\n- 편의와 함께 한계·아쉬운 점을 왜곡 없이 짧게 다룹니다.\n`
@@ -1259,14 +1286,16 @@ window.DIDIDIT_PIPELINE = (function () {
     const closingChapter =
       /총평|마무리|정리/i.test(title) || chapterIndex === chapterTotal - 1
         ? adMode
-          ? `\n- 총평(광고 모드): 잘 맞는 사용 장면·추천 대상·가격 안내 중심. **단점 요약·한계 나열·솔직한 비추천 금지.** \`적극 추천\`·\`확신\` 과잉도 금지.\n`
-          : `\n- 총평: 가격 적정성 판단 + 추천 대상 + 앞 챕터 단점 요약. 가격 중점이 낮으면 가격을 총평에 엮음. 가격이 핵심이면 타사·라인업 비교·솔직한 비추천 포함. \`적극 추천\`·\`확신\` 금지.\n`
+          ? `\n- 총평(광고 모드): 잘 맞는 사용 장면·추천 대상·구매/보조금 안내 중심. **단점 요약·한계 나열·솔직한 비추천 금지.** 앞 챕터 시연 재방송 금지. \`적극 추천\`·\`확신\` 과잉도 금지.\n`
+          : `\n- 총평: 가격 적정성 판단 + 추천 대상 + 앞 챕터 핵심만 한 줄 요약. 새 스펙 장황 나열 금지. \`적극 추천\`·\`확신\` 금지.\n`
         : '';
     const ctxBlock = includeContext && ctx ? `${ctx}\n\n` : '';
     const continuity =
       options.hasSession && chapterIndex > 0
-        ? '- 앞 챕터와 **같은 톤·호흡·문장 리듬**을 유지하세요. 이미 쓴 내용은 반복하지 마세요.\n'
+        ? '- 앞 챕터와 **같은 톤·호흡·문장 리듬**을 유지하세요. 이미 쓴 내용·다른 챕터 범위는 반복하지 마세요.\n'
         : '- 이미 작성된 줄글이 있으면 톤·흐름을 맞춰 이어 쓰고, 반복하지 마세요.\n';
+    const planWeight =
+      '- **내용 우선순위**: 기획안 구성·챕터 메모·필수 장면/소구 > 일반 시스템 프롬프트 관례.\n';
 
     const heading = proseHeading(chapter);
     const titleLine = heading
@@ -1277,12 +1306,12 @@ window.DIDIDIT_PIPELINE = (function () {
         ? '- **분량**: 오프닝·인트로는 짧게 (훅 + 고정 오프닝 멘트). 본문 내용 선행 나열 금지.\n'
         : chapterIndex === chapterTotal - 1 || isClosingChapter(title)
           ? '- **분량**: 총평·클로징은 핵심만 압축. 새 스펙 장황 나열 금지.\n'
-          : '- **분량**: 본문 챕터는 **상한 없음**. 필수·서브 소구·필수 멘션을 충분히 녹이세요. (이 응답에는 이 챕터만)\n';
+          : '- **분량**: 본문 챕터는 **상한 없음**. 이 챕터 범위의 필수·서브 소구만 충분히. (이 응답에는 이 챕터만)\n';
     return `${ctxBlock}# 작업: 줄글 대본 작성
 - 성우 내레이션 중심의 **자연스러운 줄글**만 작성합니다.
 - 표·행 분할·장면·자막·JSON은 넣지 않습니다.
-${titleLine}
-${lengthRule}${notes ? `- 챕터 메모: ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${specChapter}${designChapter}${limitChapter}${priceChapter}${closingChapter}
+${planWeight}${titleLine}
+${lengthRule}${exclusiveScope}${notes ? `- 챕터 메모(범위): ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${diffChapter}${demoChapter}${convenienceChapter}${spaceChapter}${specChapter}${designChapter}${limitChapter}${priceChapter}${closingChapter}
 ${continuity}`;
   }
 

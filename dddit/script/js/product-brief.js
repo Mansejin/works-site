@@ -135,10 +135,17 @@
     const briefBlock = formatReviewBriefBlock(state.reviewBrief, { adMode });
     const extraNotes = String(state.productNotes || '').trim();
     const teamNotes = String(state.teamBriefNotes || '').trim();
-    const teamBlock = teamNotes ? `\n## 팀 제공 자료 (최우선 반영)\n${teamNotes}` : '';
+    const teamBlock = teamNotes
+      ? `\n## 기획안·팀 가이드 (내용 최우선)
+- 챕터 구성·필수 장면·필수/서브 소구·주의사항·제품 제원은 **기획안을 따릅니다.**
+- 일반 IT리뷰 관례(디자인/실사용/한계 고정 골격 등)와 충돌하면 **기획안 구성·범위를 우선**합니다.
+- 시스템 프롬프트는 톤·고정 멘트·형식만, **내용 판단은 기획안 가중치가 더 큽니다.**
+
+${teamNotes}`
+      : '';
     const sourceNote =
       state.briefSource === 'team'
-        ? '\n- 브리프 출처: 팀 제공 (자동 서치 생략). 팀 자료·구조화 제원·리뷰 방향을 함께 반영.'
+        ? '\n- 브리프 출처: 팀 기획안 (자동 서치 생략). **내용·챕터 범위는 기획안 최우선.**'
         : '';
     const adBrand = String(state.adBrand || '').trim();
 

@@ -7,21 +7,31 @@ window.DdditChapterTitleQc = (function () {
   const INTRO_RE = /오프닝|인트로|^인트$|프롤로그/;
   const CLOSING_RE = /총평|마무리|클로징|정리|이벤트/;
 
-  /** 채널 실사용 단축 제목 우선순위 매핑 */
+  /** 채널 타임라인용 단축 제목 — 구체적 규칙이 일반 규칙보다 앞 */
   const RULES = [
     { re: /오프닝|인트로|^인트$|프롤로그/, title: '인트로', titleCard: false },
+    { re: /제품\s*차별|차별점/, title: '제품 차별점', titleCard: true },
+    { re: /성능\s*시연|시연|데모/, title: '성능 시연', titleCard: true },
+    { re: /^사용\s*편의성$|사용\s*편의/, title: '사용 편의성', titleCard: true },
+    { re: /공간|라이프|설치|배치|콤팩트|한\s*뼘/, title: '공간·설치', titleCard: true },
     { re: /가성비/, title: '가성비', titleCard: true },
     { re: /악세서리|액세서리|노즐|케이스/, title: '악세서리 활용', titleCard: true },
-    { re: /^사용\s*편의성$|사용\s*편의/, title: '사용 편의성', titleCard: true },
-    { re: /편의성|관리|세척|유지|한계|소음|거치/, title: '편의성 및 한계점', titleCard: true },
     { re: /디자인|외형|외관|폼팩터|휴대|착용|구성\s*소개|제품\s*구성/, title: '디자인', titleCard: true },
-    { re: /^디스플레이$|디스플레이|화면/, title: '디스플레이', titleCard: true },
+    { re: /^디스플레이$|^화면$/, title: '디스플레이', titleCard: true },
     { re: /가격.*총평|총평.*가격/, title: '가격 및 총평', titleCard: true },
-    { re: /가격|가격\s*만족/, title: '가격 만족도', titleCard: true },
-    { re: /실사용/, title: '실사용 및 한계점', titleCard: true },
-    { re: /성능|시연|제원|스펙|핵심|차별|기능|흡입|데모|필터|먼지/, title: '핵심 성능 및 실사용', titleCard: true },
+    { re: /^가격$|가격\s*만족/, title: '가격 만족도', titleCard: true },
+    { re: /핵심\s*성능|제원|스펙|기능|흡입|필터|먼지/, title: '핵심 성능', titleCard: true },
+    { re: /실사용/, title: '실사용', titleCard: true },
+    { re: /^성능$/, title: '핵심 성능', titleCard: true },
+    { re: /편의성|관리|세척|유지|한계|거치/, title: '편의성 및 한계점', titleCard: true },
     { re: /배터리/, title: '배터리', titleCard: true },
     { re: /총평|마무리|클로징|정리|링크|이벤트/, title: '총평', titleCard: true },
+  ];
+
+  /** 겹치기 쉬운 제목 쌍 — 연속·유사 시 구분 강제 */
+  const OVERLAP_GROUPS = [
+    ['사용 편의성', '편의성 및 한계점', '편의성'],
+    ['핵심 성능', '성능 시연', '핵심 성능 및 실사용', '실사용', '실사용 및 한계점'],
   ];
 
   const MAX_TITLE_LEN = 16;
@@ -75,8 +85,8 @@ window.DdditChapterTitleQc = (function () {
   function normalizeChapterSegment(segment, index) {
     const sourceTitle = String(segment || '').replace(/^[\d.)\s]+/, '').trim();
     const { title: bare, notes: parenNotes } = stripParens(sourceTitle);
-    // 괄호 안 키워드보다 바깥 제목을 우선 매칭 (사용 편의성(디스플레이…) → 편의성)
-    const matched = matchPreferred(bare) || matchPreferred(sourceTitle);
+    // 괄호(메모) 내용은 제목 매칭에 쓰지 않음 — "공간(…저소음)"이 편의성·한계로 빨려가는 것 방지
+    const matched = matchPreferred(bare);
 
     let title = matched?.title || bare || sourceTitle;
     let titleCard = matched ? matched.titleCard : true;
@@ -87,7 +97,6 @@ window.DdditChapterTitleQc = (function () {
     }
 
     if (!matched && looksTooLong(title)) {
-      // 긴 제목은 앞 토큰만 남김 (공백/·/및 기준)
       const shortened = title.split(/\s*[/|·]\s*|\s+및\s+/)[0].trim();
       title = shortened.slice(0, MAX_TITLE_LEN) || title.slice(0, MAX_TITLE_LEN);
     }
@@ -109,6 +118,36 @@ window.DdditChapterTitleQc = (function () {
       titleCard,
       sourceTitle,
     };
+  }
+
+  /** 인접 챕터가 같은 축으로 중복되면 source 메모를 보고 제목을 다시 가름 */
+  function dedupeOverlappingTitles(chapters) {
+    const list = Array.isArray(chapters) ? chapters.map((ch) => ({ ...ch })) : [];
+    for (let i = 1; i < list.length; i++) {
+      const prev = list[i - 1];
+      const cur = list[i];
+      const same = prev.title === cur.title;
+      const overlap = OVERLAP_GROUPS.some(
+        (g) => g.includes(prev.title) && g.includes(cur.title) && prev.title !== cur.title,
+      );
+      if (!same && !overlap) continue;
+
+      const src = `${cur.sourceTitle || ''} ${cur.notes || ''}`;
+      if (/차별/.test(src)) cur.title = '제품 차별점';
+      else if (/시연|가루|투입|건조|탈취|살균/.test(src)) cur.title = '성능 시연';
+      else if (/공간|한\s*뼘|라이프|설치|틈/.test(src)) cur.title = '공간·설치';
+      else if (/디스플레이|세척|모드|중간\s*투입|편의/.test(src) && cur.title !== '사용 편의성') {
+        cur.title = '사용 편의성';
+      } else if (same) {
+        // last resort: keep distinct by appending short disambiguator from notes
+        const bit = String(cur.notes || cur.sourceTitle || '')
+          .split(/[·\n]/)[0]
+          .trim()
+          .slice(0, 6);
+        if (bit) cur.title = `${cur.title.replace(/\s*및.*$/, '').slice(0, 8)}·${bit}`.slice(0, MAX_TITLE_LEN);
+      }
+    }
+    return list;
   }
 
   function parseStructureToChapters(structure) {
@@ -144,7 +183,18 @@ window.DdditChapterTitleQc = (function () {
       }
       merged.push({ ...ch });
     }
-    return ensureClosingChapter(merged.map((ch, i) => ({ ...ch, id: `ch-plan-${i}` })));
+    const deduped = dedupeOverlappingTitles(merged);
+    // after dedupe, titles may collide again — re-merge identical adjacent only
+    const final = [];
+    for (const ch of deduped) {
+      const prev = final[final.length - 1];
+      if (prev && prev.title === ch.title) {
+        prev.notes = [prev.notes, ch.notes].filter(Boolean).join('\n');
+        continue;
+      }
+      final.push(ch);
+    }
+    return ensureClosingChapter(final.map((ch, i) => ({ ...ch, id: `ch-plan-${i}` })));
   }
 
   /** 구성에 총평·마무리·클로징이 없으면 마지막에 총평 챕터를 붙입니다. */
@@ -156,7 +206,7 @@ window.DdditChapterTitleQc = (function () {
     list.push({
       id: `ch-plan-${list.length}`,
       title: '총평',
-      notes: '가격 적정성·추천 대상·단점 요약',
+      notes: '핵심 소구 요약·추천 대상·구매 안내 (다른 챕터 내용 재나열 금지)',
       titleCard: true,
       sourceTitle: '(자동 추가 · 총평)',
     });
@@ -233,6 +283,7 @@ window.DdditChapterTitleQc = (function () {
     looksTooLong,
     normalizeChapterSegment,
     parseStructureToChapters,
+    dedupeOverlappingTitles,
     ensureClosingChapter,
     missingClosingChapter,
     parseDescriptionChapters,
