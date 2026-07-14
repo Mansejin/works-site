@@ -30,11 +30,26 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def read_promotions() -> dict[str, Any]:
-    return _read_json(PROMOTIONS_FILE, {"promotions": [], "issues": []})
+    data = _read_json(PROMOTIONS_FILE, {"promotions": [], "memo": "", "issues": []})
+    if not str(data.get("memo") or "").strip():
+        issues = data.get("issues") or []
+        if isinstance(issues, list) and issues:
+            data["memo"] = "\n".join(str(item).strip() for item in issues if str(item).strip())
+    return data
 
 
 def write_promotions(data: dict[str, Any]) -> None:
-    _write_json(PROMOTIONS_FILE, data)
+    memo = str(data.get("memo") or "").strip()
+    if not memo:
+        issues = data.get("issues") or []
+        if isinstance(issues, list):
+            memo = "\n".join(str(item).strip() for item in issues if str(item).strip())
+    payload = {
+        "memo": memo,
+        "issues": [],
+        "promotions": data.get("promotions") or [],
+    }
+    _write_json(PROMOTIONS_FILE, payload)
 
 
 def read_snapshots() -> dict[str, Any]:
@@ -112,7 +127,9 @@ def _find_manual_match(
 def merge_ads_into_promotions(ads_campaigns: list[dict[str, Any]]) -> dict[str, Any]:
     data = read_promotions()
     manuals = list(data.get("promotions") or [])
-    issues = list(data.get("issues") or [])
+    memo = str(data.get("memo") or "").strip()
+    if not memo:
+        memo = "\n".join(str(item).strip() for item in (data.get("issues") or []) if str(item).strip())
 
     merged_promos: list[dict[str, Any]] = []
     matched_ads_ids: set[str] = set()
@@ -178,7 +195,7 @@ def merge_ads_into_promotions(ads_campaigns: list[dict[str, Any]]) -> dict[str, 
         return (rank, -int(promo.get("cost") or 0), str(promo.get("title") or ""))
 
     merged_promos.sort(key=_sort_key)
-    return {"promotions": merged_promos, "issues": issues}
+    return {"promotions": merged_promos, "memo": memo, "issues": []}
 
 
 

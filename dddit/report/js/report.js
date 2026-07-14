@@ -18,6 +18,8 @@
     subtitle: document.getElementById("report-subtitle"),
     kpiGrid: document.getElementById("kpi-grid"),
     insights: document.getElementById("insights-list"),
+    memoDisplay: document.getElementById("memo-display"),
+    memoEditor: document.getElementById("memo-editor"),
     promoBody: document.getElementById("promo-table-body"),
     videoGrid: document.getElementById("video-grid"),
     channelLink: document.getElementById("channel-link"),
@@ -507,9 +509,16 @@
   }
 
   function renderInsights(items) {
-    els.insights.innerHTML = (items || [])
-      .map((line) => `<li>${esc(line)}</li>`)
-      .join("");
+    if (els.insights) {
+      els.insights.innerHTML = (items || [])
+        .map((line) => `<li>${esc(line)}</li>`)
+        .join("");
+    }
+  }
+
+  function renderMemo(text) {
+    if (!els.memoDisplay) return;
+    els.memoDisplay.textContent = String(text || "").trim();
   }
 
   function sourceBadge(source) {
@@ -624,7 +633,11 @@
     });
   }
 
-  function retentionVideoTitle(videos, videoId) {
+  function retentionVideoTitle(videos, videoId, fallbackTitle = "") {
+    const fromSeries = String(fallbackTitle || "").trim();
+    if (fromSeries) {
+      return fromSeries.length > 26 ? `${fromSeries.slice(0, 26)}…` : fromSeries;
+    }
     const match = (videos || []).find((video) => video.id === videoId);
     const title = match?.title || videoId || "영상";
     return title.length > 26 ? `${title.slice(0, 26)}…` : title;
@@ -733,7 +746,7 @@
       if (labelEl) {
         labelEl.textContent =
           series.length === 1
-            ? `시청 유지 (${formatLabel}) — ${retentionVideoTitle(videos, series[0].videoId)}`
+            ? `시청 유지 (${formatLabel}) — ${retentionVideoTitle(videos, series[0].videoId, series[0].title)}`
             : `시청 유지 (${formatLabel}) — 조회 상위 ${series.length}개`;
       }
       charts.retention = new Chart(ctx, {
@@ -741,7 +754,7 @@
         data: {
           labels,
           datasets: series.map((item, index) => ({
-            label: retentionVideoTitle(videos, item.videoId),
+            label: retentionVideoTitle(videos, item.videoId, item.title),
             data: item.points.map((point) => (point.watchRatio || 0) * 100),
             borderColor: colors[index % colors.length],
             backgroundColor: `${colors[index % colors.length]}1a`,
@@ -775,7 +788,7 @@
             },
             y: {
               min: 0,
-              max: 100,
+              max: 200,
               title: { display: true, text: "시청 유지", font: { size: 11 } },
               ticks: { callback: (value) => `${value}%` },
             },
@@ -822,7 +835,7 @@
     if (points.length) {
       if (labelEl) {
         labelEl.textContent = data?.videoId
-          ? `시청 유지 (${formatLabel}) — ${retentionVideoTitle(videos, data.videoId)}`
+          ? `시청 유지 (${formatLabel}) — ${retentionVideoTitle(videos, data.videoId, data.title)}`
           : `시청 유지 (${formatLabel})`;
       }
       charts.retention = new Chart(ctx, {
@@ -850,7 +863,7 @@
               title: { display: true, text: "영상 진행률", font: { size: 11 } },
               ticks: { maxTicksLimit: 8 },
             },
-            y: { min: 0, max: 100, ticks: { callback: (value) => `${value}%` } },
+            y: { min: 0, max: 200, ticks: { callback: (value) => `${value}%` } },
           },
         },
       });
@@ -1167,7 +1180,12 @@
       apiGet("/api/dddit/youtube/report/promotions"),
       apiGet("/api/dddit/youtube/report/snapshots"),
     ]);
-    els.issuesEditor.value = (promo.issues || []).join("\n");
+    const memo =
+      promo.memo ||
+      (Array.isArray(promo.issues) ? promo.issues.join("\n") : "") ||
+      "";
+    if (els.memoEditor) els.memoEditor.value = memo;
+    if (els.issuesEditor) els.issuesEditor.value = memo;
     els.promotionsEditor.value = JSON.stringify(promo.promotions || [], null, 2);
     els.snapshotsEditor.value = JSON.stringify(
       { snapshots: snaps.snapshots || [], viewsTrend7d: snaps.viewsTrend7d || [] },
@@ -1177,10 +1195,8 @@
   }
 
   async function saveEditors() {
-    const issues = els.issuesEditor.value
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
+    const memo = (els.memoEditor || els.issuesEditor)?.value || "";
+    const issues = [];
     let promotions;
     let snapshotsPayload;
     try {
@@ -1191,7 +1207,7 @@
     }
     if (!Array.isArray(promotions)) throw new Error("promotions는 배열이어야 합니다.");
 
-    await apiPut("/api/dddit/youtube/report/promotions", { promotions, issues });
+    await apiPut("/api/dddit/youtube/report/promotions", { promotions, memo, issues });
     await apiPut("/api/dddit/youtube/report/snapshots", {
       snapshots: snapshotsPayload.snapshots || [],
       viewsTrend7d: snapshotsPayload.viewsTrend7d || [],
@@ -1236,6 +1252,7 @@
       renderAdsSyncStatus(overview.adsSync);
       renderStudioSyncStatus(overview.studioPromoSync);
       renderInsights(overview.insights || []);
+      renderMemo(overview.memo || (overview.issues || []).join("\n") || "");
       promoPage = 0;
       renderPromotions(overview.promotions || []);
       renderVideos(videosData.videos || []);
@@ -1358,7 +1375,10 @@
 
       const data = await apiGet("/api/dddit/youtube/report/promotions", { timeoutMs: 15_000 });
       const promotions = Array.isArray(data.promotions) ? [...data.promotions] : [];
-      const issues = Array.isArray(data.issues) ? data.issues : [];
+      const memo =
+        data.memo ||
+        (Array.isArray(data.issues) ? data.issues.join("\n") : "") ||
+        "";
       const idx = promotions.findIndex((p) => String(p.title || "").trim() === title);
       const patch = {
         title,
@@ -1387,7 +1407,7 @@
           ...patch,
         });
       }
-      await apiPut("/api/dddit/youtube/report/promotions", { promotions, issues });
+      await apiPut("/api/dddit/youtube/report/promotions", { promotions, memo, issues });
       promoPage = 0;
       await refreshPromotionsTable();
       if (msg) msg.textContent = `"${title}" 저장됨`;
