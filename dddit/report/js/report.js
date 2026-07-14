@@ -189,6 +189,12 @@
       if (err.name === "AbortError") {
         throw new Error("요청 시간이 초과되었습니다. 잠시 후 다시 시도하세요.");
       }
+      const msg = String(err.message || err);
+      if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+        throw new Error(
+          "works-api 서버에 연결하지 못했습니다. NAS 배포 직후 1~2분 정도 502가 날 수 있습니다. 잠시 후 새로고침하세요."
+        );
+      }
       throw err;
     } finally {
       window.clearTimeout(timer);

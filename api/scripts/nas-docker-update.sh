@@ -263,10 +263,20 @@ if command -v curl >/dev/null 2>&1; then
       port=$(echo "${line#WORKS_PORT=}" | tr -d '\r' | tr -d '"' | tr -d "'")
     fi
   fi
-  if curl -sf "http://127.0.0.1:${port}/health" >/dev/null 2>&1; then
+  health_ok=0
+  i=0
+  while [ "$i" -lt 30 ]; do
+    if curl -sf "http://127.0.0.1:${port}/health" >/dev/null 2>&1; then
+      health_ok=1
+      break
+    fi
+    i=$((i + 1))
+    sleep 2
+  done
+  if [ "$health_ok" = "1" ]; then
     log "==> health OK (:${port})"
   else
-    log "WARN: health check failed — docker logs works-api --tail 50"
+    log "WARN: health check failed after 60s — docker logs works-api --tail 50"
   fi
 fi
 
