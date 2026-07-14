@@ -37,7 +37,7 @@ nano .env
 | `YOUTUBE_CHANNEL_HANDLE` | 채널 핸들 (기본 `DD-DIT`) |
 | `YOUTUBE_CHANNEL_ID` | 채널 ID (`UC…`, Analytics·OAuth 필수) |
 | `YOUTUBE_OAUTH_*` | YouTube Analytics API OAuth (노출·CTR·유입·인구통계) |
-| `GOOGLE_ADS_*` | Google Ads API (프로모션 비용·노출 동기화) |
+| `GOOGLE_ADS_*` | Google Ads API (선택, `GOOGLE_ADS_SYNC_ENABLED=1`일 때만 동기화) |
 
 ### 3. Docker 실행
 

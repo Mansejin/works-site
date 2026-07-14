@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from app.config import google_ads_config
+from app.config import google_ads_config, google_ads_sync_enabled
 from app.google_oauth import get_access_token
 from app.youtube_report_store import (
     merge_ads_into_promotions,
@@ -20,8 +20,20 @@ _ADS_API_VERSION = "v24"
 _SYNC_CACHE: dict[str, Any] = {}
 
 
+def _disabled_payload() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "configured": False,
+        "enabled": False,
+        "message": (
+            "Google Ads 동기화가 꺼져 있습니다. "
+            "YouTube Studio 프로모션은 보고 데이터 편집(수동)을 사용합니다."
+        ),
+    }
+
+
 def _configured() -> bool:
-    return google_ads_config() is not None
+    return google_ads_sync_enabled() and google_ads_config() is not None
 
 
 def _not_configured() -> dict[str, Any]:
@@ -158,6 +170,9 @@ def _aggregate_campaign_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
 
 
 async def sync_campaigns(force: bool = False) -> dict[str, Any]:
+    if not google_ads_sync_enabled():
+        return {**_disabled_payload(), "lastSync": None, "campaigns": [], "campaignCount": 0}
+
     if not force:
         cached = _SYNC_CACHE.get("last")
         if cached and time.time() - cached["at"] < 300:
@@ -209,6 +224,7 @@ async def sync_campaigns(force: bool = False) -> dict[str, Any]:
         result = {
             "ok": True,
             "configured": True,
+            "enabled": True,
             "syncedAt": sync_payload["syncedAt"],
             "campaignCount": len(campaigns),
             "activeCampaignCount": active,
@@ -233,6 +249,9 @@ async def sync_campaigns(force: bool = False) -> dict[str, Any]:
 
 
 async def get_ads_status() -> dict[str, Any]:
+    if not google_ads_sync_enabled():
+        return {**_disabled_payload(), "lastSync": None, "campaigns": [], "campaignCount": 0}
+
     if not _configured():
         return {**_not_configured(), "lastSync": None, "campaigns": []}
 
@@ -240,6 +259,7 @@ async def get_ads_status() -> dict[str, Any]:
     return {
         "ok": True,
         "configured": True,
+        "enabled": True,
         "lastSync": stale.get("syncedAt"),
         "campaignCount": stale.get("campaignCount") or len(stale.get("campaigns") or []),
         "campaigns": stale.get("campaigns") or [],

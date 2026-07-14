@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from app.config import google_ads_sync_enabled
+
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "youtube"
 PROMOTIONS_FILE = DATA_DIR / "promotions.json"
 SNAPSHOTS_FILE = DATA_DIR / "subscriber-snapshots.json"
@@ -181,6 +183,9 @@ def merge_ads_into_promotions(ads_campaigns: list[dict[str, Any]]) -> dict[str, 
 
 
 def read_merged_promotions() -> dict[str, Any]:
+    if not google_ads_sync_enabled():
+        return read_promotions()
+
     ads = read_ads_sync()
     campaigns = ads.get("campaigns") or []
     if not campaigns:
