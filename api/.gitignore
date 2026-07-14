@@ -4,6 +4,8 @@ data/*
 !data/youtube/*.json
 data/youtube/studio-cookies.json
 data/youtube/studio-promo-capture.json
+data/youtube/studio-promo-last-payload.json
+data/youtube/studio-promo-sync.json
 __pycache__/
 *.pyc
 conti-collab/node_modules/

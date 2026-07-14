@@ -103,8 +103,109 @@ def _parse_int(value: Any) -> int | None:
         return None
 
 
-def _flatten_promo_dict(obj: dict[str, Any]) -> dict[str, Any]:
-    """Unwrap common Studio renderer wrappers into a flat-ish dict for matching."""
+def _is_money_obj(obj: dict[str, Any]) -> bool:
+    keys = {str(k).lower() for k in obj.keys()}
+    return "units" in keys or ("amountmicros" in keys) or ("micros" in keys and "currencycode" in keys)
+
+
+def _key_has(key: str, *needles: str) -> bool:
+    k = re.sub(r"[^a-z0-9]", "", str(key).lower())
+    return any(n in k for n in needles)
+
+
+def _text_from_any(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, dict):
+        for nested_key in ("simpleText", "text", "label", "accessibilityText", "value"):
+            if nested_key in value:
+                text = _text_from_any(value[nested_key])
+                if text:
+                    return text
+        runs = value.get("runs")
+        if isinstance(runs, list) and runs and isinstance(runs[0], dict) and runs[0].get("text"):
+            return str(runs[0]["text"])
+        return ""
+    return str(value).strip()
+
+
+_LABEL_COST = re.compile(r"비용|지출|사용.?금|금액|amount\s*spent|^spend$|spent|cost|총\s*비용", re.I)
+_LABEL_IMPR = re.compile(r"노출|impression|reach", re.I)
+_LABEL_VIEWS = re.compile(r"조회|view(?!er)", re.I)
+_LABEL_SUBS = re.compile(r"구독|subscriber|followers?\s*gained", re.I)
+
+
+def _metric_label_bucket(label: str) -> str | None:
+    text = (label or "").strip()
+    if not text:
+        return None
+    if _LABEL_COST.search(text):
+        return "cost"
+    if _LABEL_IMPR.search(text):
+        return "impressions"
+    if _LABEL_VIEWS.search(text):
+        return "views"
+    if _LABEL_SUBS.search(text):
+        return "subscribers"
+    return None
+
+
+def _absorb_metric_collections(flat: dict[str, Any]) -> dict[str, Any]:
+    """Turn metric row lists / typed metric bags into cost/impressions/views/subs keys."""
+    out = dict(flat)
+    for _key, val in list(flat.items()):
+        if isinstance(val, dict):
+            # { COST: {...}, IMPRESSIONS: n, ... }
+            for mk, mv in val.items():
+                bucket = _metric_label_bucket(str(mk))
+                if bucket and bucket not in out:
+                    out[bucket] = mv
+            continue
+        if not isinstance(val, list):
+            continue
+        for item in val:
+            if not isinstance(item, dict):
+                continue
+            label = _text_from_any(
+                item.get("label")
+                or item.get("title")
+                or item.get("name")
+                or item.get("metricType")
+                or item.get("type")
+                or item.get("key")
+                or ""
+            )
+            bucket = _metric_label_bucket(label)
+            if not bucket:
+                # typed enums like METRIC_TYPE_COST
+                for mk, mv in item.items():
+                    if _key_has(str(mk), "type", "metric") and isinstance(mv, str):
+                        bucket = _metric_label_bucket(mv)
+                        if bucket:
+                            break
+            if not bucket:
+                continue
+            value = (
+                item.get("value")
+                if "value" in item
+                else item.get("amount")
+                if "amount" in item
+                else item.get("count")
+                if "count" in item
+                else item.get("metricValue")
+                if "metricValue" in item
+                else item.get("money")
+                if "money" in item
+                else None
+            )
+            if value is None and _is_money_obj(item):
+                value = item
+            if value is not None and bucket not in out:
+                out[bucket] = value
+    return out
+
+
+def _shallow_unwrap(obj: dict[str, Any]) -> dict[str, Any]:
     flat: dict[str, Any] = dict(obj)
     for wrap in (
         "promotionRenderer",
@@ -112,17 +213,37 @@ def _flatten_promo_dict(obj: dict[str, Any]) -> dict[str, Any]:
         "promotionCardRenderer",
         "promotionListItemRenderer",
         "ypcPromotionRenderer",
+        "promotionEntity",
+        "campaignEntity",
         "promotion",
         "campaign",
+        "entity",
+        "item",
+        "data",
+        "payload",
     ):
-        inner = obj.get(wrap)
+        inner = flat.get(wrap)
         if isinstance(inner, dict):
             flat = {**flat, **inner}
-    for nest in ("metrics", "statistics", "stats", "performance", "campaignMetrics", "promotionMetrics"):
-        inner = obj.get(nest) if nest in obj else flat.get(nest)
+    for nest in (
+        "metrics",
+        "statistics",
+        "stats",
+        "performance",
+        "campaignMetrics",
+        "promotionMetrics",
+        "lifecycleMetrics",
+        "resultMetrics",
+        "deliveryMetrics",
+        "insightMetrics",
+        "totals",
+        "summary",
+        "results",
+    ):
+        inner = flat.get(nest)
         if isinstance(inner, dict):
             flat = {**flat, **inner}
-    video = obj.get("video") if isinstance(obj.get("video"), dict) else flat.get("video")
+    video = flat.get("video")
     if isinstance(video, dict):
         flat = {**flat, **video}
         if video.get("title") and not flat.get("videoTitle"):
@@ -132,59 +253,57 @@ def _flatten_promo_dict(obj: dict[str, Any]) -> dict[str, Any]:
     return flat
 
 
+def _flatten_promo_dict(obj: dict[str, Any], depth: int = 0) -> dict[str, Any]:
+    """Unwrap Studio wrappers and nested metric bags into a flat-ish dict."""
+    flat = _shallow_unwrap(obj)
+    if depth < 4:
+        for key, value in list(flat.items()):
+            if not isinstance(value, dict) or _is_money_obj(value):
+                continue
+            if _key_has(
+                str(key),
+                "metric",
+                "stat",
+                "performance",
+                "result",
+                "delivery",
+                "lifecycle",
+                "summary",
+                "total",
+                "budget",
+                "spend",
+                "cost",
+            ):
+                nested = _flatten_promo_dict(value, depth + 1)
+                for nk, nv in nested.items():
+                    if nk not in flat or flat.get(nk) in (None, "", {}, []):
+                        flat[nk] = nv
+            else:
+                # Still pull money children up one level under their field name.
+                for nk, nv in value.items():
+                    if isinstance(nv, dict) and _is_money_obj(nv) and nk not in flat:
+                        flat[nk] = nv
+                    elif _key_has(str(nk), "cost", "spend", "impression", "view", "subscriber") and nk not in flat:
+                        flat[nk] = nv
+    return _absorb_metric_collections(flat)
+
+
 def _looks_like_promo(obj: dict[str, Any]) -> bool:
     keys = {str(k).lower() for k in obj.keys()}
-    # Skip botguard / attestation blobs.
     if "botguarddata" in keys or "botguardresponse" in keys:
         return False
-    has_cost = any(
-        k in keys
-        for k in (
-            "cost",
-            "budget",
-            "spend",
-            "amountspent",
-            "spentmicros",
-            "costmicros",
-            "totalcost",
-            "amountspentmoney",
-            "spentamount",
-            "budgetspent",
-            "spendamount",
-            "costamount",
-            "totalspend",
-            "costtodate",
-        )
+    has_cost = any(_key_has(k, "cost", "spend", "spent", "budget") for k in keys)
+    has_units_money = _is_money_obj(obj)
+    nested_money = any(isinstance(v, dict) and _is_money_obj(v) for v in obj.values())
+    has_views = any(_key_has(k, "view") for k in keys)
+    has_impr = any(_key_has(k, "impression", "reach", "impr") for k in keys)
+    has_subs = any(_key_has(k, "subscriber", "follower", "subs") for k in keys)
+    has_name = any(_key_has(k, "title", "name", "campaign", "promotion", "video") for k in keys)
+    has_id = any(_key_has(k, "campaignid", "promotionid", "entityid") for k in keys) or ("id" in keys)
+    metric_hits = sum(
+        1 for flag in (has_cost or has_units_money or nested_money, has_views, has_impr, has_subs) if flag
     )
-    # Money sometimes only appears as nested {units} under spend-like keys — also detect units sibling metric bags.
-    has_units_money = "units" in keys and any(
-        k in keys for k in ("currencycode", "currency", "nanos")
-    )
-    has_views = any(
-        k in keys
-        for k in ("views", "viewcount", "videoviews", "trueviewviews", "promotedviews", "viewedcount")
-    )
-    has_impr = any(k in keys for k in ("impressions", "impressioncount", "reach", "impression"))
-    has_subs = any(
-        k in keys
-        for k in ("subscribers", "subscribersgained", "subscribercount", "followersgained", "subs")
-    )
-    has_name = any(
-        k in keys
-        for k in (
-            "title",
-            "name",
-            "campaignname",
-            "promotionname",
-            "videotitle",
-            "displayname",
-            "campaignid",
-            "promotionid",
-            "externalcampaignid",
-        )
-    )
-    metric_hits = sum(1 for flag in (has_cost or has_units_money, has_views, has_impr, has_subs) if flag)
-    return has_name and metric_hits >= 1
+    return bool((has_name or has_id) and metric_hits >= 1)
 
 
 def _pick(obj: dict[str, Any], *names: str) -> Any:
@@ -205,18 +324,73 @@ def _pick_money(obj: dict[str, Any], *names: str) -> int | None:
     return None
 
 
-def _walk_promos(node: Any, found: list[dict[str, Any]], depth: int = 0) -> None:
-    if depth > 28:
+def _pick_money_fuzzy(obj: dict[str, Any], *needles: str) -> int | None:
+    exact = _pick_money(obj, *needles)
+    if exact is not None:
+        return exact
+    best = None
+    for key, value in obj.items():
+        if not _key_has(str(key), *needles):
+            continue
+        parsed = _parse_int(value)
+        if parsed is not None:
+            best = parsed
+            # Prefer keys that look most like the primary metric
+            if any(n in re.sub(r"[^a-z0-9]", "", str(key).lower()) for n in needles[:1]):
+                return parsed
+    return best
+
+
+def _walk_promos(
+    node: Any,
+    found: list[dict[str, Any]],
+    depth: int = 0,
+    parent: dict[str, Any] | None = None,
+) -> None:
+    if depth > 32:
         return
     if isinstance(node, dict):
         flat = _flatten_promo_dict(node)
         if _looks_like_promo(flat):
             found.append(flat)
+        if _is_money_obj(node) and parent is not None:
+            found.append(_flatten_promo_dict(parent))
         for value in node.values():
-            _walk_promos(value, found, depth + 1)
+            _walk_promos(value, found, depth + 1, parent=node)
     elif isinstance(node, list):
         for item in node:
-            _walk_promos(item, found, depth + 1)
+            _walk_promos(item, found, depth + 1, parent=parent)
+
+
+def analyze_payload_shape(payload: Any) -> dict[str, Any]:
+    """Diagnostics when parsing finds zero promotions."""
+    top_keys = list(payload.keys())[:30] if isinstance(payload, dict) else []
+    units_paths: list[str] = []
+    interesting_keys: set[str] = set()
+
+    def walk(node: Any, path: str, depth: int = 0) -> None:
+        if depth > 24 or len(units_paths) >= 12:
+            return
+        if isinstance(node, dict):
+            for k, v in node.items():
+                key = str(k)
+                if _key_has(key, "unit", "cost", "spend", "impression", "view", "subscriber", "promotion", "campaign"):
+                    interesting_keys.add(key)
+                child = f"{path}.{key}" if path else key
+                if isinstance(v, dict) and _is_money_obj(v):
+                    units_paths.append(child)
+                walk(v, child, depth + 1)
+        elif isinstance(node, list):
+            for i, item in enumerate(node[:20]):
+                walk(item, f"{path}[{i}]", depth + 1)
+
+    walk(payload, "")
+    return {
+        "topKeys": top_keys,
+        "unitsPaths": units_paths[:12],
+        "interestingKeys": sorted(interesting_keys)[:40],
+        "unitsCount": len(units_paths),
+    }
 
 
 def _slugify(name: str) -> str:
@@ -258,7 +432,7 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
     if len(campaign_id) > 80 or "\n" in campaign_id:
         campaign_id = ""
 
-    cost = _pick_money(
+    cost = _pick_money_fuzzy(
         raw,
         "cost",
         "spend",
@@ -271,28 +445,26 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
         "costAmount",
         "totalSpend",
         "costToDate",
-        "costMicros",
-        "spentMicros",
     )
-    # Bare {units} sibling only when parent already looks like spend metrics bag.
+    # Bare {units} on the flattened object — only if it looks like money.
     if cost is None and isinstance(_pick(raw, "units"), (str, int, float)):
         if _pick(raw, "currencyCode", "currency", "nanos") is not None:
             cost = _parse_int({"units": _pick(raw, "units"), "nanos": _pick(raw, "nanos")})
 
-    if cost is not None and abs(cost) > 1_000_000 and (
-        _pick(raw, "costMicros", "spentMicros") is not None
-    ):
-        # micros → 원
-        cost = round(cost / 1_000_000)
+    micros = _pick_money_fuzzy(raw, "costMicros", "spentMicros", "amountSpentMicros", "budgetSpentMicros")
+    if cost is None and micros is not None:
+        cost = round(micros / 1_000_000) if abs(micros) >= 1_000_000 else micros
+    elif cost is not None and abs(cost) >= 1_000_000 and micros is not None and abs(micros) >= 1_000_000:
+        cost = round(micros / 1_000_000)
 
-    impressions = _pick_money(raw, "impressions", "impressionCount", "reach", "impression")
-    views = _pick_money(
-        raw, "views", "viewCount", "videoViews", "trueviewViews", "promotedViews", "viewedCount"
+    impressions = _pick_money_fuzzy(raw, "impressions", "impressionCount", "reach", "impression", "impr")
+    views = _pick_money_fuzzy(
+        raw, "views", "viewCount", "videoViews", "trueviewViews", "promotedViews", "viewedCount", "view"
     )
-    subscribers = _pick_money(
-        raw, "subscribers", "subscribersGained", "subscriberCount", "followersGained", "subs"
+    subscribers = _pick_money_fuzzy(
+        raw, "subscribers", "subscribersGained", "subscriberCount", "followersGained", "subs", "subscriber"
     )
-    follow_on = _pick_money(raw, "followOnViews", "clicks", "followOnViewCount")
+    follow_on = _pick_money_fuzzy(raw, "followOnViews", "clicks", "followOnViewCount", "followon")
 
     status_raw = str(_pick(raw, "status", "campaignStatus", "state") or "").upper()
     if status_raw in ("ACTIVE", "ENABLED", "RUNNING", "LIVE"):
@@ -314,8 +486,15 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
     }
     goal = goal_map.get(goal.upper(), goal) if goal else ""
 
+    if campaign_id.startswith("studio-"):
+        promo_id = campaign_id
+        studio_campaign_id = campaign_id[len("studio-") :] or None
+    else:
+        promo_id = f"studio-{campaign_id}" if campaign_id else f"studio-{_slugify(title)}"
+        studio_campaign_id = campaign_id or None
+
     return {
-        "id": f"studio-{campaign_id}" if campaign_id else f"studio-{_slugify(title)}",
+        "id": promo_id,
         "title": title[:80],
         "videoTitle": video_title,
         "videoId": video_id,
@@ -327,21 +506,84 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
         "subscribers": subscribers or 0,
         "followOnViews": follow_on or 0,
         "source": "youtube-studio",
-        "studioCampaignId": campaign_id or None,
+        "studioCampaignId": studio_campaign_id,
         "syncedAt": datetime.now(timezone.utc).isoformat(),
         "notes": ["YouTube Studio 내부 API 동기화"],
     }
 
 
+def _coerce_payload(payload: Any) -> Any:
+    """Normalize common wrappers / double-encoded JSON before walking."""
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except json.JSONDecodeError:
+            return payload
+    if not isinstance(payload, dict):
+        return payload
+    for wrap in ("response", "result", "data", "body", "payload"):
+        inner = payload.get(wrap)
+        if isinstance(inner, (dict, list)) and (
+            (isinstance(inner, dict) and len(inner) > 1)
+            or (isinstance(inner, list) and inner)
+        ):
+            outer_keys = {str(k).lower() for k in payload.keys()}
+            if outer_keys <= {wrap, "error", "context", "frameworkupdates"} or wrap in {
+                "response",
+                "result",
+                "body",
+            }:
+                payload = inner
+                break
+    return payload
+
+
+def _collect_list_candidates(payload: Any) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
+
+    def walk(node: Any, key_hint: str = "", depth: int = 0) -> None:
+        if depth > 28:
+            return
+        if isinstance(node, dict):
+            payload_bag = node.get("payload")
+            if isinstance(payload_bag, dict):
+                for pk, pv in payload_bag.items():
+                    if isinstance(pv, dict) and _key_has(str(pk), "promo", "campaign"):
+                        found.append(_flatten_promo_dict(pv))
+            for k, v in node.items():
+                walk(v, str(k), depth + 1)
+        elif isinstance(node, list):
+            key_l = re.sub(r"[^a-z0-9]", "", key_hint.lower())
+            interesting = any(
+                n in key_l for n in ("promo", "campaign", "mutation", "entity", "item", "entry", "content")
+            )
+            sample_ok = False
+            if node and isinstance(node[0], dict):
+                sample_ok = _looks_like_promo(_flatten_promo_dict(node[0]))
+            if interesting or sample_ok:
+                for item in node:
+                    if isinstance(item, dict):
+                        found.append(_flatten_promo_dict(item))
+            for item in node[:80]:
+                walk(item, key_hint, depth + 1)
+
+    walk(payload)
+    return found
+
+
 def extract_promotions_from_payload(payload: Any) -> list[dict[str, Any]]:
+    payload = _coerce_payload(payload)
     raw_items: list[dict[str, Any]] = []
     _walk_promos(payload, raw_items)
+    raw_items.extend(_collect_list_candidates(payload))
 
-    # Also pull top-level promotions list even if walk heuristics miss nested shapes.
-    if isinstance(payload, dict) and isinstance(payload.get("promotions"), list):
-        for item in payload["promotions"]:
-            if isinstance(item, dict):
-                raw_items.append(_flatten_promo_dict(item))
+    if isinstance(payload, dict):
+        for key in ("promotions", "campaigns", "items", "entries"):
+            val = payload.get(key)
+            if isinstance(val, list):
+                for item in val:
+                    if isinstance(item, dict):
+                        raw_items.append(_flatten_promo_dict(item))
 
     seen: set[str] = set()
     promos: list[dict[str, Any]] = []
@@ -666,10 +908,11 @@ async def sync_studio_promotions(
 
     try:
         if raw_payload is not None:
-            payload = raw_payload
+            payload = _coerce_payload(raw_payload)
             source = "studio-import"
         else:
             payload, used_url = await fetch_studio_payload()
+            payload = _coerce_payload(payload)
 
         promos = extract_promotions_from_payload(payload)
         if not promos and isinstance(payload, dict) and isinstance(payload.get("promotions"), list):
@@ -687,15 +930,33 @@ async def sync_studio_promotions(
                     promos.append(promo)
 
         if not promos:
+            shape = analyze_payload_shape(payload)
+            # Persist raw payload for local diagnosis (gitignored under data/youtube).
+            try:
+                _write_json(
+                    DATA_DIR / "studio-promo-last-payload.json",
+                    {
+                        "savedAt": datetime.now(timezone.utc).isoformat(),
+                        "shape": shape,
+                        "payload": payload,
+                    },
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            keys_hint = ", ".join(shape.get("topKeys") or []) or "(none)"
+            units_hint = shape.get("unitsCount") or 0
             meta = {
                 "ok": False,
                 "source": source,
                 "url": used_url,
                 "message": (
                     "응답에서 프로모션 수치를 파싱하지 못했습니다. "
-                    "캡처 URL이 프로모션 목록이 맞는지 확인하세요."
+                    f"topKeys=[{keys_hint}] units={units_hint}. "
+                    "콘솔에 window.__ddditLastPayload 가 있으면 알려주세요."
                 ),
-                "payloadKeys": list(payload.keys())[:20] if isinstance(payload, dict) else [],
+                "payloadKeys": shape.get("topKeys") or [],
+                "unitsPaths": shape.get("unitsPaths") or [],
+                "interestingKeys": shape.get("interestingKeys") or [],
                 "syncedAt": datetime.now(timezone.utc).isoformat(),
                 "promotions": [],
             }
