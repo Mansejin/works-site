@@ -6,9 +6,14 @@ import os
 def allowed_origins() -> list[str]:
     raw = os.getenv(
         "WORKS_ALLOWED_ORIGINS",
-        "https://works.mansejin.com,http://localhost:8080,http://127.0.0.1:8080",
+        "http://localhost:8080,http://127.0.0.1:8080",
     )
-    return [item.strip() for item in raw.split(",") if item.strip()]
+    origins = [item.strip() for item in raw.split(",") if item.strip()]
+    # Bookmarklet on Studio POSTs promotion JSON → works-api
+    for extra in ("https://studio.youtube.com", "https://www.youtube.com"):
+        if extra not in origins:
+            origins.append(extra)
+    return origins
 
 
 def gemini_api_key() -> str:

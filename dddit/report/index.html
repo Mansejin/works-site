@@ -390,6 +390,7 @@
       .kpi-grid, .grid-4 { grid-template-columns: repeat(2, 1fr); }
       .grid-2, .grid-promo-insights { grid-template-columns: 1fr; }
       .video-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .promo-quick-form { grid-template-columns: 1fr 1fr !important; }
     }
     @media (max-width: 560px) {
       .kpi-grid { grid-template-columns: 1fr; }
@@ -493,11 +494,43 @@
             <div class="header-actions">
               <span id="ads-sync-status" class="status-pill" style="font-size:0.72rem;">—</span>
               <span id="studio-sync-status" class="status-pill" style="font-size:0.72rem;">—</span>
-              <button id="btn-studio-sync" class="btn btn-ghost" type="button" style="padding:4px 10px;font-size:0.76rem;">Studio 동기화</button>
+              <button id="btn-copy-bookmarklet" class="btn" type="button" style="padding:4px 10px;font-size:0.76rem;" title="Studio에서 원클릭 동기화">북마클릿 복사</button>
+              <button id="btn-studio-sync" class="btn btn-ghost" type="button" style="padding:4px 10px;font-size:0.76rem;display:none;">Studio 동기화</button>
               <button id="btn-ads-sync" class="btn btn-ghost" type="button" style="padding:4px 10px;font-size:0.76rem;display:none;">Ads 동기화</button>
             </div>
           </div>
           <div class="card-body promo-table-wrap">
+            <p class="video-note" style="margin:0 0 10px;">
+              <strong>추천:</strong> Studio 프로모션 탭에서 북마클릿 한 번 클릭 → 자동 반영.
+              또는 아래 숫자만 입력.
+            </p>
+            <div class="promo-quick-form" style="display:grid;grid-template-columns:2fr repeat(4,1fr) 1fr auto;gap:8px;margin-bottom:12px;align-items:end;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">캠페인
+                <input id="promo-form-title" list="promo-title-list" placeholder="레노버 아이디어 탭 11" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;" />
+                <datalist id="promo-title-list"></datalist>
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">비용
+                <input id="promo-form-cost" type="number" inputmode="numeric" placeholder="44435" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">노출
+                <input id="promo-form-impressions" type="number" inputmode="numeric" placeholder="23905" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">조회
+                <input id="promo-form-views" type="number" inputmode="numeric" placeholder="298" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">구독
+                <input id="promo-form-subscribers" type="number" inputmode="numeric" placeholder="125" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">상태
+                <select id="promo-form-status" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;">
+                  <option>진행중</option>
+                  <option>일시중지</option>
+                  <option>완료</option>
+                </select>
+              </label>
+              <button id="btn-promo-quick-save" class="btn" type="button" style="padding:8px 12px;font-size:0.8rem;">숫자 저장</button>
+            </div>
+            <p id="promo-form-status-msg" class="video-note" style="margin:0 0 10px;"></p>
             <table>
               <thead>
                 <tr>
@@ -531,24 +564,25 @@
       <section class="card edit-panel">
         <div class="card-head"><h2>보고 데이터 편집 (팀용)</h2></div>
         <div class="card-body">
+          <details style="margin-bottom:12px;">
+            <summary style="cursor:pointer;color:var(--muted);font-size:0.9rem;">고급 · Studio cURL / JSON (거의 안 씀)</summary>
+            <div style="margin-top:8px;">
           <label for="studio-curl-editor">Studio 프로모션 cURL 캡처 (Copy as cURL)</label>
-          <textarea id="studio-curl-editor" rows="4" placeholder="Network 필터 youtubei → get?alt=json 등 큰 XHR → Copy as cURL (이름이 list_promotions가 아닐 수 있음)"></textarea>
+          <textarea id="studio-curl-editor" rows="3" placeholder="비권장 — 북마클릿 또는 숫자 저장 사용"></textarea>
           <div class="header-actions" style="margin-bottom:12px;">
             <button id="btn-studio-capture" class="btn btn-ghost" type="button">캡처 저장</button>
-            <span id="studio-capture-status" class="status-pill">1회 저장 후 Studio 동기화 가능</span>
+            <span id="studio-capture-status" class="status-pill">NAS 서버 재생용</span>
           </div>
-          <details class="studio-import-details" open style="margin-bottom:12px;border:1px solid #fde68a;background:#fffbeb;border-radius:10px;padding:10px 12px;">
-            <summary style="cursor:pointer;color:#92400e;font-size:0.9rem;font-weight:600;">401이 날 때 — Studio 응답 JSON으로 동기화 (권장)</summary>
-            <p style="font-size:0.82rem;color:#92400e;margin:8px 0;">
-              캡처/쿠키는 맞는데도 401이면 NAS 서버 IP에서 Studio 세션이 거절된 경우입니다.
-              Studio Console에 아래 훅을 넣고 <strong>F5</strong> → <code>copy(__studioPromoJson)</code> → 여기 붙여넣기 → <strong>JSON 가져오기</strong>
-            </p>
-            <textarea id="studio-hook-snippet" readonly rows="6" style="font-size:0.72rem;font-family:monospace;margin-bottom:8px;width:100%;">(function(){function s(u,t){if(!t||t.length<200)return;if(!/"\s*units\s*"\s*:\s*"\d+"/.test(t))return;if(!/(promotion|campaign|ypc|impression|subscriber)/i.test(t))return;window.__studioPromoJson=t;window.__studioPromoUrl=u;console.log("저장",u);console.log("copy(__studioPromoJson)");}const f=fetch;fetch=async(...a)=>{const r=await f(...a);const u=String(a[0]||"");if(u.includes("youtubei"))r.clone().text().then(t=>s(u,t));return r;};const o=XMLHttpRequest.prototype.open,send=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.open=function(m,u){this._u=u;return o.apply(this,arguments)};XMLHttpRequest.prototype.send=function(){this.addEventListener("load",function(){if(this._u&&String(this._u).includes("youtubei"))s(String(this._u),this.responseText)});return send.apply(this,arguments)};console.log("훅 설치 — Preserve log ON 후 F5");})();</textarea>
+          <details class="studio-import-details" style="margin-bottom:12px;">
+            <summary style="cursor:pointer;color:var(--muted);font-size:0.9rem;">JSON 붙여넣기</summary>
+            <textarea id="studio-hook-snippet" readonly rows="4" style="font-size:0.72rem;font-family:monospace;margin:8px 0;width:100%;">(function(){function s(u,t){if(!t||t.length<200)return;if(!/"\s*units\s*"\s*:\s*"\d+"/.test(t))return;if(!/(promotion|campaign|ypc|impression|subscriber)/i.test(t))return;window.__studioPromoJson=t;console.log("copy(__studioPromoJson)");}const f=fetch;fetch=async(...a)=>{const r=await f(...a);const u=String(a[0]||"");if(u.includes("youtubei"))r.clone().text().then(t=>s(u,t));return r;};console.log("훅 설치 후 F5");})();</textarea>
             <label for="studio-response-editor">프로모션 응답 JSON</label>
-            <textarea id="studio-response-editor" rows="5" placeholder='copy(__studioPromoJson) 결과 붙여넣기'></textarea>
+            <textarea id="studio-response-editor" rows="4" placeholder='copy(__studioPromoJson)'></textarea>
             <div class="header-actions" style="margin-top:8px;">
-              <button id="btn-studio-import" class="btn" type="button">JSON 가져오기</button>
-              <span id="studio-import-status" class="status-pill">브라우저에서 받은 응답을 바로 반영</span>
+              <button id="btn-studio-import" class="btn btn-ghost" type="button">JSON 가져오기</button>
+              <span id="studio-import-status" class="status-pill">—</span>
+            </div>
+          </details>
             </div>
           </details>
           <label for="issues-editor">주요 이슈 (한 줄씩)</label>
@@ -573,6 +607,6 @@
     <div id="loading" class="card loading-block">보고 데이터를 불러오는 중…</div>
   </div>
 
-  <script src="js/report.js?v=23"></script>
+  <script src="js/report.js?v=24"></script>
 </body>
 </html>

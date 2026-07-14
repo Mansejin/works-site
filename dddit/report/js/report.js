@@ -1128,6 +1128,12 @@
       })
       .join("");
     renderPromoPagination(sorted.length, promoPage);
+    const list = document.getElementById("promo-title-list");
+    if (list) {
+      list.innerHTML = sorted
+        .map((p) => `<option value="${esc(p.title || "")}"></option>`)
+        .join("");
+    }
   }
 
   function renderVideos(videos) {
@@ -1400,6 +1406,89 @@
       els.saveStatus.className = "status-pill error";
     }
   });
+
+  function buildStudioBookmarklet() {
+    // Studio 페이지에서 list_promotions → works-api import (브라우저 쿠키 사용)
+    const api = API_BASE;
+    const src =
+      "javascript:(async()=>{try{const A=" +
+      JSON.stringify(api) +
+      ";const m=location.pathname.match(/\\/channel\\/(UC[\\w-]+)/);const ch=m&&m[1];if(!ch){alert('Studio 채널(프로모션) 페이지에서 실행하세요');return;}const ck=n=>{const x=document.cookie.split(';').map(s=>s.trim()).find(t=>t.startsWith(n+'='));return x?decodeURIComponent(x.slice(n.length+1)):''};const sap=ck('SAPISID')||ck('__Secure-3PAPISID');const sap1=ck('__Secure-1PAPISID')||sap;const sap3=ck('__Secure-3PAPISID')||sap;if(!sap){alert('SAPISID 쿠키를 읽을 수 없습니다. Studio에 로그인하세요');return;}const sha=async(s)=>{const b=await crypto.subtle.digest('SHA-1',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')};const mk=async(v)=>{const t=Math.floor(Date.now()/1000);return t+'_'+(await sha(t+' '+v+' https://studio.youtube.com))+'_u'};const auth='SAPISIDHASH '+(await mk(sap))+' SAPISID1PHASH '+(await mk(sap1))+' SAPISID3PHASH '+(await mk(sap3));const body={channelId:ch,pageSize:50,context:{client:{clientName:62,clientVersion:'1.20260709.05.00',hl:'ko',gl:'KR'},user:{delegationContext:{externalChannelId:ch,roleType:{channelRoleType:'CREATOR_CHANNEL_ROLE_TYPE_OWNER'}}}}};let payload=null,ok=false,last='';for(const au of['1','0']){const r=await fetch('https://studio.youtube.com/youtubei/v1/promotions/list_promotions?alt=json&prettyPrint=false',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json',Authorization:auth,'X-Goog-AuthUser':au,'X-Youtube-Client-Name':'62','X-Youtube-Client-Version':'1.20260709.05.00'},body:JSON.stringify(body)});payload=await r.json().catch(()=>({}));if(r.ok){ok=true;break;}last=r.status+' '+(payload&&payload.error&&payload.error.message||'');}if(!ok){alert('Studio 실패: '+last);return;}const res=await fetch(A+'/api/dddit/youtube/report/studio-promotions/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({payload})});const out=await res.json().catch(()=>({}));if(!res.ok||out.ok===false){alert(out.message||out.detail||'import 실패');return;}alert(out.message||('동기화 완료 '+(out.promotionCount||0)+'개'));}catch(e){alert(e.message||e);}})();";
+    return src;
+  }
+
+  document.getElementById("btn-copy-bookmarklet")?.addEventListener("click", async () => {
+    try {
+      const code = buildStudioBookmarklet();
+      await navigator.clipboard.writeText(code);
+      setStatus("북마클릿 복사됨 — 북마크에 붙여넣고 Studio 프로모션에서 클릭", "ok");
+      alert(
+        "북마클릿이 복사되었습니다.\n\n" +
+          "1) 브라우저 북마크 추가 → URL에 붙여넣기\n" +
+          "2) Studio → 프로모션 탭에서 그 북마크 클릭\n" +
+          "3) 완료 알림 뜨면 이 보고 페이지 새로고침"
+      );
+    } catch (err) {
+      showError(err.message || "북마클릿 복사 실패");
+    }
+  });
+
+  document.getElementById("btn-promo-quick-save")?.addEventListener("click", async () => {
+    const msg = document.getElementById("promo-form-status-msg");
+    try {
+      const title = document.getElementById("promo-form-title")?.value?.trim() || "";
+      if (!title) throw new Error("캠페인 이름을 입력하세요");
+      const cost = Number(document.getElementById("promo-form-cost")?.value || 0);
+      const impressions = Number(document.getElementById("promo-form-impressions")?.value || 0);
+      const views = Number(document.getElementById("promo-form-views")?.value || 0);
+      const subscribers = Number(document.getElementById("promo-form-subscribers")?.value || 0);
+      const status = document.getElementById("promo-form-status")?.value || "진행중";
+      if (!(cost || impressions || views || subscribers)) {
+        throw new Error("비용·노출·조회·구독 중 하나 이상 입력하세요");
+      }
+
+      const data = await apiGet("/api/dddit/youtube/report/promotions", { timeoutMs: 15_000 });
+      const promotions = Array.isArray(data.promotions) ? [...data.promotions] : [];
+      const issues = Array.isArray(data.issues) ? data.issues : [];
+      const idx = promotions.findIndex((p) => String(p.title || "").trim() === title);
+      const patch = {
+        title,
+        cost,
+        impressions,
+        views,
+        subscribers,
+        status,
+        source: "manual",
+        syncedAt: new Date().toISOString(),
+        notes: [`수동 입력 ${new Date().toLocaleDateString("ko-KR")}`],
+      };
+      if (idx >= 0) {
+        promotions[idx] = { ...promotions[idx], ...patch, notes: listUnique([...(promotions[idx].notes || []), ...patch.notes]) };
+      } else {
+        promotions.unshift({
+          id: `manual-${Date.now()}`,
+          videoTitle: title,
+          videoId: "",
+          goal: null,
+          followOnViews: 0,
+          ...patch,
+        });
+      }
+      await apiPut("/api/dddit/youtube/report/promotions", { promotions, issues });
+      promoPage = 0;
+      renderPromotions(promotions.map((p) => ({ ...p, metrics: p.metrics })));
+      await refreshPromotionsTable();
+      if (msg) msg.textContent = `"${title}" 저장됨`;
+      setStatus("프로모션 숫자 저장됨", "ok");
+    } catch (err) {
+      if (msg) msg.textContent = err.message || "저장 실패";
+      showError(err.message || "프로모션 저장 실패");
+    }
+  });
+
+  function listUnique(items) {
+    return [...new Set(items.filter(Boolean))];
+  }
 
   loadReport(shouldAutoRefresh());
 })();
