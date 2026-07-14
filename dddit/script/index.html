@@ -10,7 +10,7 @@
   <style>html.team-gate-pending body { visibility: hidden; }</style>
   <script src="../js/team-gate.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="css/style.css?v=7" />
+  <link rel="stylesheet" href="css/style.css?v=8" />
   <script>
     window.__earlyErrors = window.__earlyErrors || [];
     window.addEventListener('error', function (e) {
@@ -41,9 +41,9 @@
       <div class="header-tools">
         <span id="workspace-project-badge" class="project-pill hidden"></span>
         <span id="ad-mode-badge" class="pill pill-warn hidden">광고</span>
-        <button id="toggle-error-log" class="tool-btn" type="button">로그<span id="error-log-badge" class="badge-dot hidden"></span></button>
-        <button id="toggle-prompt" class="tool-btn" type="button">프롬프트</button>
-        <button id="toggle-settings" class="tool-btn" type="button">설정</button>
+        <button id="toggle-error-log" class="tool-btn" type="button" aria-expanded="false" aria-controls="error-log-panel">로그<span id="error-log-badge" class="badge-dot hidden"></span></button>
+        <button id="toggle-prompt" class="tool-btn" type="button" aria-expanded="false" aria-controls="prompt-panel">프롬프트</button>
+        <button id="toggle-settings" class="tool-btn" type="button" aria-expanded="false" aria-controls="settings-panel">설정</button>
       </div>
     </header>
 
@@ -54,66 +54,6 @@
       <button class="step-rail-item tab-btn" type="button" data-rail="4"><span>4</span> 장면</button>
       <button class="step-rail-item tab-btn" type="button" data-rail="5"><span>5</span> 공유</button>
     </nav>
-
-    <div id="error-log-panel" class="drawer block drawer-block collapsed">
-      <div class="block-head">
-        <h2>오류 로그 <span id="error-log-count" class="muted">0건</span></h2>
-        <div class="block-head-actions">
-          <button id="btn-log-copy" class="btn btn-secondary btn-sm" type="button">복사</button>
-          <button id="btn-log-export" class="btn btn-secondary btn-sm" type="button">저장</button>
-          <button id="btn-log-clear" class="btn btn-ghost btn-sm" type="button">비우기</button>
-        </div>
-      </div>
-      <div class="block-body compact">
-        <p id="error-log-empty" class="empty-hint">기록된 오류가 없습니다.</p>
-        <ul id="error-log-list" class="error-log-list"></ul>
-      </div>
-    </div>
-
-    <div id="settings-panel" class="drawer block drawer-block collapsed">
-      <div class="block-head"><h2>설정</h2></div>
-      <div class="block-body">
-        <p id="backend-settings-note" class="hint" hidden>works.mansejin.com — Gemini·시트는 NAS에서 관리됩니다.</p>
-        <div data-local-only class="form-stack">
-          <label class="field">Google AI API 키<input id="api-key" type="password" placeholder="AIza…" autocomplete="off" /></label>
-        </div>
-        <label class="field">프로 모델<select id="model-pro"></select></label>
-        <p class="hint" data-local-only><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">API 키 발급</a></p>
-        <hr class="divider" data-local-only />
-        <h3 class="subhead" data-local-only>시트 연동 (로컬)</h3>
-        <div data-local-only class="form-stack">
-          <label class="field">시트 API URL<input id="sheet-api-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" /></label>
-          <label class="field">API 토큰
-            <span class="secret-field">
-              <input id="sheet-api-token" type="password" placeholder="팀 토큰" autocomplete="off" />
-              <button id="btn-toggle-sheet-token" class="btn btn-ghost btn-sm" type="button">표시</button>
-            </span>
-          </label>
-          <label class="field">시트 URL<input id="sheet-open-url" type="url" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" /></label>
-        </div>
-        <p id="sheet-sync-status" class="hint"></p>
-      </div>
-    </div>
-
-    <div id="prompt-panel" class="drawer block drawer-block collapsed">
-      <div class="block-head">
-        <h2>시스템 프롬프트</h2>
-        <span id="active-prompt-label" class="muted"></span>
-      </div>
-      <div class="block-body">
-        <label class="field">파일명<input id="prompt-filename" type="text" value="default-v1.1.0.txt" /></label>
-        <div class="btn-row">
-          <label class="btn btn-secondary file-btn">불러오기<input id="prompt-file-input" type="file" accept=".txt" hidden /></label>
-          <button id="btn-prompt-export" class="btn btn-secondary" type="button">저장</button>
-          <button id="btn-prompt-load-default" class="btn btn-ghost" type="button">기본값</button>
-        </div>
-        <label class="field">프롬프트<textarea id="prompt-editor" rows="8"></textarea></label>
-        <div class="btn-row">
-          <button id="btn-prompt-apply" class="btn btn-primary" type="button">적용</button>
-          <button id="btn-prompt-reset" class="btn btn-ghost" type="button">내장값</button>
-        </div>
-      </div>
-    </div>
 
     <div class="layout-grid app-shell" data-page="1">
       <div class="work-column">
@@ -268,11 +208,89 @@
     </footer>
   </div>
 
+  <div id="error-log-panel" class="tool-modal collapsed" role="dialog" aria-modal="true" aria-labelledby="error-log-title" hidden>
+    <div class="tool-modal-backdrop" data-close-tool-modal tabindex="-1"></div>
+    <div class="tool-modal-dialog block">
+      <div class="block-head">
+        <h2 id="error-log-title">오류 로그 <span id="error-log-count" class="muted">0건</span></h2>
+        <div class="block-head-actions">
+          <button id="btn-log-copy" class="btn btn-secondary btn-sm" type="button">복사</button>
+          <button id="btn-log-export" class="btn btn-secondary btn-sm" type="button">저장</button>
+          <button id="btn-log-clear" class="btn btn-ghost btn-sm" type="button">비우기</button>
+          <button class="btn btn-ghost btn-sm tool-modal-close" type="button" data-close-tool-modal aria-label="닫기">닫기</button>
+        </div>
+      </div>
+      <div class="block-body compact">
+        <p id="error-log-empty" class="empty-hint">기록된 오류가 없습니다.</p>
+        <ul id="error-log-list" class="error-log-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-panel" class="tool-modal collapsed" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+    <div class="tool-modal-backdrop" data-close-tool-modal tabindex="-1"></div>
+    <div class="tool-modal-dialog block">
+      <div class="block-head">
+        <h2 id="settings-title">설정</h2>
+        <div class="block-head-actions">
+          <button class="btn btn-ghost btn-sm tool-modal-close" type="button" data-close-tool-modal aria-label="닫기">닫기</button>
+        </div>
+      </div>
+      <div class="block-body">
+        <p id="backend-settings-note" class="hint" hidden>works.mansejin.com — Gemini·시트는 NAS에서 관리됩니다.</p>
+        <div data-local-only class="form-stack">
+          <label class="field">Google AI API 키<input id="api-key" type="password" placeholder="AIza…" autocomplete="off" /></label>
+        </div>
+        <label class="field">프로 모델<select id="model-pro"></select></label>
+        <p class="hint" data-local-only><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">API 키 발급</a></p>
+        <hr class="divider" data-local-only />
+        <h3 class="subhead" data-local-only>시트 연동 (로컬)</h3>
+        <div data-local-only class="form-stack">
+          <label class="field">시트 API URL<input id="sheet-api-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" /></label>
+          <label class="field">API 토큰
+            <span class="secret-field">
+              <input id="sheet-api-token" type="password" placeholder="팀 토큰" autocomplete="off" />
+              <button id="btn-toggle-sheet-token" class="btn btn-ghost btn-sm" type="button">표시</button>
+            </span>
+          </label>
+          <label class="field">시트 URL<input id="sheet-open-url" type="url" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" /></label>
+        </div>
+        <p id="sheet-sync-status" class="hint"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="prompt-panel" class="tool-modal collapsed" role="dialog" aria-modal="true" aria-labelledby="prompt-title" hidden>
+    <div class="tool-modal-backdrop" data-close-tool-modal tabindex="-1"></div>
+    <div class="tool-modal-dialog block tool-modal-dialog-wide">
+      <div class="block-head">
+        <h2 id="prompt-title">시스템 프롬프트</h2>
+        <div class="block-head-actions">
+          <span id="active-prompt-label" class="muted"></span>
+          <button class="btn btn-ghost btn-sm tool-modal-close" type="button" data-close-tool-modal aria-label="닫기">닫기</button>
+        </div>
+      </div>
+      <div class="block-body">
+        <label class="field">파일명<input id="prompt-filename" type="text" value="default-v1.1.0.txt" /></label>
+        <div class="btn-row">
+          <label class="btn btn-secondary file-btn">불러오기<input id="prompt-file-input" type="file" accept=".txt" hidden /></label>
+          <button id="btn-prompt-export" class="btn btn-secondary" type="button">저장</button>
+          <button id="btn-prompt-load-default" class="btn btn-ghost" type="button">기본값</button>
+        </div>
+        <label class="field">프롬프트<textarea id="prompt-editor" rows="12"></textarea></label>
+        <div class="btn-row">
+          <button id="btn-prompt-apply" class="btn btn-primary" type="button">적용</button>
+          <button id="btn-prompt-reset" class="btn btn-ghost" type="button">내장값</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" async></script>
   <script src="../js/plan-defaults.js"></script>
   <script src="../js/plan-brief-sync.js"></script>
   <script src="js/works-api.js"></script>
   <script src="js/sheet-sync.js"></script>
-  <script src="js/main.js?v=28"></script>
+  <script src="js/main.js?v=29"></script>
 </body>
 </html>
