@@ -10,7 +10,7 @@
   <style>html.team-gate-pending body { visibility: hidden; }</style>
   <script src="../js/team-gate.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="css/style.css?v=9" />
+  <link rel="stylesheet" href="css/style.css?v=10" />
   <script>
     window.__earlyErrors = window.__earlyErrors || [];
     window.addEventListener('error', function (e) {
@@ -85,6 +85,16 @@
             <div id="plan-summary" class="plan-summary"></div>
             <p id="plan-missing" class="empty-hint hidden">기획안이 없습니다. 위에서 프로젝트를 고르거나 「기획안 편집」에서 작성하세요.</p>
 
+            <div class="chapter-qc-panel" id="chapter-qc-panel">
+              <div class="chapter-qc-head">
+                <h3>챕터 제목 QC</h3>
+                <button id="btn-chapter-qc" class="btn btn-primary btn-sm" type="button">구성 → 짧은 제목 적용</button>
+              </div>
+              <p class="hint">기획안 <strong>구성</strong>을 채널 타임라인 스타일로 줄입니다. 인트로는 타이틀 카드 없음 · 세부 내용은 메모로 둡니다.</p>
+              <ol id="chapter-qc-preview" class="chapter-qc-preview"></ol>
+              <p id="chapter-qc-empty" class="empty-hint hidden">구성이 없습니다. 기획안 편집에서 구성을 입력하세요.</p>
+            </div>
+
             <details class="fold">
               <summary>생성 보조 (선택) · 카테고리·제원</summary>
               <p class="hint">기획안에 없는 스펙만 보완할 때 사용합니다.</p>
@@ -118,9 +128,9 @@
           <div class="block-body form-stack">
             <p class="hint">챕터별로 <strong>대화 맥락이 이어져</strong> 스타일이 수렴됩니다. 직접 수정한 뒤 재생성하면 다듬은 톤을 기준으로 이어 씁니다.</p>
 
-            <details class="fold">
+            <details class="fold" open>
               <summary>챕터 나누기 (선택) · 드래그로 순서 변경</summary>
-              <p class="hint">제목은 채널 더보기 타임라인 스타일(짧은 명사구). 인트로는 타이틀 카드 없음.</p>
+              <p class="hint">제목은 채널 더보기 타임라인 스타일(짧은 명사구). 인트로는 타이틀 카드 없음. 1단계에서 「구성 → 짧은 제목 적용」으로 맞출 수 있습니다.</p>
               <div id="chapter-list" class="chapter-list"></div>
               <div class="chapter-add-form">
                 <label class="field">새 챕터 제목<input id="new-chapter-title" type="text" placeholder="디자인, 핵심 성능 및 실사용…" /></label>
@@ -128,7 +138,7 @@
               </div>
               <div class="btn-row">
                 <button id="btn-add-chapter" class="btn btn-secondary btn-sm" type="button">챕터 추가</button>
-                <button id="btn-chapter-qc" class="btn btn-ghost btn-sm" type="button">기획안→제목 QC</button>
+                <button id="btn-chapter-qc-step2" class="btn btn-ghost btn-sm" type="button">구성 → 짧은 제목 적용</button>
               </div>
             </details>
 
@@ -296,6 +306,6 @@
   <script src="../js/plan-brief-sync.js"></script>
   <script src="js/works-api.js"></script>
   <script src="js/sheet-sync.js"></script>
-  <script src="js/main.js?v=30"></script>
+  <script src="js/main.js?v=31"></script>
 </body>
 </html>
