@@ -17,6 +17,7 @@ from app.youtube_report_store import (
     write_promotions,
 )
 from app.youtube_studio_auth import (
+    capture_header_keys,
     cookies_configured,
     default_innertube_context,
     studio_auth_headers,
@@ -413,7 +414,7 @@ def merge_studio_into_promotions(studio_promos: list[dict[str, Any]]) -> dict[st
 
 
 def parse_curl_capture(curl_text: str) -> dict[str, Any]:
-    """Chrome 'Copy as cURL' 텍스트에서 url/body/cookies를 추출."""
+    """Chrome 'Copy as cURL' 텍스트에서 url/body/cookies/headers를 추출."""
     text = curl_text.strip()
     url_match = re.search(r"curl\s+(?:'|\")?(https?://[^'\"\s]+)", text)
     if not url_match:
@@ -424,8 +425,10 @@ def parse_curl_capture(curl_text: str) -> dict[str, Any]:
     data_match = re.search(r"--data-raw\s+'((?:\\'|[^'])*)'", text, re.S)
     if not data_match:
         data_match = re.search(r"--data(?:-binary)?\s+'((?:\\'|[^'])*)'", text, re.S)
+    if not data_match:
+        data_match = re.search(r'--data-raw\s+"((?:\\"|[^"])*)"', text, re.S)
     if data_match:
-        raw_body = data_match.group(1).replace("\\'", "'")
+        raw_body = data_match.group(1).replace("\\'", "'").replace('\\"', '"')
         try:
             body = json.loads(raw_body)
         except json.JSONDecodeError:
@@ -446,11 +449,23 @@ def parse_curl_capture(curl_text: str) -> dict[str, Any]:
                 k, v = part.split("=", 1)
                 cookies[k.strip()] = v.strip()
 
+    headers: dict[str, str] = {}
+    wanted = set(capture_header_keys())
+    for match in re.finditer(r"-H\s+'([^:]+):\s*([^']*)'", text):
+        name = match.group(1).strip().lower()
+        if name in wanted:
+            headers[name] = match.group(2).strip()
+    for match in re.finditer(r'-H\s+"([^:]+):\s*([^"]*)"', text):
+        name = match.group(1).strip().lower()
+        if name in wanted and name not in headers:
+            headers[name] = match.group(2).strip()
+
     return {
         "url": url,
         "method": "POST",
         "body": body,
         "cookies": cookies,
+        "headers": headers,
         "capturedAt": datetime.now(timezone.utc).isoformat(),
         "notes": ["Parsed from Chrome Copy as cURL"],
     }
@@ -462,8 +477,9 @@ async def _post_studio(
     url: str,
     body: dict[str, Any] | None,
     cookies: dict[str, str],
+    extra_headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    headers = studio_auth_headers(cookies)
+    headers = studio_auth_headers(cookies, extra=extra_headers)
     res = await client.post(url, headers=headers, json=body or {})
     if not res.is_success:
         raise RuntimeError(f"Studio API {res.status_code}: {res.text[:400]}")
@@ -496,6 +512,7 @@ async def fetch_studio_payload(
     cap = capture if capture is not None else read_capture()
     channel_id = str(cap.get("channelId") or youtube_channel_id() or "").strip()
     context = default_innertube_context(channel_id)
+    extra_headers = cap.get("headers") if isinstance(cap.get("headers"), dict) else {}
 
     async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
         if cap.get("url"):
@@ -504,14 +521,26 @@ async def fetch_studio_payload(
                 body = {**body}
                 if "context" not in body:
                     body["context"] = context
-            payload = await _post_studio(client, url=str(cap["url"]), body=body, cookies=jar)
+            payload = await _post_studio(
+                client,
+                url=str(cap["url"]),
+                body=body,
+                cookies=jar,
+                extra_headers=extra_headers,
+            )
             return payload, str(cap["url"])
 
         errors: list[str] = []
         for url in _candidate_urls(_INNERTUBE_KEY_DEFAULT):
             body = {"context": context}
             try:
-                payload = await _post_studio(client, url=url, body=body, cookies=jar)
+                payload = await _post_studio(
+                    client,
+                    url=url,
+                    body=body,
+                    cookies=jar,
+                    extra_headers=extra_headers,
+                )
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"{urlparse(url).path}: {exc}")
                 continue
@@ -523,6 +552,7 @@ async def fetch_studio_payload(
                         "url": url,
                         "method": "POST",
                         "body": body,
+                        "headers": extra_headers,
                         "channelId": channel_id,
                         "capturedAt": datetime.now(timezone.utc).isoformat(),
                         "notes": ["Auto-discovered by probe"],
@@ -598,10 +628,17 @@ async def sync_studio_promotions(
         )
         return result
     except Exception as exc:  # noqa: BLE001
+        err = str(exc)
+        if "401" in err or "UNAUTHENTICATED" in err:
+            err = (
+                "Studio 로그인 인증 실패(401). "
+                "cURL을 다시 복사해 「캡처 저장」한 뒤 동기화하세요. "
+                "(계정 전환 시 x-goog-authuser가 1일 수 있음 — 최신 캡처면 자동 반영)"
+            )
         meta = {
             "ok": False,
             "source": source,
-            "message": f"Studio 동기화 실패: {exc}",
+            "message": f"Studio 동기화 실패: {err}",
             "syncedAt": None,
             "promotions": [],
         }
@@ -611,14 +648,21 @@ async def sync_studio_promotions(
 
 def get_studio_promo_status() -> dict[str, Any]:
     capture = read_capture()
-    cookies_ok = cookies_configured()
+    jar = load_local_cookies()
+    cookies_ok = cookies_configured(jar)
     meta = read_sync_meta()
+    auth_user = None
+    headers = capture.get("headers") if isinstance(capture.get("headers"), dict) else {}
+    if headers:
+        auth_user = headers.get("x-goog-authuser")
     return {
         "ok": True,
         "cookiesConfigured": cookies_ok,
+        "cookieCount": len(jar) if cookies_ok else 0,
         "captureConfigured": bool(capture.get("url")),
         "captureUrl": capture.get("url") or None,
         "capturedAt": capture.get("capturedAt"),
+        "authUser": auth_user,
         "lastSync": meta.get("syncedAt"),
         "promotionCount": meta.get("promotionCount") or 0,
         "message": meta.get("message"),

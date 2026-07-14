@@ -1020,7 +1020,11 @@
     if (studio.ready) {
       els.studioSyncStatus.textContent = "Studio 준비됨";
       els.studioSyncStatus.className = "status-pill ok";
-      els.studioSyncStatus.title = "캡처·쿠키 설정됨 — Studio 동기화 클릭";
+      els.studioSyncStatus.title =
+        studio.message ||
+        `캡처·쿠키 설정됨${studio.cookieCount ? ` (${studio.cookieCount}개)` : ""}${
+          studio.authUser != null ? ` · authuser=${studio.authUser}` : ""
+        }`;
       return;
     }
     if (studio.captureConfigured || studio.cookiesConfigured) {
