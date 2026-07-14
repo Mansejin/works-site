@@ -81,11 +81,26 @@ window.DIDIDIT_PIPELINE = (function () {
     if (!bare) return false;
     if (/(은|는|이|가|을|를|의|와|과|도|만|께|로|으로|라고|이라는|라는)$/.test(bare)) return true;
     if (/(보다|마다|만큼|대로|마저|조차|부터|까지)$/.test(bare) && bare.length < 28) return true;
+    // purpose / intent connective cut: 버리러 / 가려 / 하고자
+    if (/(러|려|고자)$/.test(bare)) return true;
+    // half connective like 안내해 / 보여줘→보여줘 is OK ending wait 줘 is speech end
+    // 해/어/아/여 alone without 요·서·도·야 → unfinished clause
+    if (/(해|어|아|여)$/.test(bare) && !/(해서|해요|해도|해야|해요|어[요서도야]|아[요서도야]|여[요서도야]|줘요|줘요)$/.test(bare)) {
+      return true;
+    }
     // dangling adjective/noun stem without ending (very short mid-chunks)
     if (bare.length <= 10 && !/[.?!…]$/.test(bare) && !/(다|요|죠|네|고|서|며|데|니)$/.test(bare)) {
       return true;
     }
     return false;
+  }
+
+  /** Row that is neither a speakable breath nor a finished sentence — must glue with next. */
+  function isIncompleteCut(text) {
+    const bare = bareScript(text);
+    if (!bare) return false;
+    if (endsCompleteSentence(bare) || endsBreathUnit(bare)) return false;
+    return true;
   }
 
   /** Korean sentence-final (strong end). */
@@ -136,9 +151,9 @@ window.DIDIDIT_PIPELINE = (function () {
     if (rows.length < 2) return null;
     let cuts = 0;
     for (let i = 0; i < rows.length - 1; i++) {
-      if (isDanglingFragment(rows[i].대본)) cuts += 1;
+      if (isIncompleteCut(rows[i].대본) || isDanglingFragment(rows[i].대본)) cuts += 1;
     }
-    if (cuts > 0) return `${cuts}행이 조사·미완성으로 끊김`;
+    if (cuts > 0) return `${cuts}행이 미완성·조사 중간 절단`;
     return null;
   }
 
@@ -182,7 +197,19 @@ window.DIDIDIT_PIPELINE = (function () {
   }
 
   function mergeRowPair(a, b) {
-    const script = `${a.대본} ${b.대본}`.replace(/\s+/g, ' ').trim();
+    const left = String(a.대본 || '').trim();
+    const right = String(b.대본 || '').trim();
+    let script;
+    if (!left) script = right;
+    else if (!right) script = left;
+    // 미완성 한글 어절 재접합: "드리"+"고…" → "드리고…" / "버리러"+"나갈" → 공백 유지
+    else if (/[가-힣]$/.test(left) && /^[가-힣]/.test(right) && (isIncompleteCut(left) || isDanglingFragment(left))) {
+      const trial = left + [...right][0];
+      if (endsBreathUnit(trial) || endsCompleteSentence(trial)) script = `${left}${right}`;
+      else script = `${left} ${right}`.replace(/\s+/g, ' ').trim();
+    } else {
+      script = `${left} ${right}`.replace(/\s+/g, ' ').trim();
+    }
     return {
       대본: script,
       장면: a.장면 || b.장면,
@@ -213,7 +240,15 @@ window.DIDIDIT_PIPELINE = (function () {
       }
       if (last > 0) {
         const head = t.slice(0, last).trim();
-        if (!isDanglingFragment(head)) return last;
+        // Only accept splits at a real breath/sentence boundary (avoid cutting 드리고 → 드리|고)
+        if (endsBreathUnit(head) || endsCompleteSentence(head)) return last;
+      }
+    }
+    // last resort: never bisect a Hangul word — back up to previous whitespace
+    for (let i = maxLen; i >= Math.floor(maxLen * 0.45); i -= 1) {
+      if (/\s/.test(t[i])) {
+        const head = t.slice(0, i).trim();
+        if (head) return i;
       }
     }
     return maxLen;
@@ -222,23 +257,47 @@ window.DIDIDIT_PIPELINE = (function () {
   function forceSplitRow(row, maxLen = ROW_CHARS_HARD_MAX) {
     const text = row.대본;
     if (text.length <= maxLen) return [row];
+    // slightly over long but incomplete cuts cost more than one longer caption
+    if (text.length <= ROW_CHARS_FORCE_SPLIT && isIncompleteCut(text)) return [row];
     const out = [];
     let rest = text;
     while (rest.length > maxLen) {
-      const cut = findBreathSplitIndex(rest, maxLen);
-      const head = rest.slice(0, cut).trim();
-      rest = rest.slice(cut).trim();
-      if (head) {
+      // Prefer keeping a mildly-long speakable line over a broken Hangul clause
+      if (rest.length <= ROW_CHARS_FORCE_SPLIT + 8) {
         out.push({
-          대본: head,
+          대본: rest,
           장면: out.length ? '컷 유지' : row.장면,
           사이즈: row.사이즈,
           자막: out.length ? '' : row.자막,
           코멘트: out.length ? '' : row.코멘트,
         });
-      } else {
+        rest = '';
         break;
       }
+      const cut = findBreathSplitIndex(rest, maxLen);
+      const head = rest.slice(0, cut).trim();
+      const next = rest.slice(cut).trim();
+      if (!head) break;
+      if (isIncompleteCut(head) || isDanglingFragment(head)) {
+        // refuse this cut — keep remainder intact
+        out.push({
+          대본: rest,
+          장면: out.length ? '컷 유지' : row.장면,
+          사이즈: row.사이즈,
+          자막: out.length ? '' : row.자막,
+          코멘트: out.length ? '' : row.코멘트,
+        });
+        rest = '';
+        break;
+      }
+      out.push({
+        대본: head,
+        장면: out.length ? '컷 유지' : row.장면,
+        사이즈: row.사이즈,
+        자막: out.length ? '' : row.자막,
+        코멘트: out.length ? '' : row.코멘트,
+      });
+      rest = next;
     }
     if (rest) {
       out.push({
@@ -253,19 +312,29 @@ window.DIDIDIT_PIPELINE = (function () {
   }
 
   /**
-   * Merge dangling particle cuts, then split long caption rows at breath pauses.
+   * Merge dangling / incomplete cuts, then split long caption rows at breath pauses.
    */
   function healBreathRows(rows) {
     const list = normalizeRows(rows);
     if (!list.length) return [];
+
+    const shouldGlue = (left, right) => {
+      if (!left || !right) return false;
+      // Completed breath/sentence units must stay separate
+      if (endsCompleteSentence(left.대본) || endsBreathUnit(left.대본)) return false;
+      const incomplete = isIncompleteCut(left.대본) || isDanglingFragment(left.대본);
+      const tooShort = left.대본.length < ROW_CHARS_MIN;
+      if (!incomplete && !tooShort) return false;
+      const mergedLen = `${left.대본} ${right.대본}`.replace(/\s+/g, ' ').trim().length;
+      // Prefer one slightly-long speakable line over a broken clause
+      return mergedLen <= ROW_CHARS_FORCE_SPLIT + 24;
+    };
+
     const merged = [];
     let buf = { ...list[0] };
     for (let i = 1; i < list.length; i++) {
       const next = list[i];
-      const dangling = isDanglingFragment(buf.대본);
-      const tooShort = buf.대본.length < ROW_CHARS_MIN;
-      const mergedLen = `${buf.대본} ${next.대본}`.replace(/\s+/g, ' ').trim().length;
-      if ((dangling || tooShort) && mergedLen <= ROW_CHARS_FORCE_SPLIT + 12) {
+      if (shouldGlue(buf, next)) {
         buf = mergeRowPair(buf, next);
         continue;
       }
@@ -274,23 +343,34 @@ window.DIDIDIT_PIPELINE = (function () {
     }
     merged.push(buf);
 
-    // Glue residual dangling fragments
+    // Second pass: keep gluing residual incomplete tails
     const glued = [];
     for (let i = 0; i < merged.length; i++) {
       let cur = merged[i];
-      while (
-        i + 1 < merged.length &&
-        isDanglingFragment(cur.대본) &&
-        `${cur.대본} ${merged[i + 1].대본}`.replace(/\s+/g, ' ').trim().length <= ROW_CHARS_FORCE_SPLIT
-      ) {
+      while (i + 1 < merged.length && shouldGlue(cur, merged[i + 1])) {
         i += 1;
         cur = mergeRowPair(cur, merged[i]);
       }
       glued.push(cur);
     }
 
-    // Split rows that would make captions too long
-    return glued.flatMap((row) => forceSplitRow(row, ROW_CHARS_HARD_MAX));
+    // Split rows that would make captions too long — but never leave incomplete heads
+    return glued.flatMap((row) => {
+      const parts = forceSplitRow(row, ROW_CHARS_HARD_MAX);
+      if (parts.length <= 1) return parts;
+      // re-glue any accidental incomplete cut introduced by force split
+      const fixed = [];
+      let acc = parts[0];
+      for (let i = 1; i < parts.length; i++) {
+        if (shouldGlue(acc, parts[i])) acc = mergeRowPair(acc, parts[i]);
+        else {
+          fixed.push(acc);
+          acc = parts[i];
+        }
+      }
+      fixed.push(acc);
+      return fixed;
+    });
   }
 
   /** @deprecated alias — breath heal */
@@ -444,6 +524,7 @@ ${continuity}`;
 - **대본 열만** 채우고 장면·사이즈·자막·코멘트는 빈 문자열.
 - 대본 내용을 삭제·왜곡하지 말고 **말하기 호흡 단위**로만 나눕니다.
 - 목표 ${ROW_CHARS_TARGET_MIN}~${ROW_CHARS_TARGET_MAX}자 / 상한 ${ROW_CHARS_HARD_MAX}자. 긴 문장은 호흡 쉼에서 분할.
+- **금지**: "버리러" / "안내해"처럼 목적·연결 어미만 남기고 끊기. 다음 절이 이어지면 한 행으로 유지.
 ${productHint}${retryHint || ''}
 
 ## 대본 원문
@@ -520,6 +601,7 @@ JSON rows 전체를 반환.`;
     endsCompleteSentence,
     endsBreathUnit,
     isDanglingFragment,
+    isIncompleteCut,
     buildConvertRetryHint,
     buildProsePrompt,
     buildConvertPrompt,

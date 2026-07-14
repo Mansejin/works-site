@@ -661,7 +661,7 @@ function isTransientGeminiError(err) {
     return true;
   }
   const msg = String(err?.message || err || '');
-  return /high demand|try again later|resource.?exhausted|overloaded|rate.?limit|too many requests|temporar(?:y|ily)|현재.*지연|사용량이 많/i.test(
+  return /high demand|try again later|resource.?exhausted|overloaded|rate.?limit|too many requests|temporar(?:y|ily)|현재.*지연|사용량이 많|failed to fetch|networkerror|load failed|연결하지 못/i.test(
     msg,
   );
 }
@@ -1519,6 +1519,7 @@ async function pushToSheet() {
     showToast('시트에 반영했습니다. 브랜드 페이지에서 대본을 공유할 수 있습니다.');
   } catch (e) {
     showToast(e.message || '시트 전송 실패', true);
+    reportError('pushToSheet', e);
   } finally {
     setLoading(false);
   }
