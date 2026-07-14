@@ -9,7 +9,7 @@
       el = document.createElement("div");
       el.id = "__dddit_sync_toast";
       el.style.cssText =
-        "position:fixed;z-index:2147483647;top:20px;right:20px;max-width:420px;padding:14px 16px;border-radius:10px;font:14px/1.4 system-ui,sans-serif;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.35)";
+        "position:fixed;z-index:2147483647;top:20px;right:20px;max-width:460px;padding:14px 16px;border-radius:10px;font:14px/1.4 system-ui,sans-serif;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.35);white-space:pre-wrap";
       document.documentElement.appendChild(el);
     }
     el.style.background = ok === false ? "#b91c1c" : ok ? "#166534" : "#1e293b";
@@ -41,6 +41,195 @@
     return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
   };
 
+  const parseWon = (text) => {
+    if (text == null || text === "") return null;
+    if (typeof text === "number" && Number.isFinite(text)) return Math.round(text);
+    if (typeof text === "object") {
+      if (text.units != null) {
+        const u = Number(String(text.units).replace(/[^\d.-]/g, ""));
+        return Number.isFinite(u) ? Math.round(u) : null;
+      }
+      const nested =
+        text.simpleText || text.text || text.label || text.value || text.amount || text.count;
+      if (nested != null) return parseWon(nested);
+      return null;
+    }
+    let s = String(text).replace(/,/g, "").replace(/₩/g, "").replace(/원/g, "").trim();
+    if (/^\d+(\.\d+)?만$/.test(s)) return Math.round(parseFloat(s) * 10000);
+    const digits = s.replace(/[^\d.-]/g, "");
+    if (!digits || digits === "." || digits === "-" || digits === "-.") return null;
+    const n = Number(digits);
+    return Number.isFinite(n) ? Math.round(n) : null;
+  };
+
+  const pick = (obj, names) => {
+    if (!obj || typeof obj !== "object") return null;
+    const map = {};
+    for (const [k, v] of Object.entries(obj)) map[String(k).toLowerCase()] = v;
+    for (const name of names) {
+      if (map[name.toLowerCase()] != null) return map[name.toLowerCase()];
+    }
+    for (const [k, v] of Object.entries(obj)) {
+      const nk = k.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (names.some((n) => nk.includes(n.toLowerCase().replace(/[^a-z0-9]/g, "")))) return v;
+    }
+    return null;
+  };
+
+  const normalizeClientPromo = (raw, idx) => {
+    if (!raw || typeof raw !== "object") return null;
+    const title =
+      pick(raw, ["title", "name", "campaignName", "promotionName", "videoTitle", "displayName"]) ||
+      "";
+    const titleText =
+      typeof title === "object"
+        ? title.simpleText || title.text || (title.runs && title.runs[0] && title.runs[0].text) || ""
+        : String(title || "").trim();
+    const cost = parseWon(
+      pick(raw, [
+        "cost",
+        "spend",
+        "amountSpent",
+        "budgetSpent",
+        "totalCost",
+        "spentAmount",
+        "amountSpentMoney",
+      ])
+    );
+    const impressions = parseWon(
+      pick(raw, ["impressions", "impressionCount", "reach", "impression"])
+    );
+    const views = parseWon(
+      pick(raw, ["views", "viewCount", "videoViews", "trueviewViews", "promotedViews"])
+    );
+    const subscribers = parseWon(
+      pick(raw, ["subscribers", "subscribersGained", "subscriberCount", "followersGained", "subs"])
+    );
+    if (!(cost || impressions || views || subscribers)) return null;
+    const idRaw = pick(raw, ["campaignId", "promotionId", "externalCampaignId", "entityId", "id"]);
+    const id =
+      (typeof idRaw === "object" ? idRaw.id || idRaw.campaignId : idRaw) ||
+      "studio-dom-" + idx + "-" + String(titleText).slice(0, 24);
+    return {
+      id: String(id).startsWith("studio-") ? String(id) : "studio-" + String(id),
+      title: String(titleText || "Studio 프로모션").slice(0, 80),
+      cost: cost || 0,
+      impressions: impressions || 0,
+      views: views || 0,
+      subscribers: subscribers || 0,
+      status: String(pick(raw, ["status", "campaignStatus", "state"]) || ""),
+      goal: String(pick(raw, ["goal", "objective", "campaignGoal"]) || ""),
+      videoId: String(pick(raw, ["videoId", "encryptedVideoId"]) || ""),
+      videoTitle: String(
+        (pick(raw, ["videoTitle"]) && String(pick(raw, ["videoTitle"]))) || titleText || ""
+      ),
+      source: "youtube-studio",
+    };
+  };
+
+  const looksPromoObj = (obj) => {
+    if (!obj || typeof obj !== "object") return false;
+    const keys = Object.keys(obj).join(" ").toLowerCase();
+    return /promo|campaign|spend|cost|impression|subscriber|viewcount|budget/.test(keys);
+  };
+
+  const harvestFromObjects = (root) => {
+    const bag = [];
+    const walk = (node, depth) => {
+      if (depth > 10 || node == null) return;
+      if (Array.isArray(node)) {
+        if (node.length && typeof node[0] === "object" && looksPromoObj(node[0])) {
+          for (const item of node) if (item && typeof item === "object") bag.push(item);
+        }
+        for (const item of node.slice(0, 40)) walk(item, depth + 1);
+        return;
+      }
+      if (typeof node !== "object") return;
+      for (const [k, v] of Object.entries(node)) {
+        if (/promo|campaign|metric|content|item|entr/i.test(k)) walk(v, depth + 1);
+        else if (depth < 3) walk(v, depth + 1);
+      }
+    };
+    walk(root, 0);
+    return bag;
+  };
+
+  const harvestPolymerPromos = () => {
+    const raw = [];
+    const els = document.querySelectorAll("*");
+    for (const el of els) {
+      try {
+        if (el.__data) raw.push(...harvestFromObjects(el.__data));
+      } catch (_) {}
+      try {
+        if (el.promotions) raw.push(...harvestFromObjects({ promotions: el.promotions }));
+      } catch (_) {}
+      try {
+        if (el.campaigns) raw.push(...harvestFromObjects({ campaigns: el.campaigns }));
+      } catch (_) {}
+    }
+    const out = [];
+    const seen = new Set();
+    raw.forEach((item, i) => {
+      const n = normalizeClientPromo(item, i);
+      if (!n) return;
+      const key = n.id + "|" + n.title + "|" + n.cost;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(n);
+    });
+    return out;
+  };
+
+  const scrapePromoTableDom = () => {
+    const out = [];
+    const rowSel = [
+      "[role='row']",
+      "ytcp-table-row",
+      "ytcp-campaign-row",
+      "ytgn-promotion-row",
+      "tr",
+    ].join(",");
+    const rows = [...document.querySelectorAll(rowSel)];
+    rows.forEach((row, idx) => {
+      const text = (row.innerText || row.textContent || "").replace(/\s+/g, " ").trim();
+      if (!text || text.length < 8) return;
+      if (!/(활성|종료|일시중지|Active|Ended|Paused|완료)/i.test(text)) return;
+      if (!/(₩|\d원|노출|조회|구독|impression|view|subscriber|\d{2,})/i.test(text)) return;
+
+      const won = text.match(/₩\s*([\d,]+)/);
+      const cost = won ? parseWon(won[1]) : null;
+      // Prefer large integers near Korean metric words when present.
+      const imprM = text.match(/노출[^\d]*([\d,]+)/i) || text.match(/([\d,]+)\s*노출/);
+      const viewM = text.match(/조회[^\d]*([\d,]+)/i) || text.match(/([\d,]+)\s*조회/);
+      const subM = text.match(/구독[^\d]*([\d,]+)/i) || text.match(/([\d,]+)\s*구독/);
+      const impressions = imprM ? parseWon(imprM[1]) : null;
+      const views = viewM ? parseWon(viewM[1]) : null;
+      const subscribers = subM ? parseWon(subM[1]) : null;
+      if (!(cost || impressions || views || subscribers)) return;
+
+      let title = "";
+      const titleEl =
+        row.querySelector("#video-title, #title, a[href*='/video/'], .title, ytcp-video-title") ||
+        null;
+      if (titleEl) title = (titleEl.textContent || "").trim();
+      if (!title) {
+        title = text.split(/(활성|종료됨|종료|일시중지|Active|Ended)/i)[0].trim().slice(0, 80);
+      }
+      out.push({
+        id: "studio-dom-" + idx,
+        title: title || "Studio 프로모션 " + (idx + 1),
+        cost: cost || 0,
+        impressions: impressions || 0,
+        views: views || 0,
+        subscribers: subscribers || 0,
+        status: /활성|Active/i.test(text) ? "진행중" : /일시중지|Paused/i.test(text) ? "일시중지" : "완료",
+        source: "youtube-studio",
+      });
+    });
+    return out;
+  };
+
   const buildAuthVariants = async () => {
     const sap = ck("SAPISID") || ck("__Secure-3PAPISID");
     const sap1 = ck("__Secure-1PAPISID") || sap;
@@ -52,7 +241,6 @@
     const datasync = String(datasyncRaw).split("||")[0] || "";
 
     const hashes = [];
-    // Modern Studio/YouTube (_u + DATASYNC_ID)
     if (datasync) {
       hashes.push({
         label: "datasync+_u",
@@ -62,7 +250,6 @@
         suffix: "_u",
       });
     }
-    // Classic
     hashes.push({
       label: "classic+_u",
       sap: await sha1([ts, sap, ORIGIN].join(" ")),
@@ -99,16 +286,30 @@
     }));
   };
 
-  const importPayload = async (payload) => {
+  const importBody = async (body) => {
+    if (body && body.payload) window.__ddditLastPayload = body.payload;
+    if (body && body.promotions) window.__ddditLastPromotions = body.promotions;
     toast("보고 API로 전송 중…");
     const res = await fetch(API + "/api/dddit/youtube/report/studio-promotions/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ payload }),
+      body: JSON.stringify(body),
     });
     const out = await res.json().catch(() => ({}));
     if (!res.ok || out.ok === false) {
-      throw new Error(out.message || out.detail || "import HTTP " + res.status);
+      const keys =
+        (out.payloadKeys || []).slice(0, 10).join(",") ||
+        Object.keys((body && body.payload) || {}).slice(0, 10).join(",");
+      console.warn("[디디딧] parse fail", out);
+      console.warn("[디디딧] payload @ window.__ddditLastPayload");
+      console.warn("[디디딧] top keys", keys, "unitsPaths", out.unitsPaths, "interesting", out.interestingKeys);
+      throw new Error(
+        (out.message || out.detail || "import 실패") +
+          " | keys=" +
+          keys +
+          " units=" +
+          ((out.unitsPaths && out.unitsPaths.length) || 0)
+      );
     }
     return out.message || "동기화 완료 " + (out.promotionCount || 0) + "개";
   };
@@ -127,7 +328,7 @@
           done = true;
           reject(new Error("페이지 요청 가로채기 타임아웃"));
         }
-      }, 12000);
+      }, 16000);
 
       const maybe = async (url, text) => {
         if (!/list_promotions/i.test(String(url || ""))) return;
@@ -162,10 +363,9 @@
         return send.apply(this, arguments);
       };
 
-      // Soft-trigger Studio to refetch promotions list
       try {
         const promoLink = [...document.querySelectorAll("a[href]")].find((a) =>
-          /content\/promotions/i.test(a.getAttribute("href") || "")
+          /content\/promotions|\/promotions/i.test(a.getAttribute("href") || "")
         );
         if (promoLink) promoLink.click();
       } catch (_) {}
@@ -177,8 +377,7 @@
     const ch = m && m[1];
     if (!ch) throw new Error("Studio 채널(프로모션) URL에서 실행하세요");
 
-    // 1) Prefer intercepting Studio's own authenticated request
-    toast("Studio 자체 요청 가로채는 중… (잠시만요)");
+    toast("Studio 자체 요청 가로채는 중…");
     let payload = null;
     try {
       payload = await captureFromPage();
@@ -186,7 +385,6 @@
       console.warn(interceptErr);
     }
 
-    // 2) Fallback: craft auth with DATASYNC_ID variants
     if (!payload) {
       toast("직접 요청으로 재시도…");
       const innertubeCtx = ytget("INNERTUBE_CONTEXT") || {};
@@ -256,7 +454,23 @@
       if (!payload) throw new Error("Studio 요청 실패: " + last);
     }
 
-    const done = await importPayload(payload);
+    window.__ddditLastPayload = payload;
+
+    // Prefer sending payload; on parse failure fall back to in-page harvest.
+    let done;
+    try {
+      done = await importBody({ payload });
+    } catch (importErr) {
+      console.warn("[디디딧] payload import failed, trying page harvest", importErr);
+      toast("응답 파싱 실패 → 페이지 데이터로 재시도…");
+      let promotions = harvestPolymerPromos();
+      if (!promotions.length) promotions = scrapePromoTableDom();
+      window.__ddditLastPromotions = promotions;
+      console.warn("[디디딧] harvested promotions", promotions);
+      if (!promotions.length) throw importErr;
+      done = await importBody({ promotions });
+    }
+
     toast(done, true);
     try {
       alert(done);
