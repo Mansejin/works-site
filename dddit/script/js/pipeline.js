@@ -400,11 +400,17 @@ window.DIDIDIT_PIPELINE = (function () {
     const titleLine = heading
       ? `- 챕터 제목은 \`## ${heading}\` 로 시작합니다. (본문에는 제목 행을 다시 쓰지 마세요)`
       : `- 이 챕터는 **인트로**입니다. \`##\` 제목 행을 넣지 마세요. 타이틀 카드 없이 바로 오프닝 멘트로 시작합니다.`;
+    const lengthRule =
+      chapterIndex === 0 || isPrologueChapter(title)
+        ? '- **분량**: 오프닝·인트로는 짧게 (훅 + 고정 오프닝 멘트). 본문 내용 선행 나열 금지.\n'
+        : chapterIndex === chapterTotal - 1 || isClosingChapter(title)
+          ? '- **분량**: 총평·클로징은 핵심만 압축. 새 스펙 장황 나열 금지.\n'
+          : '- **분량**: 본문 챕터는 **상한 없음**. 필수·서브 소구·필수 멘션을 충분히 녹이세요. (이 응답에는 이 챕터만)\n';
     return `${ctxBlock}# 작업: 줄글 대본 작성
 - 성우 내레이션 중심의 **자연스러운 줄글**만 작성합니다.
 - 표·행 분할·장면·자막·JSON은 넣지 않습니다.
 ${titleLine}
-${notes ? `- 챕터 메모: ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${specChapter}${designChapter}${limitChapter}${priceChapter}${closingChapter}
+${lengthRule}${notes ? `- 챕터 메모: ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${specChapter}${designChapter}${limitChapter}${priceChapter}${closingChapter}
 ${continuity}`;
   }
 
@@ -426,15 +432,24 @@ ${productHint}${retryHint || ''}
 ${prose}`;
   }
 
-  function buildScenePrompt(ctx, rows) {
+  function buildScenePrompt(ctx, rows, options = {}) {
     const scriptOnly = rows.map((r) => r.대본).join('\n');
+    const checklist = String(options.shootChecklist || '').trim();
+    const allowUnbox =
+      options.allowUnboxing === true ||
+      /언박싱|택배/.test(`${ctx || ''}\n${checklist}`);
+    const checklistBlock = checklist
+      ? `\n## 팀 촬영 체크리스트·필수 장면 (장면 열에 반영)\n${checklist}\n`
+      : '';
     return `${ctx}
-
+${checklistBlock}
 # 작업: 장면·사이즈 추가
 대본은 **수정하지 마세요**. 장면·사이즈 열만 채우세요. 자막·코멘트는 빈 문자열.
 - 연속 호흡: 장면에 '컷 유지'
 - 사이즈: 와이드/미디엄/클로즈업/탑뷰 등
-- 언박싱·고가 비교 세팅·작위적 감정 연기 장면 금지
+- 체크리스트·필수 장면이 대본에 대응되면 장면 설명에 구체적으로 적으세요. (예: 가루 부어 보이기, 내솥 클로즈업)
+- 고가 비교 세팅·작위적 감정 연기 장면 금지
+- 언박싱: ${allowUnbox ? '가이드에 있으므로 **허용** (택배 개봉·제품 전경)' : '가이드에 없으면 넣지 마세요'}
 
 ## 현재 대본 (행 순서)
 ${scriptOnly}

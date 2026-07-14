@@ -10,7 +10,7 @@
   <style>html.team-gate-pending body { visibility: hidden; }</style>
   <script src="../js/team-gate.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="css/style.css?v=11" />
+  <link rel="stylesheet" href="css/style.css?v=12" />
   <script>
     window.__earlyErrors = window.__earlyErrors || [];
     window.addEventListener('error', function (e) {
@@ -104,6 +104,17 @@
               <p class="hint">기획안 <strong>구성</strong>을 채널 타임라인 스타일로 줄입니다. 인트로는 타이틀 카드 없음 · 세부 내용은 메모로 둡니다.</p>
               <ol id="chapter-qc-preview" class="chapter-qc-preview"></ol>
               <p id="chapter-qc-empty" class="empty-hint hidden">구성이 없습니다. 기획안 편집에서 구성을 입력하세요.</p>
+            </div>
+
+            <div class="guide-qc-panel" id="guide-qc-panel">
+              <div class="guide-qc-head">
+                <h3>브랜드 가이드 QC</h3>
+                <span class="guide-qc-badge">미커버 <strong id="guide-qc-fail-count">0</strong></span>
+                <button id="btn-guide-qc-refresh" class="btn btn-secondary btn-sm" type="button">다시 검사</button>
+              </div>
+              <p class="hint">필수 멘션·소구·장면·제원이 기획안·줄글·장면에 반영됐는지 형식에 구애받지 않고 검사합니다. 줄글/장면 생성 후에도 갱신됩니다.</p>
+              <ul id="guide-qc-list" class="guide-qc-list"></ul>
+              <p id="guide-qc-empty" class="empty-hint hidden">가이드 항목을 인식하지 못했습니다. 기획안 필수 언급·리뷰 가이드를 확인하세요.</p>
             </div>
 
             <details class="fold">
@@ -314,9 +325,10 @@
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" async></script>
   <script src="../js/plan-defaults.js"></script>
   <script src="../js/chapter-title-qc.js?v=2"></script>
-  <script src="../js/plan-brief-sync.js"></script>
+  <script src="../js/brand-guide-qc.js?v=1"></script>
+  <script src="../js/plan-brief-sync.js?v=2"></script>
   <script src="js/works-api.js"></script>
   <script src="js/sheet-sync.js"></script>
-  <script src="js/main.js?v=36"></script>
+  <script src="js/main.js?v=37"></script>
 </body>
 </html>
