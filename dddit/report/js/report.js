@@ -32,11 +32,8 @@
     issuesEditor: document.getElementById("issues-editor"),
     promotionsEditor: document.getElementById("promotions-editor"),
     snapshotsEditor: document.getElementById("snapshots-editor"),
-    studioCurlEditor: document.getElementById("studio-curl-editor"),
-    studioCaptureStatus: document.getElementById("studio-capture-status"),
-    studioResponseEditor: document.getElementById("studio-response-editor"),
-    studioImportStatus: document.getElementById("studio-import-status"),
     promoPagination: document.getElementById("promo-pagination"),
+    saveStatus: document.getElementById("save-status"),
   };
 
   let charts = {
@@ -1305,116 +1302,6 @@
     setStatus("API 요청 중…");
     loadReport(true);
   });
-  document.getElementById("btn-ads-sync")?.addEventListener("click", async () => {
-    try {
-      setStatus("Ads 동기화 중…");
-      const result = await apiPost("/api/dddit/youtube/report/ads/sync?force=1");
-      setStatus(result.message || "Ads 동기화 완료", "ok");
-      await loadReport(true);
-    } catch (err) {
-      showError(err.message || "Ads 동기화 실패");
-    }
-  });
-  document.getElementById("btn-studio-sync")?.addEventListener("click", async () => {
-    const btn = document.getElementById("btn-studio-sync");
-    try {
-      hideError();
-      if (btn) btn.disabled = true;
-      setStatus("Studio 동기화 중… (10~30초)");
-      if (els.studioSyncStatus) {
-        els.studioSyncStatus.textContent = "동기화 중…";
-        els.studioSyncStatus.className = "status-pill";
-      }
-      const result = await apiPost("/api/dddit/youtube/report/studio-promotions/sync?force=1", {
-        timeoutMs: 60_000,
-      });
-      setStatus(result.message || "Studio 동기화 완료", "ok");
-      await refreshStudioPromoStatus();
-      await refreshPromotionsTable();
-    } catch (err) {
-      const msg = err.message || "Studio 동기화 실패";
-      if (els.studioSyncStatus) {
-        els.studioSyncStatus.textContent = "Studio 실패";
-        els.studioSyncStatus.className = "status-pill error";
-        els.studioSyncStatus.title = msg;
-      }
-      showError(msg);
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  });
-  document.getElementById("btn-studio-capture")?.addEventListener("click", async () => {
-    const btn = document.getElementById("btn-studio-capture");
-    try {
-      hideError();
-      if (btn) btn.disabled = true;
-      const curl = els.studioCurlEditor?.value?.trim() || "";
-      if (curl.length < 20) throw new Error("cURL 텍스트를 붙여넣으세요");
-      setStatus("캡처 저장 중…");
-      const { res, body } = await fetchJson(
-        `${API_BASE}/api/dddit/youtube/report/studio-promotions/capture`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ curl }),
-          timeoutMs: CAPTURE_TIMEOUT_MS,
-        }
-      );
-      if (!res.ok || body.ok === false) {
-        throw new Error(body.detail || body.message || `HTTP ${res.status}`);
-      }
-      if (els.studioCaptureStatus) {
-        const cookieHint = body.cookieCount ? ` · 쿠키 ${body.cookieCount}개` : "";
-        els.studioCaptureStatus.textContent = (body.message || "캡처 저장됨") + cookieHint;
-        els.studioCaptureStatus.className = body.warning ? "status-pill warn" : "status-pill ok";
-      }
-      setStatus(body.message || "캡처 저장됨", body.warning ? "warn" : "ok");
-      await refreshStudioPromoStatus();
-    } catch (err) {
-      if (els.studioCaptureStatus) {
-        els.studioCaptureStatus.textContent = err.message || "캡처 저장 실패";
-        els.studioCaptureStatus.className = "status-pill error";
-      }
-      showError(err.message || "캡처 저장 실패");
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  });
-  document.getElementById("btn-studio-import")?.addEventListener("click", async () => {
-    try {
-      const raw = els.studioResponseEditor?.value?.trim() || "";
-      if (raw.length < 10) throw new Error("list_promotions 응답 JSON을 붙여넣으세요");
-      let payload;
-      try {
-        payload = JSON.parse(raw);
-      } catch {
-        throw new Error("JSON 형식이 아닙니다");
-      }
-      setStatus("Studio JSON 가져오는 중…");
-      const res = await fetch(`${API_BASE}/api/dddit/youtube/report/studio-promotions/import`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payload }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || body.ok === false) {
-        throw new Error(body.detail || body.message || `HTTP ${res.status}`);
-      }
-      if (els.studioImportStatus) {
-        els.studioImportStatus.textContent = body.message || "JSON 가져오기 완료";
-        els.studioImportStatus.className = "status-pill ok";
-      }
-      setStatus(body.message || "Studio JSON 가져오기 완료", "ok");
-      await refreshStudioPromoStatus();
-      await refreshPromotionsTable();
-    } catch (err) {
-      if (els.studioImportStatus) {
-        els.studioImportStatus.textContent = err.message || "JSON 가져오기 실패";
-        els.studioImportStatus.className = "status-pill error";
-      }
-      showError(err.message || "JSON 가져오기 실패");
-    }
-  });
   document.getElementById("btn-copy-link")?.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(location.href.split("?")[0]);
@@ -1433,29 +1320,25 @@
     }
   });
 
-  function buildStudioBookmarklet() {
-    // Studio 페이지에서 list_promotions → works-api import (브라우저 쿠키 사용)
-    const api = API_BASE;
-    const src =
-      "javascript:(async()=>{try{const A=" +
-      JSON.stringify(api) +
-      ";const m=location.pathname.match(/\\/channel\\/(UC[\\w-]+)/);const ch=m&&m[1];if(!ch){alert('Studio 채널(프로모션) 페이지에서 실행하세요');return;}const ck=n=>{const x=document.cookie.split(';').map(s=>s.trim()).find(t=>t.startsWith(n+'='));return x?decodeURIComponent(x.slice(n.length+1)):''};const sap=ck('SAPISID')||ck('__Secure-3PAPISID');const sap1=ck('__Secure-1PAPISID')||sap;const sap3=ck('__Secure-3PAPISID')||sap;if(!sap){alert('SAPISID 쿠키를 읽을 수 없습니다. Studio에 로그인하세요');return;}const sha=async(s)=>{const b=await crypto.subtle.digest('SHA-1',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')};const mk=async(v)=>{const t=Math.floor(Date.now()/1000);return t+'_'+(await sha(t+' '+v+' https://studio.youtube.com))+'_u'};const auth='SAPISIDHASH '+(await mk(sap))+' SAPISID1PHASH '+(await mk(sap1))+' SAPISID3PHASH '+(await mk(sap3));const body={channelId:ch,pageSize:50,context:{client:{clientName:62,clientVersion:'1.20260709.05.00',hl:'ko',gl:'KR'},user:{delegationContext:{externalChannelId:ch,roleType:{channelRoleType:'CREATOR_CHANNEL_ROLE_TYPE_OWNER'}}}}};let payload=null,ok=false,last='';for(const au of['1','0']){const r=await fetch('https://studio.youtube.com/youtubei/v1/promotions/list_promotions?alt=json&prettyPrint=false',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json',Authorization:auth,'X-Goog-AuthUser':au,'X-Youtube-Client-Name':'62','X-Youtube-Client-Version':'1.20260709.05.00'},body:JSON.stringify(body)});payload=await r.json().catch(()=>({}));if(r.ok){ok=true;break;}last=r.status+' '+(payload&&payload.error&&payload.error.message||'');}if(!ok){alert('Studio 실패: '+last);return;}const res=await fetch(A+'/api/dddit/youtube/report/studio-promotions/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({payload})});const out=await res.json().catch(()=>({}));if(!res.ok||out.ok===false){alert(out.message||out.detail||'import 실패');return;}alert(out.message||('동기화 완료 '+(out.promotionCount||0)+'개'));}catch(e){alert(e.message||e);}})();";
-    return src;
-  }
-
   document.getElementById("btn-copy-bookmarklet")?.addEventListener("click", async () => {
     try {
-      const code = buildStudioBookmarklet();
+      const snippetUrl = new URL("js/studio-promo-sync-snippet.js", location.href).href + "?v=1";
+      const res = await fetch(snippetUrl, { cache: "no-store" });
+      if (!res.ok) throw new Error("동기화 코드를 불러오지 못했습니다");
+      let code = (await res.text()).trim();
+      // Strip leading block comment so paste runs immediately in Console.
+      code = code.replace(/^\/\*[\s\S]*?\*\/\s*/, "");
       await navigator.clipboard.writeText(code);
-      setStatus("북마클릿 복사됨 — 북마크에 붙여넣고 Studio 프로모션에서 클릭", "ok");
+      setStatus("동기화 코드 복사됨 — Studio Console에 붙여넣기", "ok");
       alert(
-        "북마클릿이 복사되었습니다.\n\n" +
-          "1) 브라우저 북마크 추가 → URL에 붙여넣기\n" +
-          "2) Studio → 프로모션 탭에서 그 북마크 클릭\n" +
-          "3) 완료 알림 뜨면 이 보고 페이지 새로고침"
+        "동기화 코드가 복사되었습니다.\n\n" +
+          "1) Studio → 프로모션 탭\n" +
+          "2) F12 → Console\n" +
+          "3) 붙여넣기 → Enter\n" +
+          "4) 우측 상단 토스트/알림 확인 후 이 페이지 새로고침"
       );
     } catch (err) {
-      showError(err.message || "북마클릿 복사 실패");
+      showError(err.message || "동기화 코드 복사 실패");
     }
   });
 
@@ -1489,7 +1372,11 @@
         notes: [`수동 입력 ${new Date().toLocaleDateString("ko-KR")}`],
       };
       if (idx >= 0) {
-        promotions[idx] = { ...promotions[idx], ...patch, notes: listUnique([...(promotions[idx].notes || []), ...patch.notes]) };
+        promotions[idx] = {
+          ...promotions[idx],
+          ...patch,
+          notes: listUnique([...(promotions[idx].notes || []), ...patch.notes]),
+        };
       } else {
         promotions.unshift({
           id: `manual-${Date.now()}`,
@@ -1502,7 +1389,6 @@
       }
       await apiPut("/api/dddit/youtube/report/promotions", { promotions, issues });
       promoPage = 0;
-      renderPromotions(promotions.map((p) => ({ ...p, metrics: p.metrics })));
       await refreshPromotionsTable();
       if (msg) msg.textContent = `"${title}" 저장됨`;
       setStatus("프로모션 숫자 저장됨", "ok");

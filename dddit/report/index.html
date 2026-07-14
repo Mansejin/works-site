@@ -173,6 +173,51 @@
     .insights li { margin-left: 1.1rem; }
 
     .promo-table-wrap { overflow-x: auto; }
+    .promo-quick-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fafafa;
+    }
+    .promo-quick-fields {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .promo-quick-form label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .promo-quick-form input,
+    .promo-quick-form select {
+      padding: 7px 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.86rem;
+      background: #fff;
+      min-width: 0;
+    }
+    .promo-quick-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .promo-quick-actions .btn {
+      flex: 0 0 auto;
+      white-space: nowrap;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      height: auto;
+      writing-mode: horizontal-tb;
+    }
     .promo-pagination {
       display: flex;
       align-items: center;
@@ -390,7 +435,7 @@
       .kpi-grid, .grid-4 { grid-template-columns: repeat(2, 1fr); }
       .grid-2, .grid-promo-insights { grid-template-columns: 1fr; }
       .video-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .promo-quick-form { grid-template-columns: 1fr 1fr !important; }
+      .promo-quick-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 560px) {
       .kpi-grid { grid-template-columns: 1fr; }
@@ -494,43 +539,45 @@
             <div class="header-actions">
               <span id="ads-sync-status" class="status-pill" style="font-size:0.72rem;">—</span>
               <span id="studio-sync-status" class="status-pill" style="font-size:0.72rem;">—</span>
-              <button id="btn-copy-bookmarklet" class="btn" type="button" style="padding:4px 10px;font-size:0.76rem;" title="Studio에서 원클릭 동기화">북마클릿 복사</button>
-              <button id="btn-studio-sync" class="btn btn-ghost" type="button" style="padding:4px 10px;font-size:0.76rem;display:none;">Studio 동기화</button>
-              <button id="btn-ads-sync" class="btn btn-ghost" type="button" style="padding:4px 10px;font-size:0.76rem;display:none;">Ads 동기화</button>
+              <button id="btn-copy-bookmarklet" class="btn" type="button" style="padding:4px 10px;font-size:0.76rem;" title="Studio Console에 붙여넣을 코드 복사">동기화 코드 복사</button>
             </div>
           </div>
           <div class="card-body promo-table-wrap">
             <p class="video-note" style="margin:0 0 10px;">
-              <strong>추천:</strong> Studio 프로모션 탭에서 북마클릿 한 번 클릭 → 자동 반영.
-              또는 아래 숫자만 입력.
+              <strong>자동:</strong> 「동기화 코드 복사」→ Studio 프로모션 탭에서 F12 → Console → 붙여넣기 → Enter<br />
+              <strong>수동:</strong> 아래 숫자만 입력 후 저장
             </p>
-            <div class="promo-quick-form" style="display:grid;grid-template-columns:2fr repeat(4,1fr) 1fr auto;gap:8px;margin-bottom:12px;align-items:end;">
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">캠페인
-                <input id="promo-form-title" list="promo-title-list" placeholder="레노버 아이디어 탭 11" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;" />
+            <div class="promo-quick-form">
+              <label>캠페인
+                <input id="promo-form-title" list="promo-title-list" placeholder="레노버 아이디어 탭 11" />
                 <datalist id="promo-title-list"></datalist>
               </label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">비용
-                <input id="promo-form-cost" type="number" inputmode="numeric" placeholder="44435" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;" />
-              </label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">노출
-                <input id="promo-form-impressions" type="number" inputmode="numeric" placeholder="23905" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;" />
-              </label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">조회
-                <input id="promo-form-views" type="number" inputmode="numeric" placeholder="298" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;" />
-              </label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">구독
-                <input id="promo-form-subscribers" type="number" inputmode="numeric" placeholder="125" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;" />
-              </label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:0.72rem;color:var(--text-muted);">상태
-                <select id="promo-form-status" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;">
-                  <option>진행중</option>
-                  <option>일시중지</option>
-                  <option>완료</option>
-                </select>
-              </label>
-              <button id="btn-promo-quick-save" class="btn" type="button" style="padding:8px 12px;font-size:0.8rem;">숫자 저장</button>
+              <div class="promo-quick-fields">
+                <label>비용
+                  <input id="promo-form-cost" type="number" inputmode="numeric" placeholder="44435" />
+                </label>
+                <label>노출
+                  <input id="promo-form-impressions" type="number" inputmode="numeric" placeholder="23905" />
+                </label>
+                <label>조회
+                  <input id="promo-form-views" type="number" inputmode="numeric" placeholder="298" />
+                </label>
+                <label>구독
+                  <input id="promo-form-subscribers" type="number" inputmode="numeric" placeholder="125" />
+                </label>
+                <label>상태
+                  <select id="promo-form-status">
+                    <option>진행중</option>
+                    <option>일시중지</option>
+                    <option>완료</option>
+                  </select>
+                </label>
+              </div>
+              <div class="promo-quick-actions">
+                <button id="btn-promo-quick-save" class="btn" type="button">숫자 저장</button>
+                <span id="promo-form-status-msg" class="video-note" style="margin:0;"></span>
+              </div>
             </div>
-            <p id="promo-form-status-msg" class="video-note" style="margin:0 0 10px;"></p>
             <table>
               <thead>
                 <tr>
@@ -564,27 +611,6 @@
       <section class="card edit-panel">
         <div class="card-head"><h2>보고 데이터 편집 (팀용)</h2></div>
         <div class="card-body">
-          <details style="margin-bottom:12px;">
-            <summary style="cursor:pointer;color:var(--muted);font-size:0.9rem;">고급 · Studio cURL / JSON (거의 안 씀)</summary>
-            <div style="margin-top:8px;">
-          <label for="studio-curl-editor">Studio 프로모션 cURL 캡처 (Copy as cURL)</label>
-          <textarea id="studio-curl-editor" rows="3" placeholder="비권장 — 북마클릿 또는 숫자 저장 사용"></textarea>
-          <div class="header-actions" style="margin-bottom:12px;">
-            <button id="btn-studio-capture" class="btn btn-ghost" type="button">캡처 저장</button>
-            <span id="studio-capture-status" class="status-pill">NAS 서버 재생용</span>
-          </div>
-          <details class="studio-import-details" style="margin-bottom:12px;">
-            <summary style="cursor:pointer;color:var(--muted);font-size:0.9rem;">JSON 붙여넣기</summary>
-            <textarea id="studio-hook-snippet" readonly rows="4" style="font-size:0.72rem;font-family:monospace;margin:8px 0;width:100%;">(function(){function s(u,t){if(!t||t.length<200)return;if(!/"\s*units\s*"\s*:\s*"\d+"/.test(t))return;if(!/(promotion|campaign|ypc|impression|subscriber)/i.test(t))return;window.__studioPromoJson=t;console.log("copy(__studioPromoJson)");}const f=fetch;fetch=async(...a)=>{const r=await f(...a);const u=String(a[0]||"");if(u.includes("youtubei"))r.clone().text().then(t=>s(u,t));return r;};console.log("훅 설치 후 F5");})();</textarea>
-            <label for="studio-response-editor">프로모션 응답 JSON</label>
-            <textarea id="studio-response-editor" rows="4" placeholder='copy(__studioPromoJson)'></textarea>
-            <div class="header-actions" style="margin-top:8px;">
-              <button id="btn-studio-import" class="btn btn-ghost" type="button">JSON 가져오기</button>
-              <span id="studio-import-status" class="status-pill">—</span>
-            </div>
-          </details>
-            </div>
-          </details>
           <label for="issues-editor">주요 이슈 (한 줄씩)</label>
           <textarea id="issues-editor" placeholder="채널 노출 부족…"></textarea>
           <label for="promotions-editor">프로모션 JSON (비용·노출·조회·구독)</label>
