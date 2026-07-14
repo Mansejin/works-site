@@ -77,16 +77,29 @@ def _parse_campaign_row(row: dict[str, Any]) -> dict[str, Any]:
     metrics = row.get("metrics") or {}
     cost_micros = int(metrics.get("costMicros") or 0)
     impressions = int(metrics.get("impressions") or 0)
-    views = int(metrics.get("videoViews") or metrics.get("views") or 0)
+    # v24+: metrics.video_views → metrics.video_trueview_views (JSON: videoTrueviewViews)
+    views = int(
+        metrics.get("videoTrueviewViews")
+        or metrics.get("videoViews")
+        or metrics.get("views")
+        or 0
+    )
     clicks = int(metrics.get("clicks") or 0)
     name = campaign.get("name") or "캠페인"
     campaign_id = str(campaign.get("id") or "")
+    status_raw = str(campaign.get("status") or "").upper()
+    if status_raw in ("ENABLED", "ACTIVE"):
+        status = "진행중"
+    elif status_raw == "PAUSED":
+        status = "일시중지"
+    else:
+        status = status_raw or "진행중"
     return {
         "id": f"ads-{campaign_id}" if campaign_id else _slugify(name),
         "adsCampaignId": campaign_id,
         "title": name,
         "videoTitle": name,
-        "status": "진행중",
+        "status": status,
         "cost": round(cost_micros / 1_000_000),
         "impressions": impressions,
         "views": views,
@@ -109,6 +122,7 @@ async def sync_campaigns(force: bool = False) -> dict[str, Any]:
     cfg = google_ads_config()
     assert cfg is not None
 
+    # Google Ads API v24 renamed metrics.video_views → metrics.video_trueview_views
     query = """
         SELECT
           campaign.id,
@@ -116,7 +130,7 @@ async def sync_campaigns(force: bool = False) -> dict[str, Any]:
           campaign.status,
           metrics.cost_micros,
           metrics.impressions,
-          metrics.video_views,
+          metrics.video_trueview_views,
           metrics.clicks
         FROM campaign
         WHERE campaign.status != 'REMOVED'

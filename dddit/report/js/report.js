@@ -70,6 +70,24 @@
   };
 
   const GENDER_LABELS = { female: "여성", male: "남성", user_specified: "기타" };
+  const AGE_LABELS = {
+    age13_17: "13–17",
+    "age13-17": "13–17",
+    age18_24: "18–24",
+    "age18-24": "18–24",
+    age25_34: "25–34",
+    "age25-34": "25–34",
+    age35_44: "35–44",
+    "age35-44": "35–44",
+    age45_54: "45–54",
+    "age45-54": "45–54",
+    age55_64: "55–64",
+    "age55-64": "55–64",
+    age65_: "65+",
+    age65: "65+",
+  };
+
+  let loadSeq = 0;
 
   function readLastApiRefresh() {
     try {
@@ -144,11 +162,14 @@
 
   async function apiPost(path) {
     const res = await fetch(`${API_BASE}${path}`, { method: "POST" });
+    const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
       throw new Error(body.detail || body.message || `HTTP ${res.status}`);
     }
-    return res.json();
+    if (body && body.ok === false) {
+      throw new Error(body.message || body.detail || "요청 실패");
+    }
+    return body;
   }
 
   async function apiGet(path, options = {}) {
@@ -173,11 +194,44 @@
     return res.json();
   }
 
+  function destroyCanvasChart(canvasOrId) {
+    const canvas =
+      typeof canvasOrId === "string" ? document.getElementById(canvasOrId) : canvasOrId;
+    if (!canvas || typeof Chart === "undefined" || typeof Chart.getChart !== "function") {
+      return;
+    }
+    const existing = Chart.getChart(canvas);
+    if (existing) existing.destroy();
+  }
+
   function destroyCharts() {
     Object.keys(charts).forEach((key) => {
       if (charts[key]) {
-        charts[key].destroy();
+        try {
+          charts[key].destroy();
+        } catch {
+          /* ignore stale chart */
+        }
         charts[key] = null;
+      }
+    });
+    [
+      "chart-traffic-sources",
+      "chart-retention",
+      "chart-age",
+      "chart-gender",
+      "chart-recent-videos",
+      "chart-views-7d",
+      "chart-subscribers",
+    ].forEach(destroyCanvasChart);
+  }
+
+  function resizeCharts() {
+    Object.values(charts).forEach((chart) => {
+      try {
+        chart?.resize?.();
+      } catch {
+        /* ignore */
       }
     });
   }
@@ -263,7 +317,10 @@
 
   function renderRecentVideosChart(rows) {
     const ctx = document.getElementById("chart-recent-videos");
-    if (!ctx || !rows?.length) return;
+    if (!ctx) return;
+    destroyCanvasChart(ctx);
+    charts.recent = null;
+    if (!rows?.length) return;
     charts.recent = new Chart(ctx, {
       type: "bar",
       data: {
@@ -321,6 +378,8 @@
   function renderViews7dChart(values, note) {
     const ctx = document.getElementById("chart-views-7d");
     if (!ctx) return;
+    destroyCanvasChart(ctx);
+    charts.views7d = null;
     const labels = ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "오늘"];
     charts.views7d = new Chart(ctx, {
       type: "line",
@@ -350,7 +409,10 @@
 
   function renderSubscriberChart(trend) {
     const ctx = document.getElementById("chart-subscribers");
-    if (!ctx || !trend?.points?.length) return;
+    if (!ctx) return;
+    destroyCanvasChart(ctx);
+    charts.subs = null;
+    if (!trend?.points?.length) return;
     const labels = trend.points.map((p) => p.label);
     charts.subs = new Chart(ctx, {
       type: "line",
@@ -494,6 +556,8 @@
   function renderTrafficChart(data) {
     const ctx = document.getElementById("chart-traffic-sources");
     if (!ctx) return;
+    destroyCanvasChart(ctx);
+    charts.traffic = null;
     const sources = (data?.sources || []).slice(0, 8);
     if (!sources.length) return;
     charts.traffic = new Chart(ctx, {
@@ -596,9 +660,14 @@
 
     if (!data?.ok) {
       if (charts.retention) {
-        charts.retention.destroy();
+        try {
+          charts.retention.destroy();
+        } catch {
+          /* ignore */
+        }
         charts.retention = null;
       }
+      destroyCanvasChart(ctx);
       if (labelEl) labelEl.textContent = data?.message || "시청 유지 조회 실패";
       return;
     }
@@ -614,9 +683,14 @@
     const colors = ["#dc2626", "#2563eb", "#16a34a"];
 
     if (charts.retention) {
-      charts.retention.destroy();
+      try {
+        charts.retention.destroy();
+      } catch {
+        /* ignore */
+      }
       charts.retention = null;
     }
+    destroyCanvasChart(ctx);
 
     if (series.length) {
       const labels = series[0].points.map((point) => `${Math.round(point.ratio * 100)}%`);
@@ -768,17 +842,56 @@
     });
   }
 
+  function setDemographicsEmpty(canvasId, message) {
+    const canvas = document.getElementById(canvasId);
+    const wrap = canvas?.parentElement;
+    if (!wrap) return;
+    wrap.querySelectorAll(".demo-empty").forEach((el) => el.remove());
+    const note = document.createElement("p");
+    note.className = "video-note demo-empty";
+    note.style.margin = "12px 0 0";
+    note.textContent = message;
+    wrap.appendChild(note);
+  }
+
+  function clearDemographicsEmpty(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    canvas?.parentElement?.querySelectorAll(".demo-empty").forEach((el) => el.remove());
+  }
+
+  function formatAgeLabel(ageGroup) {
+    const key = String(ageGroup || "");
+    if (AGE_LABELS[key]) return AGE_LABELS[key];
+    const m = key.match(/age(\d+)(?:[_-](\d+|))?/i);
+    if (!m) return key || "—";
+    if (!m[2]) return `${m[1]}+`;
+    return `${m[1]}–${m[2]}`;
+  }
+
   function renderDemographicsCharts(data) {
     const ageCtx = document.getElementById("chart-age");
     const genderCtx = document.getElementById("chart-gender");
     const ages = data?.ageGroups || [];
     const genders = data?.gender || [];
 
+    destroyCanvasChart(ageCtx);
+    destroyCanvasChart(genderCtx);
+    charts.age = null;
+    charts.gender = null;
+    clearDemographicsEmpty("chart-age");
+    clearDemographicsEmpty("chart-gender");
+
+    if (!data?.ok && data?.message) {
+      setDemographicsEmpty("chart-age", data.message);
+      setDemographicsEmpty("chart-gender", data.message);
+      return;
+    }
+
     if (ageCtx && ages.length) {
       charts.age = new Chart(ageCtx, {
         type: "bar",
         data: {
-          labels: ages.map((a) => a.ageGroup),
+          labels: ages.map((a) => formatAgeLabel(a.ageGroup)),
           datasets: [
             {
               label: "시청 비율 %",
@@ -795,6 +908,8 @@
           scales: { y: { ticks: { callback: (v) => `${v}%` } } },
         },
       });
+    } else {
+      setDemographicsEmpty("chart-age", "연령대 데이터 없음");
     }
 
     if (genderCtx && genders.length) {
@@ -805,7 +920,7 @@
           datasets: [
             {
               data: genders.map((g) => g.viewerPercentage),
-              backgroundColor: ["#ec4899", "#3b82f6", "#94a3b8"],
+              backgroundColor: ["#3b82f6", "#ec4899", "#94a3b8"],
             },
           ],
         },
@@ -815,6 +930,8 @@
           plugins: { legend: { position: "bottom" } },
         },
       });
+    } else {
+      setDemographicsEmpty("chart-gender", "성별 데이터 없음");
     }
   }
 
@@ -822,13 +939,20 @@
     if (!els.adsSyncStatus || !adsSync) return;
     if (!adsSync.configured) {
       els.adsSyncStatus.textContent = "Ads 미설정";
+      els.adsSyncStatus.className = "status-pill";
+      els.adsSyncStatus.title = adsSync.message || "";
       return;
     }
-    const when = adsSync.lastSync
-      ? new Date(adsSync.lastSync).toLocaleString("ko-KR")
-      : "미동기화";
-    els.adsSyncStatus.textContent = `Ads · ${when}`;
-    els.adsSyncStatus.className = `status-pill ${adsSync.lastSync ? "ok" : ""}`;
+    if (adsSync.lastSync) {
+      const when = new Date(adsSync.lastSync).toLocaleString("ko-KR");
+      els.adsSyncStatus.textContent = `Ads · ${when}`;
+      els.adsSyncStatus.className = "status-pill ok";
+      els.adsSyncStatus.title = adsSync.message || "";
+      return;
+    }
+    els.adsSyncStatus.textContent = "Ads 미동기화";
+    els.adsSyncStatus.className = "status-pill";
+    els.adsSyncStatus.title = adsSync.message || "Ads 동기화 버튼을 눌러 연동하세요";
   }
 
   function renderPromotions(promotions) {
@@ -926,6 +1050,7 @@
   }
 
   async function loadReport(refresh) {
+    const seq = ++loadSeq;
     els.loading.classList.remove("hidden");
     els.root.classList.add("hidden");
     els.error?.classList.add("hidden");
@@ -935,12 +1060,11 @@
 
     try {
       const overview = await apiGet(`/api/dddit/youtube/report/overview${refresh ? "?refresh=1" : ""}`);
+      if (seq !== loadSeq) return;
       const videosData = await apiGet(`/api/dddit/youtube/report/videos${refresh ? "?refresh=1" : ""}`);
+      if (seq !== loadSeq) return;
       const { traffic, retention, demographics } = await loadAnalyticsExtras(refresh);
-
-      if (overview.adsSync?.configured && refresh) {
-        apiPost("/api/dddit/youtube/report/ads/sync?force=1").catch(() => null);
-      }
+      if (seq !== loadSeq) return;
 
       const ch = overview.channel || {};
       els.title.textContent = `${ch.title || "디디딧"} · 채널 현황 분석`;
@@ -951,26 +1075,31 @@
 
       renderKpis(overview.kpis || {}, overview.channel?.subscriberCount);
       renderAnalyticsOverview(overview.analytics);
-      renderTrafficChart(traffic);
-      bindRetentionTabs(retention, videosData.videos || []);
-      renderRetentionChart(retention, videosData.videos || [], activeRetentionFormat);
-      renderDemographicsCharts(demographics);
       renderAdsSyncStatus(overview.adsSync);
-      renderRecentVideosChart(overview.recentVideosBar || []);
-      renderViews7dChart(overview.viewsTrend7d || [], overview.viewsTrendNote);
-      renderSubscriberChart(overview.subscriberTrend);
       renderInsights(overview.insights || []);
       renderPromotions(overview.promotions || []);
       renderVideos(videosData.videos || []);
-
       els.limitations.innerHTML = (overview.limitations || [])
         .map((line) => `<li>${esc(line)}</li>`)
         .join("");
 
       await loadEditors();
+      if (seq !== loadSeq) return;
 
+      // Chart.js needs visible parent to measure canvas size.
       els.loading.classList.add("hidden");
       els.root.classList.remove("hidden");
+
+      destroyCharts();
+      renderTrafficChart(traffic);
+      bindRetentionTabs(retention, videosData.videos || []);
+      renderRetentionChart(retention, videosData.videos || [], activeRetentionFormat);
+      renderDemographicsCharts(demographics);
+      renderRecentVideosChart(overview.recentVideosBar || []);
+      renderViews7dChart(overview.viewsTrend7d || [], overview.viewsTrendNote);
+      renderSubscriberChart(overview.subscriberTrend);
+      requestAnimationFrame(resizeCharts);
+
       if (refresh) {
         markApiRefreshed();
         setStatus("API 갱신됨", "ok");
@@ -978,6 +1107,7 @@
         setStatus(cacheStatusText(), "");
       }
     } catch (err) {
+      if (seq !== loadSeq) return;
       els.loading.classList.add("hidden");
       showError(err.message || String(err));
     }
@@ -990,7 +1120,8 @@
   document.getElementById("btn-ads-sync")?.addEventListener("click", async () => {
     try {
       setStatus("Ads 동기화 중…");
-      await apiPost("/api/dddit/youtube/report/ads/sync?force=1");
+      const result = await apiPost("/api/dddit/youtube/report/ads/sync?force=1");
+      setStatus(result.message || "Ads 동기화 완료", "ok");
       await loadReport(true);
     } catch (err) {
       showError(err.message || "Ads 동기화 실패");

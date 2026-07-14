@@ -4,6 +4,25 @@
   ],
   "promotions": [
     {
+      "id": "lenovo-ideatab11-subs",
+      "title": "레노버 아이디어 탭 11 (구독)",
+      "videoTitle": "펜까지 기본인데 26만 원? 레노버 아이디어 탭 11 솔직 리뷰 #태블릿 #레노버 #아이디어탭11",
+      "videoId": "",
+      "status": "진행중",
+      "goal": "시청자층 성장",
+      "cost": 44435,
+      "impressions": 23905,
+      "views": 298,
+      "subscribers": 125,
+      "followOnViews": 1,
+      "source": "manual",
+      "notes": [
+        "Studio 캡처 2026-07-14",
+        "활성 캠페인",
+        "프로모션 제목·설명은 Studio 광고 문구와 동일"
+      ]
+    },
+    {
       "id": "redmi-pad2-subs",
       "title": "레드미 패드 2 9.7 (구독)",
       "videoTitle": "20만 원대 태블릿이 이 정도라고? 레드미 패드 2 9.7 리뷰",
