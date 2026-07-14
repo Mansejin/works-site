@@ -9,10 +9,14 @@ import httpx
 
 from app.config import google_ads_config
 from app.google_oauth import get_access_token
-from app.youtube_report_store import merge_ads_into_promotions, read_ads_sync, write_ads_sync
+from app.youtube_report_store import (
+    merge_ads_into_promotions,
+    read_ads_sync,
+    write_ads_sync,
+    write_promotions,
+)
 
 _ADS_API_VERSION = "v24"
-_CACHE_TTL = 3600
 _SYNC_CACHE: dict[str, Any] = {}
 
 
@@ -31,10 +35,6 @@ def _not_configured() -> dict[str, Any]:
             "GOOGLE_ADS_CUSTOMER_ID를 NAS .env에 추가하세요."
         ),
     }
-
-
-def _normalize_customer_id(customer_id: str) -> str:
-    return re.sub(r"\D", "", customer_id)
 
 
 def _slugify(name: str) -> str:
@@ -60,54 +60,101 @@ async def _search_ads(
     }
     if not cfg.get("login_customer_id"):
         raise RuntimeError(
-            "GOOGLE_ADS_LOGIN_CUSTOMER_ID(MCC ID)가 필요합니다. 예: 1987587717"
+            "GOOGLE_ADS_LOGIN_CUSTOMER_ID(MCC ID)가 필요합니다. 예: [REDACTED]"
         )
     headers["login-customer-id"] = cfg["login_customer_id"]
 
-    res = await client.post(url, headers=headers, json={"query": query})
-    if not res.is_success:
-        detail = res.text[:500]
-        raise RuntimeError(f"Google Ads API {res.status_code}: {detail}")
-    body = res.json()
-    return list(body.get("results") or [])
+    results: list[dict[str, Any]] = []
+    page_token = ""
+    while True:
+        payload: dict[str, Any] = {"query": query}
+        if page_token:
+            payload["pageToken"] = page_token
+        res = await client.post(url, headers=headers, json=payload)
+        if not res.is_success:
+            detail = res.text[:500]
+            raise RuntimeError(f"Google Ads API {res.status_code}: {detail}")
+        body = res.json()
+        results.extend(list(body.get("results") or []))
+        page_token = body.get("nextPageToken") or ""
+        if not page_token:
+            break
+    return results
 
 
-def _parse_campaign_row(row: dict[str, Any]) -> dict[str, Any]:
-    campaign = row.get("campaign") or {}
-    metrics = row.get("metrics") or {}
-    cost_micros = int(metrics.get("costMicros") or 0)
-    impressions = int(metrics.get("impressions") or 0)
-    # v24+: metrics.video_views → metrics.video_trueview_views (JSON: videoTrueviewViews)
-    views = int(
-        metrics.get("videoTrueviewViews")
-        or metrics.get("videoViews")
-        or metrics.get("views")
-        or 0
-    )
-    clicks = int(metrics.get("clicks") or 0)
-    name = campaign.get("name") or "캠페인"
-    campaign_id = str(campaign.get("id") or "")
-    status_raw = str(campaign.get("status") or "").upper()
-    if status_raw in ("ENABLED", "ACTIVE"):
-        status = "진행중"
-    elif status_raw == "PAUSED":
-        status = "일시중지"
-    else:
-        status = status_raw or "진행중"
-    return {
-        "id": f"ads-{campaign_id}" if campaign_id else _slugify(name),
-        "adsCampaignId": campaign_id,
-        "title": name,
-        "videoTitle": name,
-        "status": status,
-        "cost": round(cost_micros / 1_000_000),
-        "impressions": impressions,
-        "views": views,
-        "clicks": clicks,
-        "subscribers": 0,
-        "source": "google-ads",
-        "syncedAt": datetime.now(timezone.utc).isoformat(),
-    }
+def _status_label(status_raw: str) -> str:
+    value = str(status_raw or "").upper()
+    if value in ("ENABLED", "ACTIVE"):
+        return "진행중"
+    if value == "PAUSED":
+        return "일시중지"
+    return value or "진행중"
+
+
+def _aggregate_campaign_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """segments.date 일별 행을 campaign.id 기준으로 합산."""
+    buckets: dict[str, dict[str, Any]] = {}
+    synced_at = datetime.now(timezone.utc).isoformat()
+
+    for row in rows:
+        campaign = row.get("campaign") or {}
+        metrics = row.get("metrics") or {}
+        campaign_id = str(campaign.get("id") or "").strip()
+        name = campaign.get("name") or "캠페인"
+        key = campaign_id or _slugify(name)
+        bucket = buckets.get(key)
+        if not bucket:
+            bucket = {
+                "campaign_id": campaign_id,
+                "name": name,
+                "status_raw": str(campaign.get("status") or ""),
+                "cost_micros": 0,
+                "impressions": 0,
+                "views": 0,
+                "clicks": 0,
+            }
+            buckets[key] = bucket
+
+        bucket["cost_micros"] += int(metrics.get("costMicros") or 0)
+        bucket["impressions"] += int(metrics.get("impressions") or 0)
+        bucket["views"] += int(
+            metrics.get("videoTrueviewViews")
+            or metrics.get("videoViews")
+            or metrics.get("views")
+            or 0
+        )
+        bucket["clicks"] += int(metrics.get("clicks") or 0)
+        status_raw = str(campaign.get("status") or "")
+        if status_raw:
+            # ENABLED를 PAUSED보다 우선
+            if bucket["status_raw"].upper() != "ENABLED":
+                bucket["status_raw"] = status_raw
+            if name:
+                bucket["name"] = name
+
+    campaigns: list[dict[str, Any]] = []
+    for bucket in buckets.values():
+        campaign_id = bucket["campaign_id"]
+        name = bucket["name"]
+        campaigns.append(
+            {
+                "id": f"ads-{campaign_id}" if campaign_id else _slugify(name),
+                "adsCampaignId": campaign_id,
+                "title": name,
+                "videoTitle": name,
+                "status": _status_label(bucket["status_raw"]),
+                "cost": round(bucket["cost_micros"] / 1_000_000),
+                "impressions": bucket["impressions"],
+                "views": bucket["views"],
+                "clicks": bucket["clicks"],
+                "subscribers": 0,
+                "source": "google-ads",
+                "syncedAt": synced_at,
+            }
+        )
+
+    campaigns.sort(key=lambda c: (-int(c.get("cost") or 0), str(c.get("title") or "")))
+    return campaigns
 
 
 async def sync_campaigns(force: bool = False) -> dict[str, Any]:
@@ -147,7 +194,7 @@ async def sync_campaigns(force: bool = False) -> dict[str, Any]:
                 cache_key="google-ads",
             )
             rows = await _search_ads(client, token, cfg, query)
-            campaigns = [_parse_campaign_row(row) for row in rows]
+            campaigns = _aggregate_campaign_rows(rows)
 
         sync_payload = {
             "syncedAt": datetime.now(timezone.utc).isoformat(),
@@ -156,15 +203,21 @@ async def sync_campaigns(force: bool = False) -> dict[str, Any]:
         }
         write_ads_sync(sync_payload)
         merged = merge_ads_into_promotions(campaigns)
+        write_promotions(merged)
 
+        active = sum(1 for c in campaigns if c.get("status") == "진행중")
         result = {
             "ok": True,
             "configured": True,
             "syncedAt": sync_payload["syncedAt"],
             "campaignCount": len(campaigns),
+            "activeCampaignCount": active,
             "campaigns": campaigns,
             "mergedPromotions": len(merged.get("promotions") or []),
-            "message": f"{len(campaigns)}개 캠페인 동기화 완료",
+            "message": (
+                f"{len(campaigns)}개 캠페인 동기화 완료"
+                + (f" (진행중 {active})" if active else "")
+            ),
         }
         _SYNC_CACHE["last"] = {"at": time.time(), "data": result}
         return result
