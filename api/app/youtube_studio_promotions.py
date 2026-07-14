@@ -112,10 +112,23 @@ def _flatten_promo_dict(obj: dict[str, Any]) -> dict[str, Any]:
         "promotionCardRenderer",
         "promotionListItemRenderer",
         "ypcPromotionRenderer",
+        "promotion",
+        "campaign",
     ):
         inner = obj.get(wrap)
         if isinstance(inner, dict):
             flat = {**flat, **inner}
+    for nest in ("metrics", "statistics", "stats", "performance", "campaignMetrics", "promotionMetrics"):
+        inner = obj.get(nest) if nest in obj else flat.get(nest)
+        if isinstance(inner, dict):
+            flat = {**flat, **inner}
+    video = obj.get("video") if isinstance(obj.get("video"), dict) else flat.get("video")
+    if isinstance(video, dict):
+        flat = {**flat, **video}
+        if video.get("title") and not flat.get("videoTitle"):
+            flat["videoTitle"] = video.get("title")
+        if video.get("videoId") and not flat.get("videoId"):
+            flat["videoId"] = video.get("videoId")
     return flat
 
 
@@ -139,6 +152,8 @@ def _looks_like_promo(obj: dict[str, Any]) -> bool:
             "budgetspent",
             "spendamount",
             "costamount",
+            "totalspend",
+            "costtodate",
         )
     )
     # Money sometimes only appears as nested {units} under spend-like keys — also detect units sibling metric bags.
@@ -235,9 +250,13 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
     )
     video_title = _text_field("videoTitle", "video_title") or title
     video_id = str(_pick(raw, "videoId", "encryptedVideoId", "externalVideoId") or "")
-    campaign_id = str(
-        _pick(raw, "campaignId", "promotionId", "id", "externalCampaignId", "entityId") or ""
-    )
+    campaign_raw = _pick(raw, "campaignId", "promotionId", "externalCampaignId", "entityId", "id")
+    if isinstance(campaign_raw, dict):
+        campaign_raw = _pick(campaign_raw, "id", "campaignId", "promotionId")
+    campaign_id = str(campaign_raw or "").strip()
+    # Avoid treating huge protobuf blobs / non-ids as campaign id
+    if len(campaign_id) > 80 or "\n" in campaign_id:
+        campaign_id = ""
 
     cost = _pick_money(
         raw,
@@ -250,6 +269,8 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
         "spentAmount",
         "spendAmount",
         "costAmount",
+        "totalSpend",
+        "costToDate",
         "costMicros",
         "spentMicros",
     )
@@ -316,14 +337,22 @@ def extract_promotions_from_payload(payload: Any) -> list[dict[str, Any]]:
     raw_items: list[dict[str, Any]] = []
     _walk_promos(payload, raw_items)
 
+    # Also pull top-level promotions list even if walk heuristics miss nested shapes.
+    if isinstance(payload, dict) and isinstance(payload.get("promotions"), list):
+        for item in payload["promotions"]:
+            if isinstance(item, dict):
+                raw_items.append(_flatten_promo_dict(item))
+
     seen: set[str] = set()
     promos: list[dict[str, Any]] = []
     for raw in raw_items:
-        promo = normalize_studio_promo(raw)
-        key = promo["id"]
-        if key in seen:
+        if not isinstance(raw, dict):
             continue
-        if not (promo["cost"] or promo["impressions"] or promo["views"] or promo["subscribers"]):
+        promo = normalize_studio_promo(raw)
+        key = str(promo.get("id") or "")
+        if not key or key in seen:
+            continue
+        if not (promo.get("cost") or promo.get("impressions") or promo.get("views") or promo.get("subscribers")):
             continue
         seen.add(key)
         promos.append(promo)
@@ -352,9 +381,11 @@ def merge_studio_into_promotions(studio_promos: list[dict[str, Any]]) -> dict[st
             return False
         return x in y or y in x or x[:16] in y or y[:16] in x
 
+    safe_studio = [p for p in studio_promos if isinstance(p, dict) and p.get("id")]
+
     for manual in manuals:
         match = None
-        for studio in studio_promos:
+        for studio in safe_studio:
             sid = str(studio.get("studioCampaignId") or "")
             if sid and sid == str(manual.get("studioCampaignId") or ""):
                 match = studio
@@ -369,7 +400,7 @@ def merge_studio_into_promotions(studio_promos: list[dict[str, Any]]) -> dict[st
                 match = studio
                 break
         if match:
-            used_studio.add(match["id"])
+            used_studio.add(str(match["id"]))
             merged.append(
                 {
                     **manual,
@@ -398,8 +429,9 @@ def merge_studio_into_promotions(studio_promos: list[dict[str, Any]]) -> dict[st
                 continue
             merged.append(manual)
 
-    for studio in studio_promos:
-        if studio["id"] in used_studio:
+    for studio in safe_studio:
+        sid = str(studio.get("id") or "")
+        if not sid or sid in used_studio:
             continue
         merged.append(studio)
 
@@ -638,8 +670,18 @@ async def sync_studio_promotions(
 
         promos = extract_promotions_from_payload(payload)
         if not promos and isinstance(payload, dict) and isinstance(payload.get("promotions"), list):
-            # already-normalized import
-            promos = [normalize_studio_promo(p) if "cost" in p or "impressions" in p else p for p in payload["promotions"]]
+            # Force-normalize raw Studio rows (never keep objects without id).
+            for item in payload["promotions"]:
+                if not isinstance(item, dict):
+                    continue
+                promo = normalize_studio_promo(item)
+                if promo.get("id") and (
+                    promo.get("cost")
+                    or promo.get("impressions")
+                    or promo.get("views")
+                    or promo.get("subscribers")
+                ):
+                    promos.append(promo)
 
         if not promos:
             meta = {
