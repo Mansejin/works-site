@@ -730,6 +730,8 @@
     }
     const points = block?.points || data?.points || [];
     const colors = ["#dc2626", "#2563eb", "#16a34a"];
+    // Shorts can exceed 100% (rewatches); longform stays 0–100%.
+    const watchYMax = format === "shorts" ? 200 : 100;
 
     if (charts.retention) {
       try {
@@ -788,7 +790,7 @@
             },
             y: {
               min: 0,
-              max: 200,
+              max: watchYMax,
               title: { display: true, text: "시청 유지", font: { size: 11 } },
               ticks: { callback: (value) => `${value}%` },
             },
@@ -863,7 +865,7 @@
               title: { display: true, text: "영상 진행률", font: { size: 11 } },
               ticks: { maxTicksLimit: 8 },
             },
-            y: { min: 0, max: 200, ticks: { callback: (value) => `${value}%` } },
+            y: { min: 0, max: watchYMax, ticks: { callback: (value) => `${value}%` } },
           },
         },
       });
