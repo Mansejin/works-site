@@ -1203,19 +1203,26 @@
     els.saveStatus.className = "status-pill ok";
   }
 
-  async function loadReport(refresh) {
+  async function loadReport(refresh, options = {}) {
+    const quiet = Boolean(options.quiet);
     const seq = ++loadSeq;
-    els.loading.classList.remove("hidden");
-    els.root.classList.add("hidden");
-    els.error?.classList.add("hidden");
-    setStatus("불러오는 중…");
-    stopSubscriberLivePoll();
-    destroyCharts();
+    if (!quiet) {
+      els.loading.classList.remove("hidden");
+      els.root.classList.add("hidden");
+      els.error?.classList.add("hidden");
+      setStatus(refresh ? "API 요청 중…" : "불러오는 중…");
+      stopSubscriberLivePoll();
+      destroyCharts();
+    } else {
+      setStatus("백그라운드 갱신 중…");
+    }
 
     try {
       const overview = await apiGet(`/api/dddit/youtube/report/overview${refresh ? "?refresh=1" : ""}`);
       if (seq !== loadSeq) return;
-      const videosData = await apiGet(`/api/dddit/youtube/report/videos${refresh ? "?refresh=1" : ""}`);
+      // Overview already warms the videos cache — do not request videos?refresh=1
+      // (that previously forced a second full rebuild and hung the first paint).
+      const videosData = await apiGet("/api/dddit/youtube/report/videos");
       if (seq !== loadSeq) return;
       const { traffic, retention, demographics } = await loadAnalyticsExtras(refresh);
       if (seq !== loadSeq) return;
@@ -1245,6 +1252,7 @@
       // Chart.js needs visible parent to measure canvas size.
       els.loading.classList.add("hidden");
       els.root.classList.remove("hidden");
+      hideError();
 
       destroyCharts();
       renderTrafficChart(traffic);
@@ -1258,20 +1266,38 @@
 
       if (refresh) {
         markApiRefreshed();
-        setStatus("API 갱신됨", "ok");
+        setStatus(quiet ? "백그라운드 갱신됨" : "API 갱신됨", "ok");
       } else {
         setStatus(cacheStatusText(), "");
       }
     } catch (err) {
       if (seq !== loadSeq) return;
+      if (quiet && !els.root.classList.contains("hidden")) {
+        setStatus("갱신 실패 · 캐시 표시 중", "error");
+        return;
+      }
       showError(err.message || String(err));
     } finally {
-      if (seq === loadSeq) {
+      if (seq === loadSeq && !quiet) {
         els.loading.classList.add("hidden");
         if (!els.error || els.error.classList.contains("hidden")) {
           els.root.classList.remove("hidden");
         }
       }
+    }
+  }
+
+  async function bootReport() {
+    await loadReport(false);
+    const softOk =
+      Boolean(els.root) &&
+      !els.root.classList.contains("hidden") &&
+      (!els.error || els.error.classList.contains("hidden"));
+    if (shouldAutoRefresh()) {
+      // Soft paint succeeded → refresh quietly. Soft failed → full refresh UI.
+      await loadReport(true, { quiet: softOk });
+    } else if (!softOk) {
+      await loadReport(true);
     }
   }
 
@@ -1490,5 +1516,5 @@
     return [...new Set(items.filter(Boolean))];
   }
 
-  loadReport(shouldAutoRefresh());
+  void bootReport();
 })();
