@@ -71,7 +71,7 @@ Studio 프로모션 탭에서 `F12` → **Console**에 아래 붙여넣기 → E
 
 | URL | 특징 |
 |-----|------|
-| `list_promotions` | Response에 `"units": "45489"` 같은 비용·노출 수치 |
+| `promotions/list_promotions` | 실제 Studio URL (Network 이름은 `list_promotions?alt=json` 등) |
 
 JSON **맨 위**에 `challenge` / `botguardData`가 보여도 정상입니다. 보안 메타데이터이고,
 실제 프로모션은 같은 응답 **아래쪽**에 있습니다. Search(`Ctrl+F`)로 비용 숫자를 찾은 뒤

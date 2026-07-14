@@ -28,6 +28,7 @@ SYNC_META_FILE = DATA_DIR / "studio-promo-sync.json"
 
 # Studio Network에서 확인되면 capture에 저장되어 우선 사용. 아래는 자동 탐색용 후보.
 _PROBE_PATHS = (
+    "youtubei/v1/promotions/list_promotions",
     "youtubei/v1/ypc/list_promotions",
     "youtubei/v1/promotion/list_promotions",
     "youtubei/v1/promotion/get_promotions",
