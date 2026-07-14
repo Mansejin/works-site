@@ -1229,6 +1229,165 @@ function loadPlanData() {
   return window.DdditPlanBriefSync?.loadPlan(project) || null;
 }
 
+function formatPlanUpdatedAt(ts) {
+  const n = Number(ts) || 0;
+  if (!n) return '기본 기획안';
+  try {
+    return new Date(n).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '저장됨';
+  }
+}
+
+function renderPlanProjectPicker() {
+  const SYNC = window.DdditPlanBriefSync;
+  const select = $('#plan-project-select');
+  const list = $('#plan-project-list');
+  const hint = $('#plan-load-hint');
+  if (!SYNC?.listProjects || !select) return;
+
+  const current = getSheetSlug();
+  const projects = SYNC.listProjects();
+  const previous = select.value;
+
+  select.innerHTML = [
+    '<option value="">프로젝트 선택…</option>',
+    ...projects.map((p) => {
+      const mark = p.hasSaved ? '저장됨' : (p.source === 'default' ? '기본' : '');
+      const title = p.title ? ` — ${p.title}` : '';
+      const suffix = mark ? ` (${mark})` : '';
+      return `<option value="${esc(p.slug)}">${esc(p.label)}${esc(title)}${esc(suffix)}</option>`;
+    }),
+  ].join('');
+
+  const preferred = projects.some((p) => p.slug === current && current !== 'default')
+    ? current
+    : (projects.some((p) => p.slug === previous) ? previous : '');
+  select.value = preferred;
+
+  if (list) {
+    list.innerHTML = projects.map((p) => {
+      const active = p.slug === current && current !== 'default';
+      const status = p.hasSaved
+        ? `로컬 저장 · ${formatPlanUpdatedAt(p.updatedAt)}`
+        : (p.hasPlan ? '기본 기획안' : '기획안 없음');
+      return `
+        <li>
+          <button type="button" class="plan-project-item${active ? ' is-active' : ''}" data-plan-project="${esc(p.slug)}">
+            <span class="plan-project-item-label">${esc(p.label)}</span>
+            <span class="plan-project-item-title">${esc(p.title || '제목 없음')}</span>
+            <span class="plan-project-item-meta">${esc(status)}${active ? ' · 현재' : ''}</span>
+          </button>
+        </li>`;
+    }).join('');
+  }
+
+  if (hint) {
+    if (current && current !== 'default') {
+      const active = projects.find((p) => p.slug === current);
+      hint.textContent = active?.hasPlan
+        ? `${SYNC.projectLabel(current)} 기획안을 사용 중입니다.`
+        : `${SYNC.projectLabel(current)}에 저장된 기획안이 없습니다.`;
+    } else {
+      hint.textContent = '프로젝트를 고른 뒤 「기획안 불러오기」를 누르세요.';
+    }
+  }
+}
+
+function setProjectSlug(slug) {
+  const next = String(slug || '').trim().toLowerCase();
+  const url = new URL(location.href);
+  if (!next || next === 'default') url.searchParams.delete('project');
+  else url.searchParams.set('project', next);
+  history.replaceState({}, '', url);
+}
+
+function switchToProject(slug, options = {}) {
+  const next = String(slug || '').trim().toLowerCase();
+  if (!next) {
+    showToast('프로젝트를 선택하세요.', true);
+    return false;
+  }
+  const current = getSheetSlug();
+  if (next === current && !options.forceReload) {
+    renderPlanSummary();
+    updateProjectChrome();
+    showToast(`${window.DdditPlanBriefSync?.projectLabel?.(next) || next} 기획안을 확인했습니다.`);
+    return true;
+  }
+
+  saveProject();
+  setProjectSlug(next);
+  loadProject();
+  state.pipelineStep = 1;
+  applyBriefToDOM();
+  updateProjectChrome();
+  updatePipelineUI();
+  renderPlanProjectPicker();
+
+  const plan = loadPlanData();
+  const label = window.DdditPlanBriefSync?.projectLabel?.(next) || next;
+  if (plan?.title) showToast(`${label} 기획안을 불러왔습니다.`);
+  else showToast(`${label}에 기획안이 없습니다. 「기획안 편집」에서 작성하세요.`, true);
+  return true;
+}
+
+function loadSelectedPlanProject() {
+  const slug = $('#plan-project-select')?.value || '';
+  switchToProject(slug, { forceReload: true });
+}
+
+function renderPlanSummary() {
+  const project = getSheetSlug();
+  const SYNC = window.DdditPlanBriefSync;
+  const container = $('#plan-summary');
+  const missing = $('#plan-missing');
+  const link = $('#plan-edit-link');
+
+  renderPlanProjectPicker();
+
+  if (link && SYNC) {
+    const url = SYNC.planEditUrl(project);
+    if (url) link.href = url;
+    link.classList.toggle('hidden', !url || project === 'default');
+  }
+
+  const plan = loadPlanData();
+  if (!plan || !container) {
+    container && (container.innerHTML = '');
+    missing?.classList.remove('hidden');
+    return;
+  }
+  missing?.classList.add('hidden');
+
+  const rows = [
+    ['제목', plan.title],
+    ['요약', plan.summary],
+    ['콘셉트', plan.concept],
+    ['핵심 메시지', plan.keyMessage],
+    ['타깃', plan.targetAudience],
+    ['톤', plan.tone],
+    ['구성', plan.structure],
+    ['필수 언급', plan.brandMust],
+    ['지양', plan.brandAvoid],
+  ].filter(([, v]) => String(v || '').trim());
+
+  const envelope = SYNC?.loadPlanEnvelope?.(project);
+  const sourceNote = envelope?.source === 'default'
+    ? '<p class="hint muted">기본 기획안입니다. 수정 내용은 기획안 페이지에 저장됩니다.</p>'
+    : '';
+
+  container.innerHTML = sourceNote + rows.map(([k, v]) => `
+    <div class="plan-summary-row">
+      <span class="plan-summary-key">${esc(k)}</span>
+      <div class="plan-summary-val">${esc(v)}</div>
+    </div>`).join('');
+
+  if (!state.chapters.length && plan.structure) {
+    state.chapters = SYNC.parseStructureToChapters(plan.structure);
+  }
+}
+
 function getEffectiveState() {
   const project = getSheetSlug();
   const plan = loadPlanData();
@@ -1377,50 +1536,6 @@ function loadState() {
     if (saved.apiKey) state.apiKey = saved.apiKey;
     if (saved.modelPro) state.modelPro = saved.modelPro;
   } catch { /* ignore */ }
-}
-
-function renderPlanSummary() {
-  const project = getSheetSlug();
-  const SYNC = window.DdditPlanBriefSync;
-  const container = $('#plan-summary');
-  const missing = $('#plan-missing');
-  const link = $('#plan-edit-link');
-
-  if (link && SYNC) {
-    const url = SYNC.planEditUrl(project);
-    if (url) link.href = url;
-    link.classList.toggle('hidden', !url || project === 'default');
-  }
-
-  const plan = loadPlanData();
-  if (!plan || !container) {
-    container && (container.innerHTML = '');
-    missing?.classList.remove('hidden');
-    return;
-  }
-  missing?.classList.add('hidden');
-
-  const rows = [
-    ['제목', plan.title],
-    ['요약', plan.summary],
-    ['콘셉트', plan.concept],
-    ['핵심 메시지', plan.keyMessage],
-    ['타깃', plan.targetAudience],
-    ['톤', plan.tone],
-    ['구성', plan.structure],
-    ['필수 언급', plan.brandMust],
-    ['지양', plan.brandAvoid],
-  ].filter(([, v]) => String(v || '').trim());
-
-  container.innerHTML = rows.map(([k, v]) => `
-    <div class="plan-summary-row">
-      <span class="plan-summary-key">${esc(k)}</span>
-      <div class="plan-summary-val">${esc(v)}</div>
-    </div>`).join('');
-
-  if (!state.chapters.length && plan.structure) {
-    state.chapters = SYNC.parseStructureToChapters(plan.structure);
-  }
 }
 
 function applyBriefToDOM() {
@@ -1848,9 +1963,14 @@ function updateProjectChrome() {
   const effective = getEffectiveState();
   const project = getSheetSlug();
   const badge = $('#workspace-project-badge');
-  if (badge && project !== 'default') {
-    badge.textContent = window.DdditPlanBriefSync?.projectLabel?.(project) || project;
-    badge.classList.remove('hidden');
+  if (badge) {
+    if (project && project !== 'default') {
+      badge.textContent = window.DdditPlanBriefSync?.projectLabel?.(project) || project;
+      badge.classList.remove('hidden');
+    } else {
+      badge.textContent = '';
+      badge.classList.add('hidden');
+    }
   }
   $('#ad-mode-badge')?.classList.toggle('hidden', !effective.adMode);
 }
@@ -2001,6 +2121,19 @@ function bindEvents() {
   $('#btn-sheet-push')?.addEventListener('click', pushToSheet);
   $('#btn-sheet-pull')?.addEventListener('click', pullFromSheet);
   $('#btn-pipeline-next-brief')?.addEventListener('click', () => navigatePipeline(2));
+  $('#btn-plan-load')?.addEventListener('click', loadSelectedPlanProject);
+  $('#plan-project-select')?.addEventListener('change', () => {
+    const slug = $('#plan-project-select')?.value || '';
+    if (slug) switchToProject(slug);
+  });
+  $('#plan-project-list')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-plan-project]');
+    if (!btn) return;
+    const slug = btn.getAttribute('data-plan-project') || '';
+    const select = $('#plan-project-select');
+    if (select && slug) select.value = slug;
+    switchToProject(slug);
+  });
   document.querySelectorAll('[data-goto]').forEach((btn) => {
     btn.addEventListener('click', () => navigatePipeline(Number(btn.dataset.goto)));
   });

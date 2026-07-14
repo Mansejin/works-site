@@ -13,20 +13,83 @@ window.DdditPlanBriefSync = (function () {
     return `works/dddit/${String(project || '').trim().toLowerCase()}/plan`;
   }
 
-  function loadPlanEnvelope(project) {
-    try {
-      const raw = localStorage.getItem(planStorageKey(project));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed?.data || typeof parsed.data !== 'object') return null;
-      return { updatedAt: Number(parsed.updatedAt) || 0, data: parsed.data };
-    } catch {
-      return null;
-    }
+  function defaultPlan(project) {
+    const slug = String(project || '').trim().toLowerCase();
+    const data = window.DdditPlanDefaults?.[slug];
+    if (!data || typeof data !== 'object') return null;
+    return structuredClone(data);
   }
 
-  function loadPlan(project) {
-    return loadPlanEnvelope(project)?.data || null;
+  function loadPlanEnvelope(project, options = {}) {
+    const slug = String(project || '').trim().toLowerCase();
+    if (!slug || slug === 'default') return null;
+    try {
+      const raw = localStorage.getItem(planStorageKey(slug));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.data && typeof parsed.data === 'object') {
+          return {
+            updatedAt: Number(parsed.updatedAt) || 0,
+            data: parsed.data,
+            source: 'local',
+          };
+        }
+      }
+    } catch {
+      /* fall through */
+    }
+    if (options.includeDefault === false) return null;
+    const fallback = defaultPlan(slug);
+    if (!fallback) return null;
+    return { updatedAt: 0, data: fallback, source: 'default' };
+  }
+
+  function loadPlan(project, options) {
+    return loadPlanEnvelope(project, options)?.data || null;
+  }
+
+  function hasSavedPlan(project) {
+    return Boolean(loadPlanEnvelope(project, { includeDefault: false }));
+  }
+
+  function listProjects() {
+    const known = Object.keys(PROJECT_META);
+    const discovered = new Set(known);
+
+    try {
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i) || '';
+        const match = key.match(/^works\/dddit\/([^/]+)\/plan$/);
+        if (match?.[1] && match[1] !== 'default') discovered.add(match[1]);
+      }
+    } catch {
+      /* ignore */
+    }
+
+    return [...discovered]
+      .sort((a, b) => {
+        const ai = known.indexOf(a);
+        const bi = known.indexOf(b);
+        if (ai === -1 && bi === -1) return a.localeCompare(b);
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      })
+      .map((slug) => {
+        const meta = PROJECT_META[slug] || {};
+        const envelope = loadPlanEnvelope(slug);
+        const title = String(envelope?.data?.title || '').trim();
+        return {
+          slug,
+          label: meta.label || slug,
+          planPath: meta.planPath || null,
+          hasSaved: hasSavedPlan(slug),
+          hasPlan: Boolean(envelope),
+          source: envelope?.source || null,
+          title,
+          updatedAt: envelope?.updatedAt || 0,
+        };
+      });
   }
 
   function parseStructureToChapters(structure) {
@@ -95,8 +158,12 @@ window.DdditPlanBriefSync = (function () {
 
   return {
     PROJECT_META,
+    planStorageKey,
+    defaultPlan,
     loadPlanEnvelope,
     loadPlan,
+    hasSavedPlan,
+    listProjects,
     planToBriefState,
     planEditUrl,
     projectLabel,

@@ -35,7 +35,7 @@
     {
       name: "콘티 작성기",
       path: "script/",
-      summary: "기획안 · 줄글 · 5열 변환 · Google 시트 전송",
+      summary: "기존 프로젝트 기획안 불러오기 · 줄글 · 5열 변환 · Google 시트",
       status: "사용 가능",
       ready: true,
     },
@@ -283,6 +283,7 @@
             </div>
           </a>
           <button type="button" class="project-pill project-share" data-share="${escapeHtml(`${location.origin}/dddit/${project.id}/productlist/`)}">담당자 공유 링크</button>
+          <a class="project-pill" href="script/?project=${escapeHtml(project.id)}">콘티 작성기</a>
         </div>
       `;
     }).join("");
