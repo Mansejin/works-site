@@ -611,11 +611,22 @@ async def report_overview(refresh: bool = Query(False)) -> dict[str, Any]:
 
 @router.get("/videos")
 async def report_videos(refresh: bool = Query(False)) -> dict[str, Any]:
-    if not refresh:
+    cached = _cache_get("videos")
+    if cached and not refresh:
+        return cached
+
+    if refresh:
+        # Overview call usually warms the videos cache first — reuse it.
         cached = _cache_get("videos")
         if cached:
             return cached
-    await _build_report_overview(refresh=True)
+        await _build_report_overview(refresh=True)
+    else:
+        # Soft miss: if overview is warm but videos is cold, soft rebuild no-ops —
+        # force one rebuild so videos is filled.
+        force = _cache_get("videos") is None and _cache_get("overview") is not None
+        await _build_report_overview(refresh=force)
+
     cached = _cache_get("videos")
     if cached:
         return cached
