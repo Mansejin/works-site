@@ -93,6 +93,9 @@ window.DdditPlanBriefSync = (function () {
   }
 
   function parseStructureToChapters(structure) {
+    if (window.DdditChapterTitleQc?.parseStructureToChapters) {
+      return window.DdditChapterTitleQc.parseStructureToChapters(structure);
+    }
     const text = String(structure || '').trim();
     if (!text) return [];
     return text

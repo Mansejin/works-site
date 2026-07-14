@@ -30,11 +30,20 @@ window.DIDIDIT_PIPELINE = (function () {
   };
 
   function isPrologueChapter(title) {
-    return /프롤로그|오프닝/i.test(title || '');
+    return /프롤로그|오프닝|인트로|^인트$/i.test(title || '');
   }
 
   function isClosingChapter(title) {
     return /총평|클로징|마무리/i.test(title || '');
+  }
+
+  function proseHeading(chapter) {
+    if (window.DdditChapterTitleQc?.headingForProse) {
+      return window.DdditChapterTitleQc.headingForProse(chapter);
+    }
+    if (!chapter) return '';
+    if (chapter.titleCard === false || isPrologueChapter(chapter.title)) return '';
+    return String(chapter?.title || '').trim();
   }
 
   function getNarrationRhythmBlock() {
@@ -166,10 +175,14 @@ window.DIDIDIT_PIPELINE = (function () {
         ? '- 앞 챕터와 **같은 톤·호흡·문장 리듬**을 유지하세요. 이미 쓴 내용은 반복하지 마세요.\n'
         : '- 이미 작성된 줄글이 있으면 톤·흐름을 맞춰 이어 쓰고, 반복하지 마세요.\n';
 
+    const heading = proseHeading(chapter);
+    const titleLine = heading
+      ? `- 챕터 제목은 \`## ${heading}\` 로 시작합니다. (본문에는 제목 행을 다시 쓰지 마세요)`
+      : `- 이 챕터는 **인트로**입니다. \`##\` 제목 행을 넣지 마세요. 타이틀 카드 없이 바로 오프닝 멘트로 시작합니다.`;
     return `${ctxBlock}# 작업: 줄글 대본 작성
 - 성우 내레이션 중심의 **자연스러운 줄글**만 작성합니다.
 - 표·행 분할·장면·자막·JSON은 넣지 않습니다.
-- 챕터 제목은 \`## ${title}\` 로 시작합니다.
+${titleLine}
 ${notes ? `- 챕터 메모: ${notes}` : ''}${roleBlock}${roundup}${prologueChapter}${specChapter}${designChapter}${priceChapter}${closingChapter}
 ${continuity}`;
   }
@@ -250,5 +263,6 @@ JSON rows 전체를 반환.`;
     splitProseChunks,
     isPrologueChapter,
     isClosingChapter,
+    proseHeading,
   };
 })();
