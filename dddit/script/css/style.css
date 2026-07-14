@@ -167,6 +167,7 @@ a { color: var(--accent); }
   border-radius: var(--radius) var(--radius) 0 0;
   background: #fafbfc;
   overflow-x: auto;
+  overflow-y: hidden;
   margin-bottom: 0;
 }
 
