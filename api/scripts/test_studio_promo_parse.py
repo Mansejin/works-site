@@ -108,10 +108,46 @@ def test_normalize_micros() -> None:
     assert promo["cost"] == 12
 
 
+def test_generic_title_and_status_enum() -> None:
+    promo = normalize_studio_promo(
+        {
+            "title": "Youtube Promotion - 2026-07-10 - 34762609",
+            "videoTitle": "레노버 아이디어 탭 11 솔직 리뷰",
+            "status": "PROMOTION_STATUS_ACTIVE",
+            "goal": "PROMOTION_GOAL_AUDIENCE_GROWTH",
+            "amountSpent": {"units": "48308", "currencyCode": "KRW"},
+            "impressions": 100,
+            "views": 10,
+            "promotionId": "34762609",
+        }
+    )
+    assert promo["status"] == "진행중"
+    assert promo["goal"] == "시청자층 성장"
+    assert "레노버" in promo["title"]
+    assert promo["startDate"] == "2026-07-10"
+    assert promo["studioCampaignId"] == "34762609"
+
+
+def test_sort_recent_active_first() -> None:
+    from app.youtube_studio_promotions import _sort_promotions
+
+    rows = [
+        {"title": "old", "status": "진행중", "cost": 1, "startDate": "2026-04-01"},
+        {"title": "new", "status": "진행중", "cost": 1, "startDate": "2026-07-10"},
+        {"title": "ended", "status": "완료", "cost": 999, "startDate": "2026-07-11"},
+    ]
+    sorted_rows = _sort_promotions(rows)
+    assert sorted_rows[0]["title"] == "new"
+    assert sorted_rows[1]["title"] == "old"
+    assert sorted_rows[2]["title"] == "ended"
+
+
 if __name__ == "__main__":
     test_units_money_nested()
     test_metric_rows_korean_labels()
     test_framework_updates_entity()
     test_client_preparsed_rows()
     test_normalize_micros()
+    test_generic_title_and_status_enum()
+    test_sort_recent_active_first()
     print("ok")

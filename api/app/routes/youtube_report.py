@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from app.config import google_ads_config, google_ads_sync_enabled, youtube_analytics_oauth_config, youtube_api_key, youtube_channel_handle
 from app.google_ads import get_ads_status, sync_campaigns
 from app.youtube_studio_promotions import (
+    cleanup_stale_studio_promotions,
     get_studio_promo_status,
     save_capture_from_curl,
     sync_studio_promotions,
@@ -753,6 +754,14 @@ async def report_studio_promo_import(body: StudioImportBody) -> dict[str, Any]:
     if raw is None:
         raise HTTPException(status_code=400, detail="payload 또는 promotions가 필요합니다")
     result = await sync_studio_promotions(raw_payload=raw)
+    _REPORT_CACHE.clear()
+    return result
+
+
+@router.post("/studio-promotions/cleanup")
+def report_studio_promo_cleanup() -> dict[str, Any]:
+    """Drop raw Youtube Promotion-* duplicates left by a bad sync."""
+    result = cleanup_stale_studio_promotions()
     _REPORT_CACHE.clear()
     return result
 

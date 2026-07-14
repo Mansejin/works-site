@@ -1070,13 +1070,23 @@
   }
   function sortPromotionsForDisplay(promotions) {
     const rank = (status) => {
-      if (status === "진행중") return 0;
-      if (status === "일시중지") return 1;
+      const s = String(status || "");
+      if (s === "진행중" || /ACTIVE/i.test(s)) return 0;
+      if (s === "일시중지" || /PAUSED/i.test(s)) return 1;
       return 2;
+    };
+    const dateKey = (p) => {
+      const blob = [p.startDate, p.syncedAt, p.rawTitle, p.title, ...(p.notes || [])]
+        .filter(Boolean)
+        .join(" ");
+      const m = String(blob).match(/(20\d{2}-\d{2}-\d{2})/);
+      return m ? m[1].replace(/-/g, "") : "0";
     };
     return [...(promotions || [])].sort((a, b) => {
       const byStatus = rank(a.status) - rank(b.status);
       if (byStatus) return byStatus;
+      const byDate = Number(dateKey(b)) - Number(dateKey(a));
+      if (byDate) return byDate;
       return (Number(b.cost) || 0) - (Number(a.cost) || 0);
     });
   }
@@ -1336,6 +1346,22 @@
     } catch (err) {
       els.saveStatus.textContent = err.message || "저장 실패";
       els.saveStatus.className = "status-pill error";
+    }
+  });
+
+  document.getElementById("btn-promo-cleanup")?.addEventListener("click", async () => {
+    try {
+      setStatus("깨진 Studio 행 정리 중…");
+      const out = await apiPost("/api/dddit/youtube/report/studio-promotions/cleanup");
+      if (!out?.ok) throw new Error(out?.message || "정리 실패");
+      setStatus(out.message || "정리 완료", "ok");
+      promoPage = 0;
+      await refreshPromotionsTable();
+      try {
+        alert(out.message || "정리 완료");
+      } catch (_) {}
+    } catch (err) {
+      showError(err.message || "정리 실패");
     }
   });
 

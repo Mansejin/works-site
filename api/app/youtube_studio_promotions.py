@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from app.config import youtube_channel_id
+from app.config import youtube_api_key, youtube_channel_id
 from app.youtube_report_store import (
     DATA_DIR,
     _read_json,
@@ -398,6 +398,98 @@ def _slugify(name: str) -> str:
     return slug.strip("-")[:48] or "studio-promo"
 
 
+_GENERIC_PROMO_TITLE = re.compile(
+    r"(?i)^youtube\s*promotion\s*[-–—]\s*(20\d{2}-\d{2}-\d{2})(?:\s*[-–—]\s*(\w+))?$"
+)
+
+
+def _is_generic_studio_title(title: str) -> bool:
+    return bool(_GENERIC_PROMO_TITLE.match((title or "").strip()))
+
+
+def _status_label(raw: Any) -> str:
+    text = str(raw or "").strip()
+    upper = text.upper()
+    upper = re.sub(r"^(PROMOTION|CAMPAIGN|AD)_?STATUS_?", "", upper)
+    upper = upper.replace(" ", "_")
+    if upper in {"ACTIVE", "ENABLED", "RUNNING", "LIVE", "PROMOTING"}:
+        return "진행중"
+    if upper in {"PAUSED", "PAUSE"}:
+        return "일시중지"
+    if upper in {"ENDED", "COMPLETED", "DONE", "FINISHED", "EXPIRED", "STOPPED"}:
+        return "완료"
+    if text in {"진행중", "일시중지", "완료"}:
+        return text
+    if not upper:
+        return "진행중"
+    # Unknown raw enums should not leak into UI.
+    if "_" in upper or upper.startswith("PROMOTION"):
+        return "진행중"
+    return text[:20] or "진행중"
+
+
+def _goal_label(raw: Any) -> str:
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    key = re.sub(r"^(PROMOTION|CAMPAIGN)_?GOAL_?", "", text.upper())
+    key = key.replace(" ", "_")
+    goal_map = {
+        "AUDIENCE_GROWTH": "시청자층 성장",
+        "SUBSCRIBE": "시청자층 성장",
+        "SUBSCRIBERS": "시청자층 성장",
+        "VIEWS": "동영상 조회수",
+        "VIDEO_VIEWS": "동영상 조회수",
+        "WEBSITE": "웹사이트 방문",
+        "WEBSITE_TRAFFIC": "웹사이트 방문",
+    }
+    if key in goal_map:
+        return goal_map[key]
+    if "_" in key:
+        return ""
+    return text
+
+
+def _extract_promo_date(*values: Any) -> str | None:
+    for value in values:
+        if not value:
+            continue
+        text = str(value)
+        match = re.search(r"(20\d{2}-\d{2}-\d{2})", text)
+        if match:
+            return match.group(1)
+        try:
+            num = int(float(text))
+            if num > 1_000_000_000_000:
+                num //= 1000
+            if 1_600_000_000 <= num <= 2_200_000_000:
+                return datetime.fromtimestamp(num, tz=timezone.utc).strftime("%Y-%m-%d")
+        except (TypeError, ValueError, OSError, OverflowError):
+            pass
+    return None
+
+
+def _humanize_promo_title(
+    *,
+    title: str,
+    video_title: str,
+    goal: str | None,
+    promo_date: str | None,
+) -> str:
+    base = (title or "").strip()
+    video = (video_title or "").strip()
+    if _is_generic_studio_title(base):
+        if video and not _is_generic_studio_title(video):
+            short = video if len(video) <= 42 else f"{video[:42]}…"
+            if goal:
+                return f"{short} ({goal})"
+            return short
+        if promo_date:
+            return f"Studio 프로모션 {promo_date}"
+        return "Studio 프로모션"
+    return (base[:80] if base else "") or "Studio 프로모션"
+
+
 def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
     raw = _flatten_promo_dict(raw)
 
@@ -419,18 +511,22 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
                 return text
         return ""
 
-    title = _text_field("title", "name", "campaignName", "promotionName", "videoTitle", "displayName") or (
-        "Studio 프로모션"
-    )
-    video_title = _text_field("videoTitle", "video_title") or title
+    raw_title = _text_field(
+        "title", "name", "campaignName", "promotionName", "displayName", "videoTitle"
+    ) or "Studio 프로모션"
+    video_title = _text_field("videoTitle", "video_title", "promotedVideoTitle") or ""
+    if not video_title and not _is_generic_studio_title(raw_title):
+        video_title = raw_title
     video_id = str(_pick(raw, "videoId", "encryptedVideoId", "externalVideoId") or "")
     campaign_raw = _pick(raw, "campaignId", "promotionId", "externalCampaignId", "entityId", "id")
     if isinstance(campaign_raw, dict):
         campaign_raw = _pick(campaign_raw, "id", "campaignId", "promotionId")
     campaign_id = str(campaign_raw or "").strip()
-    # Avoid treating huge protobuf blobs / non-ids as campaign id
     if len(campaign_id) > 80 or "\n" in campaign_id:
         campaign_id = ""
+    generic_match = _GENERIC_PROMO_TITLE.match(raw_title.strip())
+    if generic_match and not campaign_id:
+        campaign_id = generic_match.group(2) or ""
 
     cost = _pick_money_fuzzy(
         raw,
@@ -446,7 +542,6 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
         "totalSpend",
         "costToDate",
     )
-    # Bare {units} on the flattened object — only if it looks like money.
     if cost is None and isinstance(_pick(raw, "units"), (str, int, float)):
         if _pick(raw, "currencyCode", "currency", "nanos") is not None:
             cost = _parse_int({"units": _pick(raw, "units"), "nanos": _pick(raw, "nanos")})
@@ -462,29 +557,31 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
         raw, "views", "viewCount", "videoViews", "trueviewViews", "promotedViews", "viewedCount", "view"
     )
     subscribers = _pick_money_fuzzy(
-        raw, "subscribers", "subscribersGained", "subscriberCount", "followersGained", "subs", "subscriber"
+        raw,
+        "subscribersGained",
+        "subscribers",
+        "subscriberCount",
+        "followersGained",
+        "newSubscribers",
+        "gainedSubscribers",
+        "subs",
+        "subscriber",
     )
     follow_on = _pick_money_fuzzy(raw, "followOnViews", "clicks", "followOnViewCount", "followon")
 
-    status_raw = str(_pick(raw, "status", "campaignStatus", "state") or "").upper()
-    if status_raw in ("ACTIVE", "ENABLED", "RUNNING", "LIVE"):
-        status = "진행중"
-    elif status_raw in ("PAUSED",):
-        status = "일시중지"
-    elif status_raw in ("ENDED", "COMPLETED", "DONE", "FINISHED"):
-        status = "완료"
-    else:
-        status = "진행중" if status_raw == "" else status_raw
-
-    goal = str(_pick(raw, "goal", "objective", "campaignGoal") or "")
-    goal_map = {
-        "AUDIENCE_GROWTH": "시청자층 성장",
-        "SUBSCRIBE": "시청자층 성장",
-        "VIEWS": "동영상 조회수",
-        "VIDEO_VIEWS": "동영상 조회수",
-        "WEBSITE": "웹사이트 방문",
-    }
-    goal = goal_map.get(goal.upper(), goal) if goal else ""
+    status = _status_label(_pick(raw, "status", "campaignStatus", "state", "promotionStatus"))
+    goal = _goal_label(_pick(raw, "goal", "objective", "campaignGoal", "promotionGoal"))
+    promo_date = _extract_promo_date(
+        _pick(raw, "startDate", "startTime", "createTime", "createdAt", "beginDate"),
+        raw_title,
+        _pick(raw, "endDate", "endTime"),
+    )
+    title = _humanize_promo_title(
+        title=raw_title,
+        video_title=video_title,
+        goal=goal or None,
+        promo_date=promo_date,
+    )
 
     if campaign_id.startswith("studio-"):
         promo_id = campaign_id
@@ -496,7 +593,7 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": promo_id,
         "title": title[:80],
-        "videoTitle": video_title,
+        "videoTitle": (video_title or title)[:120],
         "videoId": video_id,
         "status": status,
         "goal": goal or None,
@@ -505,11 +602,85 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
         "views": views or 0,
         "subscribers": subscribers or 0,
         "followOnViews": follow_on or 0,
+        "startDate": promo_date,
         "source": "youtube-studio",
         "studioCampaignId": studio_campaign_id,
         "syncedAt": datetime.now(timezone.utc).isoformat(),
         "notes": ["YouTube Studio 내부 API 동기화"],
+        "rawTitle": raw_title[:120],
     }
+
+
+def _status_rank(status: Any) -> int:
+    label = _status_label(status)
+    if label == "진행중":
+        return 0
+    if label == "일시중지":
+        return 1
+    return 2
+
+
+def _sort_promotions(promos: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def key(p: dict[str, Any]) -> tuple:
+        date = _extract_promo_date(
+            p.get("startDate"),
+            p.get("syncedAt"),
+            p.get("rawTitle"),
+            p.get("title"),
+            " ".join(str(n) for n in (p.get("notes") or [])),
+        ) or "1970-01-01"
+        return (
+            _status_rank(p.get("status")),
+            -int(date.replace("-", "") or 0),
+            -int(p.get("cost") or 0),
+            str(p.get("title") or ""),
+        )
+
+    return sorted(promos, key=key)
+
+
+def _token_overlap(a: str, b: str) -> bool:
+    x = " ".join((a or "").lower().split())
+    y = " ".join((b or "").lower().split())
+    if not x or not y:
+        return False
+    if x in y or y in x or x[:16] in y or y[:16] in x:
+        return True
+    xt = {t for t in re.split(r"[\s\-_/()]+", x) if len(t) >= 2}
+    yt = {t for t in re.split(r"[\s\-_/()]+", y) if len(t) >= 2}
+    if not xt or not yt:
+        return False
+    return len(xt & yt) >= 2
+
+
+def _metrics_match_score(a: dict[str, Any], b: dict[str, Any]) -> float:
+    score = 0.0
+    matched = 0
+    for field, weight in (("cost", 3.0), ("impressions", 2.0), ("views", 2.0)):
+        av = int(a.get(field) or 0)
+        bv = int(b.get(field) or 0)
+        if av <= 0 or bv <= 0:
+            continue
+        ratio = abs(av - bv) / max(av, bv)
+        if ratio > 0.28:
+            return 999.0
+        score += ratio * weight
+        matched += 1
+    return score if matched >= 2 else 999.0
+
+
+def _is_stale_studio_row(promo: dict[str, Any]) -> bool:
+    source = str(promo.get("source") or "")
+    title = str(promo.get("title") or "")
+    if source == "youtube-studio":
+        return True
+    if _is_generic_studio_title(title) or _is_generic_studio_title(str(promo.get("rawTitle") or "")):
+        return True
+    if status := str(promo.get("status") or ""):
+        if "PROMOTION_STATUS" in status.upper() or "CAMPAIGN_STATUS" in status.upper():
+            # keep row but caller remaps status; not stale by itself
+            pass
+    return False
 
 
 def _coerce_payload(payload: Any) -> Any:
@@ -599,56 +770,86 @@ def extract_promotions_from_payload(payload: Any) -> list[dict[str, Any]]:
         seen.add(key)
         promos.append(promo)
 
-    promos.sort(
-        key=lambda p: (
-            0 if p.get("status") == "진행중" else 1,
-            -int(p.get("cost") or 0),
-            str(p.get("title") or ""),
-        )
-    )
-    return promos
+    return _sort_promotions(promos)
 
 
 def merge_studio_into_promotions(studio_promos: list[dict[str, Any]]) -> dict[str, Any]:
     data = read_promotions()
-    manuals = list(data.get("promotions") or [])
+    existing = list(data.get("promotions") or [])
     memo = str(data.get("memo") or "").strip()
     if not memo:
         memo = "\n".join(str(item).strip() for item in (data.get("issues") or []) if str(item).strip())
     issues: list[str] = []
-    merged: list[dict[str, Any]] = []
+
+    manuals = [p for p in existing if isinstance(p, dict) and not _is_stale_studio_row(p)]
+    for manual in manuals:
+        manual["status"] = _status_label(manual.get("status"))
+
+    safe_studio: list[dict[str, Any]] = []
+    for promo in studio_promos:
+        if not isinstance(promo, dict) or not promo.get("id"):
+            continue
+        goal = _goal_label(promo.get("goal")) or (str(promo.get("goal") or "") if promo.get("goal") else "")
+        promo_date = promo.get("startDate") or _extract_promo_date(
+            promo.get("title"), promo.get("rawTitle"), promo.get("syncedAt")
+        )
+        safe_studio.append(
+            {
+                **promo,
+                "status": _status_label(promo.get("status")),
+                "goal": goal or None,
+                "startDate": promo_date,
+                "title": _humanize_promo_title(
+                    title=str(promo.get("rawTitle") or promo.get("title") or ""),
+                    video_title=str(promo.get("videoTitle") or ""),
+                    goal=goal or None,
+                    promo_date=promo_date,
+                ),
+            }
+        )
+
     used_studio: set[str] = set()
-
-    def _overlap(a: str, b: str) -> bool:
-        x = " ".join((a or "").lower().split())
-        y = " ".join((b or "").lower().split())
-        if not x or not y:
-            return False
-        return x in y or y in x or x[:16] in y or y[:16] in x
-
-    safe_studio = [p for p in studio_promos if isinstance(p, dict) and p.get("id")]
+    merged: list[dict[str, Any]] = []
 
     for manual in manuals:
-        match = None
+        candidates: list[tuple[float, dict[str, Any]]] = []
         for studio in safe_studio:
             sid = str(studio.get("studioCampaignId") or "")
             if sid and sid == str(manual.get("studioCampaignId") or ""):
-                match = studio
-                break
+                candidates.append((0.0, studio))
+                continue
             if manual.get("videoId") and studio.get("videoId") and manual["videoId"] == studio["videoId"]:
+                candidates.append((0.05, studio))
+                continue
+            if _token_overlap(str(manual.get("title") or ""), str(studio.get("title") or "")):
+                candidates.append((0.1, studio))
+                continue
+            if _token_overlap(str(manual.get("videoTitle") or ""), str(studio.get("videoTitle") or "")):
+                candidates.append((0.12, studio))
+                continue
+            if _token_overlap(str(manual.get("title") or ""), str(studio.get("videoTitle") or "")):
+                candidates.append((0.14, studio))
+                continue
+            metric = _metrics_match_score(manual, studio)
+            if metric < 999:
+                candidates.append((0.4 + metric, studio))
+
+        match = None
+        if candidates:
+            candidates.sort(key=lambda item: item[0])
+            for _score, studio in candidates:
+                if str(studio.get("id")) in used_studio:
+                    continue
                 match = studio
                 break
-            if _overlap(str(manual.get("title") or ""), str(studio.get("title") or "")):
-                match = studio
-                break
-            if _overlap(str(manual.get("videoTitle") or ""), str(studio.get("videoTitle") or "")):
-                match = studio
-                break
+
         if match:
             used_studio.add(str(match["id"]))
+            studio_video = str(match.get("videoTitle") or "")
             merged.append(
                 {
                     **manual,
+                    "title": manual.get("title") or match.get("title"),
                     "cost": match.get("cost") or manual.get("cost") or 0,
                     "impressions": match.get("impressions") or manual.get("impressions") or 0,
                     "views": match.get("views") or manual.get("views") or 0,
@@ -656,18 +857,20 @@ def merge_studio_into_promotions(studio_promos: list[dict[str, Any]]) -> dict[st
                     if match.get("subscribers")
                     else manual.get("subscribers") or 0,
                     "followOnViews": match.get("followOnViews") or manual.get("followOnViews") or 0,
-                    "status": match.get("status") or manual.get("status"),
+                    "status": _status_label(match.get("status") or manual.get("status")),
                     "goal": match.get("goal") or manual.get("goal"),
                     "videoId": match.get("videoId") or manual.get("videoId") or "",
-                    "videoTitle": match.get("videoTitle") or manual.get("videoTitle") or "",
+                    "videoTitle": studio_video
+                    if studio_video and not _is_generic_studio_title(studio_video)
+                    else manual.get("videoTitle") or studio_video or "",
+                    "startDate": match.get("startDate") or manual.get("startDate"),
                     "source": "merged-studio",
-                    "studioCampaignId": match.get("studioCampaignId"),
+                    "studioCampaignId": match.get("studioCampaignId") or manual.get("studioCampaignId"),
                     "syncedAt": match.get("syncedAt"),
                     "notes": list({*(manual.get("notes") or []), "Studio 동기화"}),
                 }
             )
         else:
-            # keep non-studio manuals; drop empty google-ads shells
             if manual.get("source") == "google-ads" and not (
                 manual.get("cost") or manual.get("impressions") or manual.get("views")
             ):
@@ -678,16 +881,11 @@ def merge_studio_into_promotions(studio_promos: list[dict[str, Any]]) -> dict[st
         sid = str(studio.get("id") or "")
         if not sid or sid in used_studio:
             continue
+        if any(_metrics_match_score(studio, kept) < 0.55 for kept in merged):
+            continue
         merged.append(studio)
 
-    merged.sort(
-        key=lambda p: (
-            0 if p.get("status") == "진행중" else 1 if p.get("status") == "일시중지" else 2,
-            -int(p.get("cost") or 0),
-            str(p.get("title") or ""),
-        )
-    )
-    return {"promotions": merged, "memo": memo, "issues": issues}
+    return {"promotions": _sort_promotions(merged), "memo": memo, "issues": issues}
 
 
 def parse_curl_capture(curl_text: str) -> dict[str, Any]:
@@ -897,6 +1095,92 @@ async def fetch_studio_payload(
         )
 
 
+async def enrich_studio_promos_with_video_titles(
+    promos: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Fill missing/generic titles using YouTube Data API when videoId is known."""
+    api_key = youtube_api_key()
+    ids = sorted(
+        {
+            str(p.get("videoId") or "").strip()
+            for p in promos
+            if p.get("videoId")
+            and (
+                _is_generic_studio_title(str(p.get("title") or ""))
+                or _is_generic_studio_title(str(p.get("videoTitle") or ""))
+                or not str(p.get("videoTitle") or "").strip()
+            )
+        }
+    )
+    if not api_key or not ids:
+        return promos
+
+    titles: dict[str, str] = {}
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            for index in range(0, len(ids), 50):
+                chunk = ids[index : index + 50]
+                res = await client.get(
+                    "https://www.googleapis.com/youtube/v3/videos",
+                    params={"part": "snippet", "id": ",".join(chunk), "key": api_key},
+                )
+                if res.status_code != 200:
+                    continue
+                for item in res.json().get("items") or []:
+                    vid = str(item.get("id") or "")
+                    title = str((item.get("snippet") or {}).get("title") or "").strip()
+                    if vid and title:
+                        titles[vid] = title
+    except Exception:  # noqa: BLE001
+        return promos
+
+    if not titles:
+        return promos
+
+    enriched: list[dict[str, Any]] = []
+    for promo in promos:
+        vid = str(promo.get("videoId") or "")
+        video_title = titles.get(vid) or str(promo.get("videoTitle") or "")
+        title = _humanize_promo_title(
+            title=str(promo.get("rawTitle") or promo.get("title") or ""),
+            video_title=video_title,
+            goal=str(promo.get("goal") or "") or None,
+            promo_date=promo.get("startDate"),
+        )
+        enriched.append({**promo, "videoTitle": video_title or promo.get("videoTitle"), "title": title})
+    return enriched
+
+
+def cleanup_stale_studio_promotions() -> dict[str, Any]:
+    """Drop raw Studio duplicate rows and re-sort without a live Studio fetch."""
+    data = read_promotions()
+    existing = list(data.get("promotions") or [])
+    memo = str(data.get("memo") or "").strip()
+    if not memo:
+        memo = "\n".join(str(item).strip() for item in (data.get("issues") or []) if str(item).strip())
+    kept: list[dict[str, Any]] = []
+    dropped = 0
+    for promo in existing:
+        if not isinstance(promo, dict):
+            continue
+        if _is_stale_studio_row(promo):
+            dropped += 1
+            continue
+        promo = {**promo, "status": _status_label(promo.get("status"))}
+        if promo.get("goal"):
+            promo["goal"] = _goal_label(promo.get("goal")) or promo.get("goal")
+        kept.append(promo)
+    payload = {"promotions": _sort_promotions(kept), "memo": memo, "issues": []}
+    write_promotions(payload)
+    return {
+        "ok": True,
+        "dropped": dropped,
+        "kept": len(kept),
+        "message": f"깨진 Studio 행 {dropped}개 정리, {len(kept)}개 유지",
+        "promotions": payload["promotions"],
+    }
+
+
 async def sync_studio_promotions(
     *,
     force: bool = True,
@@ -928,6 +1212,9 @@ async def sync_studio_promotions(
                     or promo.get("subscribers")
                 ):
                     promos.append(promo)
+
+        if promos:
+            promos = await enrich_studio_promos_with_video_titles(promos)
 
         if not promos:
             shape = analyze_payload_shape(payload)
