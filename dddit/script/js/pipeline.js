@@ -4,9 +4,12 @@
 window.DIDIDIT_PIPELINE = (function () {
   const HEADERS = ['대본', '장면', '사이즈', '자막', '코멘트'];
 
-  const ROW_CHARS_MIN = 20;
-  const ROW_CHARS_TARGET_MAX = 45;
-  const ROW_CHARS_HARD_MAX = 50;
+  const ROW_CHARS_MIN = 18;
+  const ROW_CHARS_TARGET_MAX = 55;
+  /** Soft tip: prefer at/under this for one breath. Soft overage alone does not retry. */
+  const ROW_CHARS_HARD_MAX = 72;
+  /** Only force-split / hard-fail above this (rare long clauses). */
+  const ROW_CHARS_FORCE_SPLIT = 96;
 
   const ROWS_SCHEMA = {
     type: 'object',
@@ -49,11 +52,31 @@ window.DIDIDIT_PIPELINE = (function () {
   function getNarrationRhythmBlock() {
     return `
 # 대본 호흡·행 분할 (변환 단계 필수)
-- 1행 = 성우 한 호흡. 행당 공백 포함 **25~45자** (50자 초과 금지).
-- 호흡이 바뀔 때 새 행. 마침표마다 무조건 분리 X.
-- 15자 내외 초단문만 연속 나열 금지. 여러 문장을 한 행에 합치기 금지.
-- 좋은 예: 3문장을 호흡 단위로 3행 분할
-- 나쁜 예: 3문장을 1행에 합침 / 10자짜리 행만 10개 연속`;
+- 1행 = **완성된 한 문장(또는 한 호흡이 끝나는 절)**. 행당 공백 포함 목표 **25~55자**, 상한 **${ROW_CHARS_HARD_MAX}자**.
+- **문장 중간에서 행을 끊지 마세요.** 행은 반드시 문장 종결(다/요/죠/습니다/?/!/…)로 끝나야 합니다.
+- 호흡이 바뀔 때 새 행. 마침표마다 무조건 분리 X (아주 짧은 연속만 합쳐도 됨).
+- 15자 내외 초단문만 연속 나열 금지. 한 문장을 두 행으로 쪼개지 마세요.
+- 좋은 예: "배터리는 하루 종일 버팁니다." / "충전은 USB-C 한 줄로 끝납니다."
+- 나쁜 예: "배터리는 하루 종일" + 다음 행 "버팁니다." (미완성 절단)`;
+  }
+
+  /** Korean / punctuation sentence-end check for narration rows. */
+  function endsCompleteSentence(text) {
+    const t = String(text || '').trim();
+    if (!t) return true;
+    const bare = t.replace(/["'”’」』)\]]+$/g, '').trim();
+    if (/[.?!…～~]$/.test(bare)) return true;
+    // Adverbial / connective tails that look like -다 but are not sentence-final
+    if (/(보다|마다|만큼|대로|마저|조차|부터|까지)$/.test(bare)) return false;
+    if (/(습니다|습니까|세요|셔요|군요|네요|데요|죠|예요|이에요|답니다|거든요|니까요|에요|이요)[.?!…]*$/.test(bare)) {
+      return true;
+    }
+    // 해요체: …요 (excluding connective false friends already handled)
+    if (/요$/.test(bare) && bare.length >= 6) return true;
+    // Plain -다: prefer clear finite endings, not fragments like "생각보다"
+    if (/(았|었|였|했|됐|됐|됩|합|입|갑|옵|습)다$/.test(bare)) return true;
+    if (/(ㄴ다|는다|운다|인다|한다|된다|이다)$/.test(bare) && bare.length >= 8) return true;
+    return false;
   }
 
   function detectChoppyRhythm(rows) {
@@ -66,33 +89,169 @@ window.DIDIDIT_PIPELINE = (function () {
   }
 
   function detectOverlongRows(rows) {
-    const longRows = rows.filter((r) => r.대본.length > ROW_CHARS_HARD_MAX);
+    const longRows = rows.filter((r) => r.대본.length > ROW_CHARS_FORCE_SPLIT);
     if (longRows.length) {
-      return `${longRows.length}행이 ${ROW_CHARS_HARD_MAX}자 초과 — 호흡마다 분할 필요`;
+      return `${longRows.length}행이 ${ROW_CHARS_FORCE_SPLIT}자 초과 — 문장·호흡 경계에서 분할`;
     }
-    const avg = rows.reduce((s, r) => s + r.대본.length, 0) / rows.length;
-    if (avg > 48) return `평균 ${Math.round(avg)}자/행 — 장문 합침`;
     return null;
   }
 
+  function detectMidSentenceCuts(rows) {
+    if (rows.length < 2) return null;
+    let cuts = 0;
+    for (let i = 0; i < rows.length - 1; i++) {
+      const cur = rows[i].대본;
+      if (!endsCompleteSentence(cur) && cur.length < ROW_CHARS_FORCE_SPLIT) cuts += 1;
+    }
+    if (cuts > 0) return `${cuts}행이 문장 중간에 끊김`;
+    return null;
+  }
+
+  /** Soft checklist (logging / optional tip). Does not force API retry by itself. */
   function validateScriptRows(rows) {
     const issues = [];
     if (!rows.length) issues.push('행이 없습니다');
     rows.forEach((r, i) => {
       if (!r.대본.trim()) issues.push(`${i + 1}행 대본 누락`);
       const len = r.대본.length;
-      if (len > ROW_CHARS_HARD_MAX) issues.push(`${i + 1}행 ${len}자 (50자 초과)`);
+      if (len > ROW_CHARS_FORCE_SPLIT) issues.push(`${i + 1}행 ${len}자 (${ROW_CHARS_FORCE_SPLIT}자 초과)`);
+      else if (len > ROW_CHARS_HARD_MAX) issues.push(`${i + 1}행 ${len}자 (권장 ${ROW_CHARS_HARD_MAX}자 초과)`);
       else if (len < ROW_CHARS_MIN && rows.length >= 6) issues.push(`${i + 1}행 ${len}자 (너무 짧음)`);
     });
     const choppy = detectChoppyRhythm(rows);
     if (choppy) issues.push(choppy);
     const overlong = detectOverlongRows(rows);
     if (overlong) issues.push(overlong);
+    const mid = detectMidSentenceCuts(rows);
+    if (mid) issues.push(mid);
+    return issues;
+  }
+
+  /** Only these trigger another Gemini convert attempt. */
+  function validateHardIssues(rows) {
+    const issues = [];
+    if (!rows.length) issues.push('행이 없습니다');
+    rows.forEach((r, i) => {
+      if (!r.대본.trim()) issues.push(`${i + 1}행 대본 누락`);
+      if (r.대본.length > ROW_CHARS_FORCE_SPLIT) {
+        issues.push(`${i + 1}행 ${r.대본.length}자 (${ROW_CHARS_FORCE_SPLIT}자 초과)`);
+      }
+    });
+    const mid = detectMidSentenceCuts(rows);
+    if (mid) issues.push(mid);
     return issues;
   }
 
   function buildConvertRetryHint(issues) {
-    return `\n\n[재시도] 이전 변환 문제: ${issues.slice(0, 4).join(' · ')}. 호흡마다 행 분할, 행당 25~45자, 50자 초과 금지.`;
+    return `\n\n[재시도] 이전 변환 문제: ${issues.slice(0, 4).join(' · ')}. 문장 중간 분할 금지. 행은 종결(다/요/습니다/?/!)로 끝내고, 목표 25~55자·상한 ${ROW_CHARS_HARD_MAX}자.`;
+  }
+
+  function mergeRowPair(a, b) {
+    const script = `${a.대본} ${b.대본}`.replace(/\s+/g, ' ').trim();
+    return {
+      대본: script,
+      장면: a.장면 || b.장면,
+      사이즈: a.사이즈 || b.사이즈,
+      자막: [a.자막, b.자막].filter(Boolean).join(' · '),
+      코멘트: [a.코멘트, b.코멘트].filter(Boolean).join(' · '),
+    };
+  }
+
+  function findForceSplitIndex(text, maxLen) {
+    const t = String(text || '');
+    if (t.length <= maxLen) return -1;
+    const window = t.slice(0, maxLen);
+    const patterns = [/[.?!…]\s*/g, /(?:습니다|습니까|세요|네요|군요|죠|다|요)[.?!…]?\s*/g, /[,，、]\s*/g, /\s+/g];
+    for (const re of patterns) {
+      let last = -1;
+      let m;
+      re.lastIndex = 0;
+      while ((m = re.exec(window)) !== null) {
+        const end = m.index + m[0].length;
+        if (end >= Math.floor(maxLen * 0.35)) last = end;
+      }
+      if (last > 0) return last;
+    }
+    return maxLen;
+  }
+
+  function forceSplitRow(row) {
+    const text = row.대본;
+    if (text.length <= ROW_CHARS_FORCE_SPLIT) return [row];
+    const out = [];
+    let rest = text;
+    while (rest.length > ROW_CHARS_FORCE_SPLIT) {
+      const cut = findForceSplitIndex(rest, ROW_CHARS_HARD_MAX);
+      const head = rest.slice(0, cut).trim();
+      rest = rest.slice(cut).trim();
+      if (head) {
+        out.push({
+          대본: head,
+          장면: out.length ? '컷 유지' : row.장면,
+          사이즈: out.length ? row.사이즈 : row.사이즈,
+          자막: out.length ? '' : row.자막,
+          코멘트: out.length ? '' : row.코멘트,
+        });
+      } else {
+        break;
+      }
+    }
+    if (rest) {
+      out.push({
+        대본: rest,
+        장면: out.length ? '컷 유지' : row.장면,
+        사이즈: row.사이즈,
+        자막: out.length ? '' : row.자막,
+        코멘트: out.length ? '' : row.코멘트,
+      });
+    }
+    return out.length ? out : [row];
+  }
+
+  /**
+   * Merge mid-sentence row cuts, then force-split only pathological lengths.
+   */
+  function healSentenceRows(rows) {
+    const list = normalizeRows(rows);
+    if (!list.length) return [];
+    const merged = [];
+    let buf = { ...list[0] };
+    for (let i = 1; i < list.length; i++) {
+      const next = list[i];
+      const incomplete = !endsCompleteSentence(buf.대본);
+      const wouldBeHuge = `${buf.대본} ${next.대본}`.replace(/\s+/g, ' ').trim().length > ROW_CHARS_FORCE_SPLIT + 20;
+      if (incomplete && !wouldBeHuge) {
+        buf = mergeRowPair(buf, next);
+        continue;
+      }
+      if (incomplete && wouldBeHuge) {
+        // Prefer attaching a short dangling fragment even if soft-long
+        if (buf.대본.length < ROW_CHARS_MIN || next.대본.length < ROW_CHARS_MIN) {
+          buf = mergeRowPair(buf, next);
+          continue;
+        }
+      }
+      merged.push(buf);
+      buf = { ...next };
+    }
+    merged.push(buf);
+
+    // Second pass: glue tiny leftover fragments that are clearly unfinished
+    const glued = [];
+    for (let i = 0; i < merged.length; i++) {
+      let cur = merged[i];
+      while (
+        i + 1 < merged.length &&
+        !endsCompleteSentence(cur.대본) &&
+        `${cur.대본} ${merged[i + 1].대본}`.replace(/\s+/g, ' ').trim().length <= ROW_CHARS_FORCE_SPLIT
+      ) {
+        i += 1;
+        cur = mergeRowPair(cur, merged[i]);
+      }
+      glued.push(cur);
+    }
+
+    return glued.flatMap(forceSplitRow);
   }
 
   function normalizeRows(rows) {
@@ -188,14 +347,18 @@ ${continuity}`;
   }
 
   function buildConvertPrompt(ctx, prose, retryHint) {
-    return `${ctx}
-${getNarrationRhythmBlock()}
+    // Slim prompt: full product brief slows convert and is unused for row splitting.
+    const productHint = String(ctx || '').trim()
+      ? `- 제품·톤 힌트(참고만): ${String(ctx).replace(/\s+/g, ' ').slice(0, 280)}\n`
+      : '';
+    return `${getNarrationRhythmBlock()}
 
 # 작업: 줄글 → 대본 열 변환
 아래 줄글을 JSON \`rows\` 배열로 변환하세요.
 - **대본 열만** 채우고 장면·사이즈·자막·코멘트는 빈 문자열.
-- 줄글 문장을 삭제·왜곡하지 말고 호흡 단위로만 나눕니다.
-${retryHint || ''}
+- 줄글 문장을 삭제·왜곡하지 말고 **문장(호흡) 단위**로만 나눕니다.
+- 문장 종결 전에 행을 바꾸지 마세요.
+${productHint}${retryHint || ''}
 
 ## 줄글 원문
 ${prose}`;
@@ -252,9 +415,13 @@ JSON rows 전체를 반환.`;
     ROWS_SCHEMA,
     ROW_CHARS_MIN,
     ROW_CHARS_HARD_MAX,
+    ROW_CHARS_FORCE_SPLIT,
     normalizeRows,
     parseRowsJson,
     validateScriptRows,
+    validateHardIssues,
+    healSentenceRows,
+    endsCompleteSentence,
     buildConvertRetryHint,
     buildProsePrompt,
     buildConvertPrompt,

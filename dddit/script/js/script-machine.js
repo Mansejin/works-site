@@ -431,7 +431,9 @@ async function postGeminiAndExtractText(model, body) {
 }
 
 async function callGeminiJson(userPrompt, temperature = 0.4, stage = 'convert') {
-  const model = state.modelPro;
+  const cfg = window.DIDIDIT_CONFIG || {};
+  // Convert / scene / caption: Flash for speed. Pro stays for prose draft only.
+  const model = cfg.FAST_GEMINI_MODEL || 'gemini-3.5-flash';
   const body = {
     systemInstruction: { parts: [{ text: getSystemRules(stage) }] },
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
@@ -828,19 +830,22 @@ async function runConvertToSheet() {
       setLoading(true, `변환 중… (${i + 1}/${chunks.length})`);
       let part = [];
       let retryHint = '';
-      for (let attempt = 0; attempt < 3; attempt++) {
+      // At most 2 API attempts; heal locally instead of soft-issue retries.
+      for (let attempt = 0; attempt < 2; attempt++) {
         part = await callGeminiJson(
           PIPE.buildConvertPrompt(ctx, chunks[i], retryHint),
-          attempt > 0 ? 0.25 : 0.35,
+          attempt > 0 ? 0.2 : 0.3,
           'convert',
         );
-        const issues = PIPE.validateScriptRows(part);
-        if (!issues.length) break;
-        retryHint = PIPE.buildConvertRetryHint(issues);
-        if (attempt === 2) {
-          reportError('runConvertToSheet.validate', new Error(issues.join('; ')), { chunk: i + 1 }, { silent: true });
+        part = PIPE.healSentenceRows(part);
+        const hard = PIPE.validateHardIssues(part);
+        if (!hard.length) break;
+        retryHint = PIPE.buildConvertRetryHint(hard);
+        if (attempt === 1) {
+          reportError('runConvertToSheet.validate', new Error(hard.join('; ')), { chunk: i + 1 }, { silent: true });
         }
       }
+      part = PIPE.healSentenceRows(part);
       rows = rows.concat(part);
     }
     state.allRows = PIPE.normalizeRows(rows);
