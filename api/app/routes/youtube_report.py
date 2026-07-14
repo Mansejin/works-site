@@ -11,6 +11,11 @@ from pydantic import BaseModel, Field
 
 from app.config import google_ads_config, google_ads_sync_enabled, youtube_analytics_oauth_config, youtube_api_key, youtube_channel_handle
 from app.google_ads import get_ads_status, sync_campaigns
+from app.youtube_studio_promotions import (
+    get_studio_promo_status,
+    save_capture_from_curl,
+    sync_studio_promotions,
+)
 from app.routes.youtube import _fetch_via_api, _fetch_via_scrape, _format_count
 from app.youtube_analytics import (
     fetch_analytics_overview,
@@ -477,7 +482,17 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             limitations.append("Google Ads API: 프로모션 비용·노출 동기화 (연동됨)")
         else:
             limitations.append(
-                "Google Ads API: 동기화 꺼짐 — YouTube Studio 프로모션은 수동 입력 (promotions.json)"
+                "Google Ads API: 동기화 꺼짐 — YouTube Studio 프로모션은 Studio 캡처/수동 입력"
+            )
+        studio_status = get_studio_promo_status()
+        if studio_status.get("ready"):
+            when = studio_status.get("lastSync") or "미동기화"
+            limitations.append(f"YouTube Studio 내부 API: 프로모션 동기화 준비됨 (lastSync={when})")
+        elif studio_status.get("cookiesConfigured") or studio_status.get("captureConfigured"):
+            limitations.append("YouTube Studio 내부 API: 캡처/쿠키 일부 설정됨 — Studio 동기화 버튼으로 실행")
+        else:
+            limitations.append(
+                "YouTube Studio 내부 API: 프로모션 탭 Copy as cURL 저장 후 자동 동기화 가능"
             )
 
         if analytics_overview.get("ok"):
@@ -519,6 +534,7 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             "analytics": analytics_overview,
             "analyticsStatusNote": _analytics_status_note(analytics_overview),
             "adsSync": ads_status,
+            "studioPromoSync": studio_status,
             "limitations": limitations,
         }
         _cache_set(cache_key, payload)
@@ -634,5 +650,48 @@ async def report_ads_status() -> dict[str, Any]:
 @router.post("/ads/sync")
 async def report_ads_sync(force: bool = Query(True)) -> dict[str, Any]:
     result = await sync_campaigns(force=force)
+    _REPORT_CACHE.clear()
+    return result
+
+
+class StudioCaptureBody(BaseModel):
+    curl: str = Field(min_length=20)
+
+
+class StudioImportBody(BaseModel):
+    payload: Any = None
+    promotions: list[dict[str, Any]] | None = None
+
+
+@router.get("/studio-promotions/status")
+def report_studio_promo_status() -> dict[str, Any]:
+    return get_studio_promo_status()
+
+
+@router.post("/studio-promotions/capture")
+def report_studio_promo_capture(body: StudioCaptureBody) -> dict[str, Any]:
+    result = save_capture_from_curl(body.curl)
+    _REPORT_CACHE.clear()
+    return result
+
+
+@router.post("/studio-promotions/import")
+async def report_studio_promo_import(body: StudioImportBody) -> dict[str, Any]:
+    """북마클릿/DevTools에서 응답 JSON을 바로 넣을 때 사용."""
+    raw: Any
+    if body.promotions is not None:
+        raw = {"promotions": body.promotions}
+    else:
+        raw = body.payload
+    if raw is None:
+        raise HTTPException(status_code=400, detail="payload 또는 promotions가 필요합니다")
+    result = await sync_studio_promotions(raw_payload=raw)
+    _REPORT_CACHE.clear()
+    return result
+
+
+@router.post("/studio-promotions/sync")
+async def report_studio_promo_sync(force: bool = Query(True)) -> dict[str, Any]:
+    result = await sync_studio_promotions(force=force)
     _REPORT_CACHE.clear()
     return result

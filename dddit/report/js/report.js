@@ -25,9 +25,12 @@
     analyticsKpiGrid: document.getElementById("analytics-kpi-grid"),
     analyticsStatus: document.getElementById("analytics-status"),
     adsSyncStatus: document.getElementById("ads-sync-status"),
+    studioSyncStatus: document.getElementById("studio-sync-status"),
     issuesEditor: document.getElementById("issues-editor"),
     promotionsEditor: document.getElementById("promotions-editor"),
     snapshotsEditor: document.getElementById("snapshots-editor"),
+    studioCurlEditor: document.getElementById("studio-curl-editor"),
+    studioCaptureStatus: document.getElementById("studio-capture-status"),
   };
 
   let charts = {
@@ -940,10 +943,10 @@
     if (!els.adsSyncStatus || !adsSync) return;
     if (adsSync.enabled === false) {
       if (btn) btn.style.display = "none";
-      els.adsSyncStatus.textContent = "Studio 수동";
+      els.adsSyncStatus.textContent = "Ads 끔";
       els.adsSyncStatus.className = "status-pill";
       els.adsSyncStatus.title =
-        adsSync.message || "Google Ads 동기화 꺼짐 — 프로모션 JSON으로 수동 관리";
+        adsSync.message || "Google Ads 동기화 꺼짐 — Studio 동기화/수동 입력 사용";
       return;
     }
     if (btn) btn.style.display = "";
@@ -963,6 +966,36 @@
     els.adsSyncStatus.textContent = "Ads 미동기화";
     els.adsSyncStatus.className = "status-pill";
     els.adsSyncStatus.title = adsSync.message || "Ads 동기화 버튼을 눌러 연동하세요";
+  }
+
+  function renderStudioSyncStatus(studio) {
+    if (!els.studioSyncStatus) return;
+    if (!studio) {
+      els.studioSyncStatus.textContent = "Studio —";
+      return;
+    }
+    if (studio.lastSync) {
+      const when = new Date(studio.lastSync).toLocaleString("ko-KR");
+      els.studioSyncStatus.textContent = `Studio · ${when}`;
+      els.studioSyncStatus.className = "status-pill ok";
+      els.studioSyncStatus.title = studio.message || "";
+      return;
+    }
+    if (studio.ready) {
+      els.studioSyncStatus.textContent = "Studio 준비됨";
+      els.studioSyncStatus.className = "status-pill ok";
+      els.studioSyncStatus.title = "캡처·쿠키 설정됨 — Studio 동기화 클릭";
+      return;
+    }
+    if (studio.captureConfigured || studio.cookiesConfigured) {
+      els.studioSyncStatus.textContent = "Studio 부분설정";
+      els.studioSyncStatus.className = "status-pill";
+      els.studioSyncStatus.title = "캡처 또는 쿠키가 부족합니다";
+      return;
+    }
+    els.studioSyncStatus.textContent = "Studio 캡처 필요";
+    els.studioSyncStatus.className = "status-pill";
+    els.studioSyncStatus.title = "프로모션 목록 cURL을 아래 편집란에 저장하세요";
   }
 
   function sortPromotionsForDisplay(promotions) {
@@ -1107,6 +1140,7 @@
       renderKpis(overview.kpis || {}, overview.channel?.subscriberCount);
       renderAnalyticsOverview(overview.analytics);
       renderAdsSyncStatus(overview.adsSync);
+      renderStudioSyncStatus(overview.studioPromoSync);
       renderInsights(overview.insights || []);
       renderPromotions(overview.promotions || []);
       renderVideos(videosData.videos || []);
@@ -1156,6 +1190,43 @@
       await loadReport(true);
     } catch (err) {
       showError(err.message || "Ads 동기화 실패");
+    }
+  });
+  document.getElementById("btn-studio-sync")?.addEventListener("click", async () => {
+    try {
+      setStatus("Studio 동기화 중…");
+      const result = await apiPost("/api/dddit/youtube/report/studio-promotions/sync?force=1");
+      setStatus(result.message || "Studio 동기화 완료", result.ok === false ? "error" : "ok");
+      if (result.ok === false) showError(result.message || "Studio 동기화 실패");
+      await loadReport(true);
+    } catch (err) {
+      showError(err.message || "Studio 동기화 실패");
+    }
+  });
+  document.getElementById("btn-studio-capture")?.addEventListener("click", async () => {
+    try {
+      const curl = els.studioCurlEditor?.value?.trim() || "";
+      if (curl.length < 20) throw new Error("cURL 텍스트를 붙여넣으세요");
+      const res = await fetch(`${API_BASE}/api/dddit/youtube/report/studio-promotions/capture`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ curl }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.ok === false) {
+        throw new Error(body.detail || body.message || `HTTP ${res.status}`);
+      }
+      if (els.studioCaptureStatus) {
+        els.studioCaptureStatus.textContent = body.message || "캡처 저장됨";
+        els.studioCaptureStatus.className = "status-pill ok";
+      }
+      setStatus(body.message || "캡처 저장됨", "ok");
+    } catch (err) {
+      if (els.studioCaptureStatus) {
+        els.studioCaptureStatus.textContent = err.message || "캡처 저장 실패";
+        els.studioCaptureStatus.className = "status-pill error";
+      }
+      showError(err.message || "캡처 저장 실패");
     }
   });
   document.getElementById("btn-copy-link")?.addEventListener("click", async () => {

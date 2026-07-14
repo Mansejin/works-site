@@ -478,7 +478,9 @@
             <h2>프로모션 효율 요약</h2>
             <div class="header-actions">
               <span id="ads-sync-status" class="status-pill" style="font-size:0.72rem;">—</span>
-              <button id="btn-ads-sync" class="btn btn-ghost" type="button" style="padding:4px 10px;font-size:0.76rem;">Ads 동기화</button>
+              <span id="studio-sync-status" class="status-pill" style="font-size:0.72rem;">—</span>
+              <button id="btn-studio-sync" class="btn btn-ghost" type="button" style="padding:4px 10px;font-size:0.76rem;">Studio 동기화</button>
+              <button id="btn-ads-sync" class="btn btn-ghost" type="button" style="padding:4px 10px;font-size:0.76rem;display:none;">Ads 동기화</button>
             </div>
           </div>
           <div class="card-body promo-table-wrap">
@@ -514,6 +516,12 @@
       <section class="card edit-panel">
         <div class="card-head"><h2>보고 데이터 편집 (팀용)</h2></div>
         <div class="card-body">
+          <label for="studio-curl-editor">Studio 프로모션 cURL 캡처 (Copy as cURL)</label>
+          <textarea id="studio-curl-editor" rows="4" placeholder="Studio → 프로모션 탭 → DevTools Network → 목록 요청 → Copy as cURL 붙여넣기"></textarea>
+          <div class="header-actions" style="margin-bottom:12px;">
+            <button id="btn-studio-capture" class="btn btn-ghost" type="button">캡처 저장</button>
+            <span id="studio-capture-status" class="status-pill">1회 저장 후 Studio 동기화 가능</span>
+          </div>
           <label for="issues-editor">주요 이슈 (한 줄씩)</label>
           <textarea id="issues-editor" placeholder="채널 노출 부족…"></textarea>
           <label for="promotions-editor">프로모션 JSON (비용·노출·조회·구독)</label>
@@ -536,6 +544,6 @@
     <div id="loading" class="card loading-block">보고 데이터를 불러오는 중…</div>
   </div>
 
-  <script src="js/report.js?v=15"></script>
+  <script src="js/report.js?v=16"></script>
 </body>
 </html>
