@@ -19,7 +19,7 @@
       path: "vendict/",
       brand: "벤딕트",
       status: "진행 중",
-      summary: "차량용 청소기 협찬 · 업로드 8/2",
+      summary: "차량용 청소기 협찬 · 가이드 반영 · 업로드 8/2 · 이벤트 3명",
     },
     {
       id: "inic",
