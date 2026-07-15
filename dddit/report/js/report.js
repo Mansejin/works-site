@@ -102,6 +102,38 @@
   let loadSeq = 0;
   let allPromotions = [];
   let promoPage = 0;
+  let chartSnapshot = null;
+
+  function applyChartTheme() {
+    if (typeof Chart === "undefined") return;
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    Chart.defaults.color = dark ? "#9aa8bc" : "#64748b";
+    Chart.defaults.borderColor = dark ? "#2a3648" : "#e2e8f0";
+  }
+
+  function redrawChartsFromSnapshot() {
+    if (!chartSnapshot) return;
+    applyChartTheme();
+    destroyCharts();
+    const {
+      traffic,
+      retention,
+      demographics,
+      recentVideosBar,
+      viewsTrend7d,
+      viewsTrendNote,
+      subscriberTrend,
+      videos,
+    } = chartSnapshot;
+    renderTrafficChart(traffic);
+    bindRetentionTabs(retention, videos || []);
+    renderRetentionChart(retention, videos || [], activeRetentionFormat);
+    renderDemographicsCharts(demographics);
+    renderRecentVideosChart(recentVideosBar || []);
+    renderViews7dChart(viewsTrend7d || [], viewsTrendNote);
+    renderSubscriberChart(subscriberTrend);
+    requestAnimationFrame(resizeCharts);
+  }
 
   function readLastApiRefresh() {
     try {
@@ -1665,6 +1697,17 @@
       hideError();
 
       destroyCharts();
+      applyChartTheme();
+      chartSnapshot = {
+        traffic,
+        retention,
+        demographics,
+        recentVideosBar: overview.recentVideosBar || [],
+        viewsTrend7d: overview.viewsTrend7d || [],
+        viewsTrendNote: overview.viewsTrendNote,
+        subscriberTrend: overview.subscriberTrend,
+        videos: videosData.videos || [],
+      };
       renderTrafficChart(traffic);
       bindRetentionTabs(retention, videosData.videos || []);
       renderRetentionChart(retention, videosData.videos || [], activeRetentionFormat);
@@ -1777,6 +1820,10 @@
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeVideoAnalysisModal();
   });
+  document.addEventListener("dddit-theme", () => {
+    redrawChartsFromSnapshot();
+  });
 
+  applyChartTheme();
   void bootReport();
 })();
