@@ -436,6 +436,7 @@
 
       <div class="table-actions">
         <button type="button" class="btn-add" id="btn-add-row">+ 제품 추가</button>
+        <span id="productlist-sync-status" style="margin:0;font-size:0.75rem;color:var(--text-muted);"></span>
       </div>
     </div>
   </div>
@@ -457,8 +458,10 @@
 ]
   </script>
 
+  <script src="../../js/productlist-sync.js"></script>
   <script>
     const STORAGE_KEY = "works/dddit/inic/productlist";
+    const PROJECT = "inic";
     const LEGACY_STORAGE_KEYS = [
       "works/dddit/productlist/inic",
       "works/dddit/productlist",
@@ -466,6 +469,7 @@
 
     const tbody = document.getElementById("product-tbody");
     const btnAddRow = document.getElementById("btn-add-row");
+    const syncStatus = document.getElementById("productlist-sync-status");
 
     const PLACEHOLDERS = {
       name: "제품명 입력",
@@ -653,6 +657,10 @@
       });
     }
 
+    function setSyncStatus(text) {
+      if (syncStatus) syncStatus.textContent = text || "";
+    }
+
     function saveToLocalStorage(rows) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ updatedAt: Date.now(), rows }));
     }
@@ -676,13 +684,25 @@
       }
     }
 
-    function persistRows() {
-      saveToLocalStorage(collectRows());
+    async function persistRows() {
+      const rows = collectRows();
+      saveToLocalStorage(rows);
+      if (!window.DdditProductlistSync?.isHosted) return;
+      try {
+        await window.DdditProductlistSync.save(PROJECT, rows);
+        setSyncStatus("서버에 저장됨");
+      } catch (err) {
+        setSyncStatus("서버 저장 실패 · 이 브라우저에만 임시 저장");
+        console.warn(err);
+      }
     }
 
     function scheduleSave() {
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(persistRows, 400);
+      setSyncStatus("저장 중…");
+      saveTimer = setTimeout(() => {
+        void persistRows();
+      }, 400);
     }
 
     function isTouchUi() {
@@ -840,21 +860,60 @@
       });
     }
 
-    function init() {
+    async function init() {
       const embeddedRows = readEmbeddedRows().map(normalizeRow);
-      const storedRows = loadFromLocalStorage();
-      renderRows((storedRows || embeddedRows).map(normalizeRow));
+      let rows = null;
+      let shouldSeedServer = false;
+
+      if (window.DdditProductlistSync?.isHosted) {
+        setSyncStatus("불러오는 중…");
+        try {
+          const remote = await window.DdditProductlistSync.load(PROJECT);
+          if (remote && window.DdditProductlistSync.hasContent(remote.rows)) {
+            rows = remote.rows.map(normalizeRow);
+            setSyncStatus("서버 데이터");
+          }
+        } catch (err) {
+          console.warn(err);
+          setSyncStatus("서버 연결 실패 · 로컬 데이터 사용");
+        }
+      }
+
+      if (!rows) {
+        const localRows = loadFromLocalStorage();
+        if (window.DdditProductlistSync?.hasContent?.(localRows)) {
+          rows = localRows.map(normalizeRow);
+        } else {
+          rows = embeddedRows;
+        }
+        shouldSeedServer = true;
+      }
+
+      renderRows(rows.map(normalizeRow));
       bindEditEvents();
       bindRowActions();
-
       btnAddRow.addEventListener("click", addRow);
       window.addEventListener("beforeunload", () => {
         clearTimeout(saveTimer);
         saveToLocalStorage(collectRows());
       });
+
+      if (
+        window.DdditProductlistSync?.isHosted &&
+        shouldSeedServer &&
+        window.DdditProductlistSync.hasContent(rows)
+      ) {
+        try {
+          await window.DdditProductlistSync.save(PROJECT, rows);
+          saveToLocalStorage(rows);
+          setSyncStatus("서버에 저장됨");
+        } catch (err) {
+          console.warn(err);
+        }
+      }
     }
 
-    init();
+    void init();
   </script>
   <script src="../../js/brand-portal-page.js"></script>
 </body>
