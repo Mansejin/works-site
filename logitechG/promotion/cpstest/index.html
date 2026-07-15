@@ -8,13 +8,68 @@
     <link rel="canonical" href="https://works.mansejin.com/logitechG/promotion/cpstest/">
     <title>SUPERSTRIKE 클릭 챌린지</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        /* BrownPro — Latin / English */
+        @font-face {
+            font-family: 'BrownPro';
+            src: url('fonts/BrownPro-Thin.otf') format('opentype');
+            font-weight: 100;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+0000-00FF, U+0100-024F, U+1E00-1EFF, U+2000-206F, U+20A0-20CF;
+        }
+
+        @font-face {
+            font-family: 'BrownPro';
+            src: url('fonts/BrownPro-Regular.otf') format('opentype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+0000-00FF, U+0100-024F, U+1E00-1EFF, U+2000-206F, U+20A0-20CF;
+        }
+
+        @font-face {
+            font-family: 'BrownPro';
+            src: url('fonts/BrownPro-Bold.otf') format('opentype');
+            font-weight: 700 900;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+0000-00FF, U+0100-024F, U+1E00-1EFF, U+2000-206F, U+20A0-20CF;
+        }
+
+        /* Noto Sans KR — Korean */
+        @font-face {
+            font-family: 'Noto Sans KR';
+            src: url('fonts/NotoSansCJKkr-Regular.otf') format('opentype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+AC00-D7A3, U+1100-11FF, U+3130-318F, U+A960-A97F, U+D7B0-D7FF;
+        }
+
+        @font-face {
+            font-family: 'Noto Sans KR';
+            src: url('fonts/NotoSansCJKkr-Bold.otf') format('opentype');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+AC00-D7A3, U+1100-11FF, U+3130-318F, U+A960-A97F, U+D7B0-D7FF;
+        }
+
+        @font-face {
+            font-family: 'Noto Sans KR';
+            src: url('fonts/NotoSansCJKkr-Black.otf') format('opentype');
+            font-weight: 900;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+AC00-D7A3, U+1100-11FF, U+3130-318F, U+A960-A97F, U+D7B0-D7FF;
+        }
 
         :root {
             --logi-blue: #00B8FC;
             --bg-color: #000000;
             --text-color: #ffffff;
             --panel-bg: #141414;
+            --font-brand: 'BrownPro', 'Noto Sans KR', sans-serif;
         }
 
         body {
@@ -22,7 +77,8 @@
             padding: 0;
             background-color: var(--bg-color);
             color: var(--text-color);
-            font-family: 'Noto Sans KR', sans-serif;
+            font-family: var(--font-brand);
+            font-weight: 400;
             display: flex;
             align-items: center;
             justify-content: center;
