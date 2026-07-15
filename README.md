@@ -57,7 +57,10 @@ works.mansejin.com/
 |------|------|-----|--------|
 | CNAME | `works` | `mansejin.github.io` | **DNS only (회색 구름)** |
 
-GitHub Pages 서브도메인은 회색 구름이 맞습니다.
+GitHub Pages 서브도메인은 회색 구름이 맞습니다.  
+내부 페이지 정적 파일까지 막으려면 Cloudflare Access + 주황 구름으로 전환해야 합니다. 절차: [`docs/team-gate-hardening.md`](docs/team-gate-hardening.md).
+
+works-api는 `DDDIT_TEAM_GATE_PASSCODE` 설정 시 팀 토큰 없이 민감 데이터 API를 거부합니다.
 
 ## 배포
 

@@ -82,17 +82,26 @@ window.DdditSheetSync = (function () {
     try {
       res = await fetch(url, {
         method,
-        headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
-        body: method === 'POST' ? JSON.stringify(body || {}) : undefined,
+        headers:
+          method === "POST"
+            ? window.DdditApiAuth?.authHeaders?.({ "Content-Type": "application/json" }) || {
+                "Content-Type": "application/json",
+              }
+            : window.DdditApiAuth?.authHeaders?.() || {},
+        body: method === "POST" ? JSON.stringify(body || {}) : undefined,
       });
     } catch (err) {
-      const msg = String(err?.message || err || '');
+      const msg = String(err?.message || err || "");
       if (/failed to fetch|networkerror|load failed|네트워크/i.test(msg)) {
         throw new Error(
-          '시트 서버에 연결하지 못했습니다 (Failed to fetch). 네트워크·works-api 상태를 확인한 뒤 다시 시도해 주세요.',
+          "시트 서버에 연결하지 못했습니다 (Failed to fetch). 네트워크·works-api 상태를 확인한 뒤 다시 시도해 주세요.",
         );
       }
       throw err;
+    }
+
+    if (window.DdditApiAuth?.handleUnauthorized?.(res)) {
+      throw new Error("Team authentication required");
     }
 
     const raw = await res.text();

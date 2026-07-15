@@ -10,10 +10,13 @@ from app.routes.hub import router as hub_router
 from app.routes.logitechg import router as logitechg_router
 from app.routes.youtube import router as youtube_router
 from app.routes.youtube_report import router as youtube_report_router
+from app.team_gate_auth import TeamGateApiMiddleware
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="works-api", docs_url=None, redoc_url=None)
+    # Outer CORS wraps auth so browsers still receive CORS headers on 401.
+    app.add_middleware(TeamGateApiMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins(),

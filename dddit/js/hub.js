@@ -194,18 +194,28 @@
   }
 
   async function loadFromServer() {
-    const res = await fetch(`${API_BASE}/api/dddit/hub`);
+    const headers = window.DdditApiAuth?.authHeaders?.() || {};
+    const res = await fetch(`${API_BASE}/api/dddit/hub`, { headers });
+    if (window.DdditApiAuth?.handleUnauthorized?.(res)) {
+      throw new Error("Team authentication required");
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
     return payload?.data ?? null;
   }
 
   async function saveToServer() {
+    const headers = window.DdditApiAuth?.authHeaders?.({ "Content-Type": "application/json" }) || {
+      "Content-Type": "application/json",
+    };
     const res = await fetch(`${API_BASE}/api/dddit/hub`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ updatedAt: Date.now(), data: state }),
     });
+    if (window.DdditApiAuth?.handleUnauthorized?.(res)) {
+      throw new Error("Team authentication required");
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
 
@@ -614,7 +624,12 @@
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/dddit/youtube/channel${force ? "?refresh=1" : ""}`);
+      const res = await fetch(`${API_BASE}/api/dddit/youtube/channel${force ? "?refresh=1" : ""}`, {
+        headers: window.DdditApiAuth?.authHeaders?.() || {},
+      });
+      if (window.DdditApiAuth?.handleUnauthorized?.(res)) {
+        throw new Error("Team authentication required");
+      }
       if (res.status === 404) {
         throw new Error("API_NOT_DEPLOYED");
       }

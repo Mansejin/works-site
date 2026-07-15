@@ -2,6 +2,7 @@
  * 디디딧 내부 페이지 팀 게이트 (works.mansejin.com)
  * 브랜드 공유 페이지(브랜드 홈·plan/conti/productlist)는 제외.
  * NAS DDDIT_TEAM_GATE_PASSCODE 설정 시에만 활성화됩니다.
+ * 상태 조회 실패 시 실패-폐쇄(로그인 화면으로 이동).
  */
 (function () {
   "use strict";
@@ -56,15 +57,12 @@
     document.documentElement.classList.add("team-gate-pending");
   }
 
-  async function fetchGateEnabled() {
-    try {
-      const res = await fetch(`${API_BASE}/api/dddit/team-gate/status`);
-      if (!res.ok) return false;
-      const data = await res.json();
-      return !!data.enabled;
-    } catch {
-      return false;
+  async function fetchGateStatus() {
+    const res = await fetch(`${API_BASE}/api/dddit/team-gate/status`);
+    if (!res.ok) {
+      throw new Error(`team-gate status HTTP ${res.status}`);
     }
+    return res.json();
   }
 
   async function verifyToken(token) {
@@ -80,17 +78,20 @@
     if (!IS_PROD || isGatePage() || isPublicBrandSharePath()) return;
     if (sessionStorage.getItem(BYPASS_KEY) === "1") return;
 
-    const enabled = await fetchGateEnabled();
-    if (!enabled) return;
-
-    const token = sessionStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      location.replace(gateUrl());
-      return;
-    }
-
     blockPage();
     try {
+      const status = await fetchGateStatus();
+      if (!status.enabled) {
+        revealPage();
+        return;
+      }
+
+      const token = sessionStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        location.replace(gateUrl());
+        return;
+      }
+
       const ok = await verifyToken(token);
       if (!ok) {
         sessionStorage.removeItem(TOKEN_KEY);
@@ -99,6 +100,7 @@
       }
       revealPage();
     } catch {
+      // Fail closed — do not reveal internal pages when status/API is unreachable.
       location.replace(gateUrl());
     }
   }
