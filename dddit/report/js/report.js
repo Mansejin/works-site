@@ -213,11 +213,15 @@
 
   async function fetchJson(url, options = {}) {
     const timeoutMs = options.timeoutMs ?? API_TIMEOUT_MS;
-    const { timeoutMs: _t, ...fetchOpts } = options;
+    const { timeoutMs: _t, headers: extraHeaders, ...fetchOpts } = options;
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    const headers = window.DdditApiAuth?.authHeaders?.(extraHeaders) || { ...(extraHeaders || {}) };
     try {
-      const res = await fetch(url, { ...fetchOpts, signal: controller.signal });
+      const res = await fetch(url, { ...fetchOpts, headers, signal: controller.signal });
+      if (window.DdditApiAuth?.handleUnauthorized?.(res)) {
+        throw new Error("Team authentication required");
+      }
       const body = await res.json().catch(() => ({}));
       return { res, body };
     } catch (err) {
@@ -237,14 +241,22 @@
   }
 
   async function apiPost(path, options = {}) {
-    const { res, body } = await fetchJson(`${API_BASE}${path}`, { method: "POST", ...options });
+    const { headers, body, ...rest } = options;
+    const { res, body: resBody } = await fetchJson(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: window.DdditApiAuth?.authHeaders?.(
+        Object.assign({ "Content-Type": "application/json" }, headers || {})
+      ),
+      body: body != null && typeof body !== "string" ? JSON.stringify(body) : body,
+      ...rest,
+    });
     if (!res.ok) {
-      throw new Error(body.detail || body.message || `HTTP ${res.status}`);
+      throw new Error(resBody.detail || resBody.message || `HTTP ${res.status}`);
     }
-    if (body && body.ok === false) {
-      throw new Error(body.message || body.detail || "요청 실패");
+    if (resBody && resBody.ok === false) {
+      throw new Error(resBody.message || resBody.detail || "요청 실패");
     }
-    return body;
+    return resBody;
   }
 
   async function apiGet(path, options = {}) {
@@ -258,9 +270,14 @@
   async function apiPut(path, payload) {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: window.DdditApiAuth?.authHeaders?.({ "Content-Type": "application/json" }) || {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(payload),
     });
+    if (window.DdditApiAuth?.handleUnauthorized?.(res)) {
+      throw new Error("Team authentication required");
+    }
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.detail || `HTTP ${res.status}`);

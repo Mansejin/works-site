@@ -27,8 +27,13 @@ window.DdditWorksApi = (function () {
     if (configCache && !force) return configCache;
     if (configPromise && !force) return configPromise;
 
-    configPromise = fetch(`${BASE}/api/dddit/config`)
+    configPromise = fetch(`${BASE}/api/dddit/config`, {
+      headers: window.DdditApiAuth?.authHeaders?.() || {},
+    })
       .then(async (res) => {
+        if (window.DdditApiAuth?.handleUnauthorized?.(res)) {
+          throw new Error("Team authentication required");
+        }
         if (!res.ok) throw new Error(`works-api ${res.status}`);
         const data = await res.json();
         configCache = data;
@@ -63,7 +68,9 @@ window.DdditWorksApi = (function () {
     try {
       res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: window.DdditApiAuth?.authHeaders?.({ "Content-Type": "application/json" }) || {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(body),
         signal: options.signal,
       });
@@ -78,6 +85,13 @@ window.DdditWorksApi = (function () {
       e.apiStatus = 0;
       e.apiModel = model;
       e.cause = err;
+      throw e;
+    }
+
+    if (window.DdditApiAuth?.handleUnauthorized?.(res)) {
+      const e = new Error("Team authentication required");
+      e.apiStatus = 401;
+      e.apiModel = model;
       throw e;
     }
 

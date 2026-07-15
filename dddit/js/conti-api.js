@@ -59,8 +59,14 @@ window.DdditContiApi = (function () {
     return `conti-${String(project || "").trim().toLowerCase()}`;
   }
 
-  async function request(path, options) {
-    const res = await fetch(`${API_BASE}${path}`, options);
+  async function request(path, options = {}) {
+    const headers = window.DdditApiAuth?.authHeaders?.(options.headers) || {
+      ...(options.headers || {}),
+    };
+    const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    if (window.DdditApiAuth?.handleUnauthorized?.(res)) {
+      throw new Error("Team authentication required");
+    }
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       const detail = body?.detail;
