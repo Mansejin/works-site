@@ -7,10 +7,12 @@
   <meta name="description" content="디디딧 콘티 작성기 — 기획안 · 대본 · Google 시트" />
   <link rel="canonical" href="https://works.mansejin.com/dddit/script/" />
   <title>콘티 작성기 · 디디딧</title>
+  <script src="../js/theme-boot.js"></script>
   <style>html.team-gate-pending body { visibility: hidden; }</style>
   <script src="../js/team-gate.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="css/style.css?v=15" />
+  <link rel="stylesheet" href="../css/theme-dark.css?v=1" />
+  <link rel="stylesheet" href="css/style.css?v=16" />
   <script>
     window.__earlyErrors = window.__earlyErrors || [];
     window.addEventListener('error', function (e) {
@@ -41,6 +43,10 @@
         <p id="header-subtitle"><span id="pipeline-stage-label">기획안</span><span id="header-product" class="header-product hidden"></span></p>
       </div>
       <div class="header-tools">
+        <button type="button" class="theme-toggle" data-theme-toggle>
+          <span data-theme-icon aria-hidden="true">☾</span>
+          <span data-theme-label>다크</span>
+        </button>
         <span id="workspace-project-badge" class="project-pill hidden"></span>
         <button id="ad-mode-toggle" class="ad-mode-toggle is-on" type="button" aria-pressed="true" title="광고 모드 켜기/끄기">광고 ON</button>
         <button id="toggle-error-log" class="tool-btn" type="button" aria-expanded="false" aria-controls="error-log-panel">로그<span id="error-log-badge" class="badge-dot hidden"></span></button>
@@ -348,6 +354,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" async></script>
+  <script src="../js/theme.js"></script>
   <script src="../js/plan-defaults.js?v=2"></script>
   <script src="../js/chapter-title-qc.js?v=3"></script>
   <script src="../js/brand-guide-qc.js?v=1"></script>
