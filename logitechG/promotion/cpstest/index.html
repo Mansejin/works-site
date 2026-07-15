@@ -328,10 +328,44 @@
             padding: 10px 8px 6px;
         }
 
-        #cpsChart {
+        .chart-legend {
+            display: flex;
+            gap: 14px;
+            justify-content: flex-end;
+            margin-bottom: 6px;
+        }
+
+        .chart-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #888;
+        }
+
+        .chart-legend-swatch {
+            width: 14px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .chart-legend-swatch.instant {
+            background: var(--logi-blue);
+        }
+
+        .chart-legend-swatch.average {
+            background: #ff8a3d;
+        }
+
+        #cpsChart,
+        #resultChart {
             width: 100%;
             height: 130px;
             display: block;
+        }
+
+        #resultChart {
+            height: 110px;
         }
 
         .result-overlay {
@@ -549,6 +583,10 @@
                     </div>
                 </div>
                 <div class="cps-chart-wrap">
+                    <div class="chart-legend">
+                        <div class="chart-legend-item"><span class="chart-legend-swatch instant"></span>순간 CPS</div>
+                        <div class="chart-legend-item"><span class="chart-legend-swatch average"></span>평균 CPS</div>
+                    </div>
                     <canvas id="cpsChart" aria-label="실시간 CPS 차트"></canvas>
                 </div>
             </div>
@@ -564,6 +602,10 @@
             <p style="color: #aaa; font-size: 20px; margin: 5px 0 20px 0;">초당 클릭 수 (CPS) : <span id="finalCps" style="color: var(--logi-blue); font-weight: bold;">0</span></p>
 
             <div class="result-chart-wrap">
+                <div class="chart-legend">
+                    <div class="chart-legend-item"><span class="chart-legend-swatch instant"></span>순간 CPS</div>
+                    <div class="chart-legend-item"><span class="chart-legend-swatch average"></span>평균 CPS</div>
+                </div>
                 <canvas id="resultChart" aria-label="CPS 기록 차트"></canvas>
             </div>
 
@@ -579,7 +621,7 @@
     <script>
         const timeLimit = 10;
         const AUTO_RETURN_SECONDS = 10;
-        const SECOND_BUCKETS = 10;
+        const SAMPLE_INTERVAL = 0.1;
 
         let clicks = 0;
         let timeLeft = timeLimit;
@@ -590,6 +632,7 @@
         let gameStartTime = 0;
         let autoReturnLeft = AUTO_RETURN_SECONDS;
         let clickTimestamps = [];
+        let chartSeries = [];
 
         let isCountingDown = false;
         let isGaming = false;
@@ -637,105 +680,164 @@
             return Math.min(timeLimit, (performance.now() - gameStartTime) / 1000);
         }
 
-        function getClickBuckets() {
-            const buckets = new Array(SECOND_BUCKETS).fill(0);
-            for (const t of clickTimestamps) {
-                const idx = Math.min(Math.floor(t), SECOND_BUCKETS - 1);
-                if (idx >= 0) buckets[idx]++;
+        function getInstantCps(atTime) {
+            const windowStart = Math.max(0, atTime - 1);
+            return clickTimestamps.filter((t) => t > windowStart && t <= atTime).length;
+        }
+
+        function getAverageCps(atTime) {
+            if (atTime <= 0) return 0;
+            const count = clickTimestamps.filter((t) => t <= atTime).length;
+            return count / atTime;
+        }
+
+        function sampleSeries(forceElapsed) {
+            const elapsed = forceElapsed !== undefined ? forceElapsed : getElapsedSeconds();
+            const lastPoint = chartSeries[chartSeries.length - 1];
+            if (lastPoint && Math.abs(lastPoint.t - elapsed) < SAMPLE_INTERVAL * 0.5 && forceElapsed === undefined) {
+                return;
             }
-            return buckets;
-        }
 
-        function getCurrentSecondCps() {
-            if (!isGaming && !isFinished) return 0;
-            const elapsed = getElapsedSeconds();
-            const currentIdx = Math.min(Math.floor(elapsed), SECOND_BUCKETS - 1);
-            const bucketStart = currentIdx;
-            const count = clickTimestamps.filter((t) => t >= bucketStart && t < bucketStart + 1).length;
-            return count;
-        }
-
-        function getAverageCps() {
-            const elapsed = getElapsedSeconds();
-            if (elapsed <= 0) return 0;
-            return clicks / elapsed;
+            chartSeries.push({
+                t: elapsed,
+                instant: getInstantCps(elapsed),
+                average: getAverageCps(elapsed)
+            });
         }
 
         function setupCanvas(canvas, ctx) {
             const rect = canvas.getBoundingClientRect();
+            const width = Math.max(rect.width, 1);
+            const height = Math.max(rect.height, 1);
             const dpr = window.devicePixelRatio || 1;
-            canvas.width = Math.floor(rect.width * dpr);
-            canvas.height = Math.floor(rect.height * dpr);
+            canvas.width = Math.floor(width * dpr);
+            canvas.height = Math.floor(height * dpr);
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            return { width: rect.width, height: rect.height };
+            return { width, height };
         }
 
-        function drawCpsChart(canvas, ctx, options) {
-            const { highlightCurrent = false, elapsedOverride = null } = options;
+        function drawPolyline(ctx, points, color, lineWidth) {
+            if (points.length < 2) return;
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            points.forEach((point, index) => {
+                if (index === 0) ctx.moveTo(point.x, point.y);
+                else ctx.lineTo(point.x, point.y);
+            });
+            ctx.stroke();
+        }
+
+        function drawCpsChart(canvas, ctx) {
             const size = setupCanvas(canvas, ctx);
             const width = size.width;
             const height = size.height;
-            const padding = { top: 8, right: 8, bottom: 22, left: 28 };
+            const padding = { top: 12, right: 10, bottom: 24, left: 34 };
             const chartWidth = width - padding.left - padding.right;
             const chartHeight = height - padding.top - padding.bottom;
-            const buckets = getClickBuckets();
-            const maxValue = Math.max(1, ...buckets);
-            const barGap = 6;
-            const barWidth = (chartWidth - barGap * (SECOND_BUCKETS - 1)) / SECOND_BUCKETS;
-            const elapsed = elapsedOverride !== null ? elapsedOverride : getElapsedSeconds();
-            const currentIdx = Math.min(Math.floor(elapsed), SECOND_BUCKETS - 1);
+            const series = chartSeries.length
+                ? chartSeries
+                : [{ t: 0, instant: 0, average: 0 }, { t: timeLimit, instant: 0, average: 0 }];
+
+            const maxValue = Math.max(
+                1,
+                ...series.map((p) => p.instant),
+                ...series.map((p) => p.average)
+            );
+            const yMax = Math.ceil(maxValue * 1.15) || 1;
 
             ctx.clearRect(0, 0, width, height);
 
             ctx.strokeStyle = '#252525';
             ctx.lineWidth = 1;
-            for (let i = 0; i <= 3; i++) {
-                const y = padding.top + (chartHeight / 3) * i;
+            for (let i = 0; i <= 4; i++) {
+                const y = padding.top + (chartHeight / 4) * i;
                 ctx.beginPath();
                 ctx.moveTo(padding.left, y);
                 ctx.lineTo(width - padding.right, y);
                 ctx.stroke();
             }
 
-            for (let i = 0; i < SECOND_BUCKETS; i++) {
-                const value = buckets[i];
-                const barHeight = (value / maxValue) * chartHeight;
-                const x = padding.left + i * (barWidth + barGap);
-                const y = padding.top + chartHeight - barHeight;
-                const isCurrent = highlightCurrent && i === currentIdx && isGaming;
-
-                ctx.fillStyle = isCurrent ? '#00B8FC' : (value > 0 ? 'rgba(0, 184, 252, 0.55)' : '#1a1a1a');
-                ctx.fillRect(x, y, barWidth, barHeight);
-
-                ctx.fillStyle = '#555';
-                ctx.font = '10px BrownPro, Noto Sans KR, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(String(i + 1), x + barWidth / 2, height - 6);
-
-                if (value > 0) {
-                    ctx.fillStyle = isCurrent ? '#fff' : '#aaa';
-                    ctx.font = 'bold 10px BrownPro, Noto Sans KR, sans-serif';
-                    ctx.fillText(String(value), x + barWidth / 2, Math.max(padding.top + 10, y - 4));
-                }
+            ctx.fillStyle = '#555';
+            ctx.font = '10px BrownPro, Noto Sans KR, sans-serif';
+            ctx.textAlign = 'center';
+            for (let sec = 0; sec <= timeLimit; sec += 2) {
+                const x = padding.left + (sec / timeLimit) * chartWidth;
+                ctx.fillText(String(sec) + 's', x, height - 6);
             }
 
-            ctx.fillStyle = '#666';
-            ctx.font = '10px BrownPro, Noto Sans KR, sans-serif';
             ctx.textAlign = 'right';
-            ctx.fillText(String(maxValue), padding.left - 6, padding.top + 8);
+            ctx.fillStyle = '#666';
+            ctx.fillText(String(yMax), padding.left - 6, padding.top + 8);
+            ctx.fillText('0', padding.left - 6, padding.top + chartHeight);
+
+            const toPoint = (point, key) => ({
+                x: padding.left + (point.t / timeLimit) * chartWidth,
+                y: padding.top + chartHeight - (point[key] / yMax) * chartHeight
+            });
+
+            const instantPoints = series.map((p) => toPoint(p, 'instant'));
+            const averagePoints = series.map((p) => toPoint(p, 'average'));
+
+            if (instantPoints.length > 1) {
+                const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight);
+                gradient.addColorStop(0, 'rgba(0, 184, 252, 0.22)');
+                gradient.addColorStop(1, 'rgba(0, 184, 252, 0)');
+                ctx.beginPath();
+                ctx.moveTo(instantPoints[0].x, padding.top + chartHeight);
+                instantPoints.forEach((point) => ctx.lineTo(point.x, point.y));
+                ctx.lineTo(instantPoints[instantPoints.length - 1].x, padding.top + chartHeight);
+                ctx.closePath();
+                ctx.fillStyle = gradient;
+                ctx.fill();
+            }
+
+            drawPolyline(ctx, averagePoints, '#ff8a3d', 2.5);
+            drawPolyline(ctx, instantPoints, '#00B8FC', 2.5);
+
+            const lastInstant = instantPoints[instantPoints.length - 1];
+            const lastAverage = averagePoints[averagePoints.length - 1];
+            if (lastInstant) {
+                ctx.fillStyle = '#00B8FC';
+                ctx.beginPath();
+                ctx.arc(lastInstant.x, lastInstant.y, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            if (lastAverage) {
+                ctx.fillStyle = '#ff8a3d';
+                ctx.beginPath();
+                ctx.arc(lastAverage.x, lastAverage.y, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
 
         function updateLiveStats() {
-            liveCpsEl.textContent = getCurrentSecondCps().toFixed(1);
-            avgCpsEl.textContent = getAverageCps().toFixed(1);
-            drawCpsChart(cpsChart, cpsCtx, { highlightCurrent: true });
+            const elapsed = getElapsedSeconds();
+            sampleSeries();
+            const instant = getInstantCps(elapsed);
+            const average = getAverageCps(elapsed);
+            liveCpsEl.textContent = instant.toFixed(1);
+            avgCpsEl.textContent = average.toFixed(1);
+            drawCpsChart(cpsChart, cpsCtx);
         }
 
         function resetChartDisplay() {
             clickTimestamps = [];
+            chartSeries = [{ t: 0, instant: 0, average: 0 }];
             liveCpsEl.textContent = '0.0';
             avgCpsEl.textContent = '0.0';
-            drawCpsChart(cpsChart, cpsCtx, { highlightCurrent: false, elapsedOverride: 0 });
+            drawCpsChart(cpsChart, cpsCtx);
+        }
+
+        function showResultChart() {
+            sampleSeries(timeLimit);
+            resultOverlay.style.display = 'flex';
+            requestAnimationFrame(() => {
+                drawCpsChart(resultChart, resultCtx);
+                requestAnimationFrame(() => drawCpsChart(resultChart, resultCtx));
+            });
         }
 
         function startAutoReturnCountdown() {
@@ -756,6 +858,7 @@
             document.getElementById('mainScreen').classList.remove('active');
             document.getElementById('gameScreen').classList.add('active');
             resetGame();
+            requestAnimationFrame(() => drawCpsChart(cpsChart, cpsCtx));
         }
 
         function goToMain() {
@@ -769,6 +872,7 @@
             clearAllTimers();
             resultOverlay.style.display = 'none';
             resetGame();
+            requestAnimationFrame(() => drawCpsChart(cpsChart, cpsCtx));
         }
 
         clickArea.addEventListener('pointerdown', function (e) {
@@ -832,7 +936,7 @@
                 if (timeLeft <= 0) {
                     endGame();
                 }
-            }, 16);
+            }, 50);
         }
 
         function endGame() {
@@ -843,13 +947,15 @@
             timeDisplay.textContent = '0.00';
             clickArea.textContent = '종료!';
 
+            sampleSeries(timeLimit);
             finalClicks.textContent = clicks;
             finalCps.textContent = (clicks / timeLimit).toFixed(1);
-            updateLiveStats();
+            liveCpsEl.textContent = getInstantCps(timeLimit).toFixed(1);
+            avgCpsEl.textContent = (clicks / timeLimit).toFixed(1);
+            drawCpsChart(cpsChart, cpsCtx);
 
             resultShowTimer = setTimeout(() => {
-                drawCpsChart(resultChart, resultCtx, { highlightCurrent: false, elapsedOverride: timeLimit });
-                resultOverlay.style.display = 'flex';
+                showResultChart();
                 startAutoReturnCountdown();
             }, 300);
         }
@@ -876,9 +982,9 @@
         }
 
         window.addEventListener('resize', () => {
-            drawCpsChart(cpsChart, cpsCtx, { highlightCurrent: isGaming, elapsedOverride: isFinished ? timeLimit : null });
+            drawCpsChart(cpsChart, cpsCtx);
             if (resultOverlay.style.display === 'flex') {
-                drawCpsChart(resultChart, resultCtx, { highlightCurrent: false, elapsedOverride: timeLimit });
+                drawCpsChart(resultChart, resultCtx);
             }
         });
 
