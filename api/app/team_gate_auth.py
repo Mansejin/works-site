@@ -16,9 +16,14 @@ _PUBLIC_GET = {
     "/api/dddit/conti",
     "/api/dddit/conti/projects",
     "/api/dddit/sheet/get",
+    "/api/dddit/productlist",
 }
 _PUBLIC_POST = {
     "/api/dddit/team-gate/login",
+}
+_PUBLIC_PUT = {
+    # Brand-shared product request lists (editable on public brand pages)
+    "/api/dddit/productlist",
 }
 
 # Studio Console bookmarklet cannot read works sessionStorage — allow import
@@ -54,6 +59,9 @@ def is_public_api_request(request: Request) -> bool:
         return True
 
     if method == "POST" and path in _PUBLIC_POST:
+        return True
+
+    if method == "PUT" and path in _PUBLIC_PUT:
         return True
 
     if method == "POST" and path in _STUDIO_PUBLIC_POST and is_studio_origin(request):
