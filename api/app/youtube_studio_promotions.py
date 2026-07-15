@@ -568,6 +568,15 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
         "subscriber",
     )
     follow_on = _pick_money_fuzzy(raw, "followOnViews", "clicks", "followOnViewCount", "followon")
+    budget = _pick_money_fuzzy(
+        raw,
+        "budget",
+        "totalBudget",
+        "campaignBudget",
+        "dailyBudget",
+        "budgetAmount",
+        "totalBudgetAmount",
+    )
 
     status = _status_label(_pick(raw, "status", "campaignStatus", "state", "promotionStatus"))
     goal = _goal_label(_pick(raw, "goal", "objective", "campaignGoal", "promotionGoal"))
@@ -590,7 +599,7 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
         promo_id = f"studio-{campaign_id}" if campaign_id else f"studio-{_slugify(title)}"
         studio_campaign_id = campaign_id or None
 
-    return {
+    payload = {
         "id": promo_id,
         "title": title[:80],
         "videoTitle": (video_title or title)[:120],
@@ -609,6 +618,9 @@ def normalize_studio_promo(raw: dict[str, Any]) -> dict[str, Any]:
         "notes": ["YouTube Studio 내부 API 동기화"],
         "rawTitle": raw_title[:120],
     }
+    if budget:
+        payload["budget"] = budget
+    return payload
 
 
 def _status_rank(status: Any) -> int:

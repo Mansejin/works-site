@@ -459,7 +459,7 @@ async def _retention_series_for_videos(
     start_date: str,
     end_date: str,
     format_key: str,
-    limit: int = 3,
+    limit: int = 6,
 ) -> list[dict[str, Any]]:
     series: list[dict[str, Any]] = []
     for item in videos[:limit]:
@@ -618,8 +618,17 @@ async def _build_channel_retention_formats(
     }
 
 
-async def fetch_retention(video_id: str | None = None, refresh: bool = False) -> dict[str, Any]:
-    cache_key = f"retention:{video_id or 'channel'}"
+async def fetch_retention(
+    video_id: str | None = None,
+    video_ids: list[str] | None = None,
+    refresh: bool = False,
+) -> dict[str, Any]:
+    ids = [vid for vid in (video_ids or []) if vid]
+    if not ids and video_id:
+        ids = [video_id]
+    # Cap compare fan-out to keep Analytics quota reasonable.
+    ids = ids[:8]
+    cache_key = f"retention:{','.join(ids) if ids else 'channel'}"
     if not refresh:
         cached = _cache_get(cache_key)
         if cached:
@@ -634,20 +643,55 @@ async def fetch_retention(video_id: str | None = None, refresh: bool = False) ->
             token, channel_id = await _get_token_and_channel(client)
 
             formats: dict[str, Any] | None = None
+            series: list[dict[str, Any]] = []
+            trend: list[dict[str, Any]] = []
+            points: list[dict[str, Any]] = []
+            avg_pct = None
+            scope = "channel"
+            primary_id = ids[0] if len(ids) == 1 else None
 
-            if video_id:
+            if len(ids) >= 2:
+                meta = await _fetch_video_meta(client, ids)
+                series = await _retention_series_for_videos(
+                    client,
+                    token,
+                    channel_id,
+                    [
+                        {
+                            "videoId": vid,
+                            "title": (meta.get(vid) or {}).get("title") or "",
+                            "views": 0,
+                        }
+                        for vid in ids
+                    ],
+                    start_date=start_date,
+                    end_date=end_date,
+                    format_key="compare",
+                    limit=len(ids),
+                )
+                scope = "compare"
+                points = []
+            elif len(ids) == 1:
                 points = await _retention_points_for_video(
                     client,
                     token,
                     channel_id,
-                    video_id,
+                    ids[0],
                     start_date=start_date,
                     end_date=end_date,
                 )
                 scope = "video"
-                series: list[dict[str, Any]] = []
-                trend: list[dict[str, Any]] = []
-                avg_pct = None
+                meta = await _fetch_video_meta(client, ids)
+                if points:
+                    series = [
+                        {
+                            "videoId": ids[0],
+                            "title": (meta.get(ids[0]) or {}).get("title") or "",
+                            "views": 0,
+                            "points": points,
+                            "format": "video",
+                        }
+                    ]
             else:
                 formats = await _build_channel_retention_formats(
                     client,
@@ -677,13 +721,14 @@ async def fetch_retention(video_id: str | None = None, refresh: bool = False) ->
                 "configured": True,
                 "scope": scope,
                 "chartMode": chart_mode,
-                "videoId": video_id,
+                "videoId": primary_id,
+                "videoIds": ids,
                 "period": {"startDate": start_date, "endDate": end_date},
                 "points": points,
                 "series": series,
                 "formats": formats,
                 "trend": trend,
-                "averageViewPercentage": avg_pct if not video_id else None,
+                "averageViewPercentage": avg_pct if not ids else None,
                 "message": None,
             }
             _cache_set(cache_key, payload)

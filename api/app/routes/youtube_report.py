@@ -133,24 +133,67 @@ def parse_description_chapters(description: str) -> list[dict[str, Any]]:
     return chapters
 
 
+def _is_subscribe_promotion(promo: dict[str, Any]) -> bool:
+    goal = str(promo.get("goal") or "")
+    title = str(promo.get("title") or "")
+    if any(token in goal for token in ("시청자층", "구독")):
+        return True
+    if re.search(r"\(구독\)|구독\s*$|구독\s*캠페인", title):
+        return True
+    return False
+
+
+def _is_views_promotion(promo: dict[str, Any]) -> bool:
+    if _is_subscribe_promotion(promo):
+        return False
+    goal = str(promo.get("goal") or "")
+    title = str(promo.get("title") or "")
+    if any(token in goal for token in ("조회", "Views", "VIEWS")):
+        return True
+    if re.search(r"\(조회|조회수", title):
+        return True
+    return False
+
+
+def _promotion_goal_group(promo: dict[str, Any]) -> str:
+    if _is_subscribe_promotion(promo):
+        return "subscribe"
+    if _is_views_promotion(promo):
+        return "views"
+    return "other"
+
+
 def _promotion_metrics(promo: dict[str, Any]) -> dict[str, Any]:
     cost = _parse_int(promo.get("cost"))
     impressions = _parse_int(promo.get("impressions"))
     views = _parse_int(promo.get("views"))
     subscribers = _parse_int(promo.get("subscribers"))
     clicks = _parse_int(promo.get("clicks") or promo.get("followOnViews"))
+    group = _promotion_goal_group(promo)
 
-    cpv = round(cost / views, 1) if views > 0 else None
+    raw_cpv = round(cost / views, 1) if views > 0 else None
     cps = round(cost / subscribers) if subscribers > 0 else None
     cpm = round(cost / impressions * 1000, 1) if impressions > 0 else None
     cpc = round(cost / clicks, 1) if clicks > 0 else None
     ctr = round(views / impressions * 100, 2) if impressions > 0 else None
 
+    # Subscribe campaigns should be judged by CPS, not incidental CPV.
+    cpv = None if group == "subscribe" else raw_cpv
+
     efficiency = ""
-    if cpv is not None:
+    if group == "subscribe":
+        if cps is not None:
+            efficiency = f"구독자 1명당 약 {cps:,}원"
+            if cps <= 400:
+                efficiency += " · 효율 매우 좋음"
+            elif cps <= 700:
+                efficiency += " · 효율 보통"
+    elif cpv is not None:
         efficiency = f"조회 1회당 약 {cpv:,.0f}원"
         if cpv <= 30:
             efficiency += " · 효율 좋음"
+        elif cpv <= 60:
+            efficiency += " · 효율 보통"
     elif cps is not None:
         efficiency = f"구독자 1명당 약 {cps:,}원"
         if cps <= 400:
@@ -162,6 +205,7 @@ def _promotion_metrics(promo: dict[str, Any]) -> dict[str, Any]:
         "cpm": cpm,
         "cpc": cpc,
         "ctr": ctr,
+        "goalGroup": group,
         "efficiencyText": efficiency,
     }
 
@@ -698,9 +742,15 @@ async def report_traffic_sources(refresh: bool = Query(False)) -> dict[str, Any]
 @router.get("/retention")
 async def report_retention(
     video_id: str | None = Query(None),
+    video_ids: str | None = Query(None, description="Comma-separated video IDs for compare"),
     refresh: bool = Query(False),
 ) -> dict[str, Any]:
-    return await fetch_retention(video_id=video_id, refresh=refresh)
+    ids: list[str] = []
+    if video_ids:
+        ids = [part.strip() for part in str(video_ids).split(",") if part.strip()]
+    elif video_id:
+        ids = [video_id]
+    return await fetch_retention(video_ids=ids or None, refresh=refresh)
 
 
 @router.get("/demographics")
