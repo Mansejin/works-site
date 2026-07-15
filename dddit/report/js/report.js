@@ -5,9 +5,10 @@
   const REFRESH_CACHE_KEY = "works/dddit/report/lastApiRefresh";
   const REFRESH_TTL_MS = 24 * 60 * 60 * 1000;
   const SUBSCRIBER_POLL_MS = 90_000;
-  const PROMO_PAGE_SIZE = 5;
+  const PROMO_PAGE_SIZE = 12;
   const API_TIMEOUT_MS = 90_000;
   const CAPTURE_TIMEOUT_MS = 45_000;
+  const RETENTION_COMPARE_COLORS = ["#dc2626", "#2563eb", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
 
   const els = {
     root: document.getElementById("report-root"),
@@ -50,7 +51,10 @@
   let retentionData = null;
   let retentionVideos = [];
   let activeRetentionFormat = "longform";
+  let retentionSelectedIds = { longform: null, shorts: null };
+  let allReportVideos = [];
   let subscriberPollTimer = null;
+  let videoModalRetentionChart = null;
 
   const TRAFFIC_LABELS = {
     ADVERTISING: "광고",
@@ -571,20 +575,31 @@
       return;
     }
 
+    const evals = evaluateAnalyticsKpis(analytics);
     const items = [
-      { label: "조회수 (28일)", value: formatNum(analytics.views) },
+      {
+        label: "조회수 (28일)",
+        value: formatNum(analytics.views),
+        eval: evals.views,
+      },
       {
         label:
           analytics.impressionsSource === "reporting-api" ? "썸네일 노출 (28일)" : "노출수",
         value: analytics.impressions != null ? formatNum(analytics.impressions) : "—",
+        eval: evals.impressions,
       },
-      { label: "CTR", value: analytics.impressions != null && analytics.ctr != null ? `${analytics.ctr}%` : "—" },
+      {
+        label: "CTR",
+        value: analytics.impressions != null && analytics.ctr != null ? `${analytics.ctr}%` : "—",
+        eval: evals.ctr,
+      },
       {
         label: "평균 시청률",
         value:
           analytics.averageViewPercentage != null
             ? `${Number(analytics.averageViewPercentage).toFixed(1)}%`
             : "—",
+        eval: evals.avgWatch,
       },
     ];
     els.analyticsKpiGrid.innerHTML = items
@@ -593,9 +608,65 @@
       <div class="analytics-kpi">
         <div class="label">${esc(item.label)}</div>
         <div class="value">${esc(item.value)}</div>
+        ${
+          item.eval
+            ? `<div class="eval ${esc(item.eval.tone)}">${esc(item.eval.text)}</div>`
+            : ""
+        }
       </div>`
       )
       .join("");
+  }
+
+  function evaluateAnalyticsKpis(analytics) {
+    const views = Number(analytics.views);
+    const impressions = analytics.impressions != null ? Number(analytics.impressions) : null;
+    const ctr = analytics.ctr != null ? Number(analytics.ctr) : null;
+    const avgWatch =
+      analytics.averageViewPercentage != null ? Number(analytics.averageViewPercentage) : null;
+
+    const result = { views: null, impressions: null, ctr: null, avgWatch: null };
+
+    if (Number.isFinite(ctr)) {
+      if (ctr >= 5) result.ctr = { tone: "good", text: "우수 · 썸네일/제목 클릭 반응이 강함" };
+      else if (ctr >= 3) result.ctr = { tone: "ok", text: "양호 · 평균 이상 클릭률" };
+      else if (ctr >= 2) result.ctr = { tone: "warn", text: "보통 · 훅·비주얼 개선 여지" };
+      else result.ctr = { tone: "bad", text: "낮음 · 썸네일·제목 점검 권장" };
+    } else {
+      result.ctr = { tone: "muted", text: "노출 데이터 대기 중" };
+    }
+
+    if (Number.isFinite(avgWatch)) {
+      if (avgWatch >= 50) result.avgWatch = { tone: "good", text: "우수 · 시청 몰입도 높음" };
+      else if (avgWatch >= 35) result.avgWatch = { tone: "ok", text: "양호 · 전반 유지력 안정" };
+      else if (avgWatch >= 25) result.avgWatch = { tone: "warn", text: "보통 · 초반 이탈 점검" };
+      else result.avgWatch = { tone: "bad", text: "낮음 · 오프닝·전개 구조 개선 필요" };
+    } else {
+      result.avgWatch = { tone: "muted", text: "데이터 없음" };
+    }
+
+    if (Number.isFinite(views)) {
+      if (views >= 80000) result.views = { tone: "good", text: "강세 · 최근 28일 수요 큼" };
+      else if (views >= 30000) result.views = { tone: "ok", text: "양호 · 안정적인 수요 구간" };
+      else if (views >= 10000) result.views = { tone: "warn", text: "보통 · 프로모·검색 유입 보강" };
+      else result.views = { tone: "bad", text: "약세 · 신규 노출 파이프라인 필요" };
+    }
+
+    if (impressions != null && Number.isFinite(impressions) && Number.isFinite(views) && impressions > 0) {
+      const convert = (views / impressions) * 100;
+      if (convert >= 8) result.impressions = { tone: "good", text: `전환 ${convert.toFixed(1)}% · 노출 대비 반응 좋음` };
+      else if (convert >= 4) result.impressions = { tone: "ok", text: `전환 ${convert.toFixed(1)}% · 무난한 클릭 전환` };
+      else if (convert >= 2) result.impressions = { tone: "warn", text: `전환 ${convert.toFixed(1)}% · 클릭 유도 보강` };
+      else result.impressions = { tone: "bad", text: `전환 ${convert.toFixed(1)}% · 노출은 되나 유입 약함` };
+    } else if (impressions != null && Number.isFinite(impressions)) {
+      if (impressions >= 500000) result.impressions = { tone: "ok", text: "노출 규모 큼 · CTR과 함께 해석" };
+      else if (impressions >= 100000) result.impressions = { tone: "warn", text: "중간 노출 · 도달 확장 여지" };
+      else result.impressions = { tone: "warn", text: "노출 제한적 · 배포·프로모 검토" };
+    } else {
+      result.impressions = { tone: "muted", text: "Reporting API 수집 대기" };
+    }
+
+    return result;
   }
 
   function renderTrafficChart(data) {
@@ -605,10 +676,18 @@
     charts.traffic = null;
     const sources = (data?.sources || []).slice(0, 8);
     if (!sources.length) return;
+    const total = sources.reduce((sum, s) => sum + (Number(s.views) || 0), 0) || 1;
     charts.traffic = new Chart(ctx, {
       type: "doughnut",
       data: {
-        labels: sources.map((s) => TRAFFIC_LABELS[s.source] || s.source),
+        labels: sources.map((s) => {
+          const name = TRAFFIC_LABELS[s.source] || s.source;
+          const share =
+            s.share != null
+              ? Number(s.share)
+              : ((Number(s.views) || 0) / total) * 100;
+          return `${name} ${share.toFixed(1)}%`;
+        }),
         datasets: [
           {
             data: sources.map((s) => s.views),
@@ -628,7 +707,18 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: "right", labels: { boxWidth: 10, font: { size: 10 } } } },
+        plugins: {
+          legend: { position: "right", labels: { boxWidth: 10, font: { size: 10 } } },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                const views = Number(context.raw) || 0;
+                const pct = (views / total) * 100;
+                return `${context.label.split(" ").slice(0, -1).join(" ") || context.label}: ${formatNum(views)}회 (${pct.toFixed(1)}%)`;
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -668,6 +758,7 @@
   function bindRetentionTabs(data, videos) {
     retentionData = data;
     retentionVideos = videos || [];
+    retentionSelectedIds = { longform: null, shorts: null };
     const tabs = document.getElementById("retention-tabs");
     if (!tabs) return;
 
@@ -702,6 +793,57 @@
     }
   }
 
+  function retentionSelectedFor(format, series) {
+    const available = (series || []).map((item) => item.videoId).filter(Boolean);
+    let selected = retentionSelectedIds[format];
+    if (!selected || !selected.length) {
+      selected = available.slice(0, Math.min(3, available.length));
+      retentionSelectedIds[format] = selected;
+    }
+    const filtered = selected.filter((id) => available.includes(id));
+    if (!filtered.length && available.length) {
+      retentionSelectedIds[format] = available.slice(0, Math.min(2, available.length));
+      return retentionSelectedIds[format];
+    }
+    return filtered;
+  }
+
+  function renderRetentionComparePicker(series, format) {
+    const host = document.getElementById("retention-compare");
+    if (!host) return;
+    if (!series.length) {
+      host.innerHTML = "";
+      return;
+    }
+    const selected = new Set(retentionSelectedFor(format, series));
+    host.innerHTML = `
+      ${series
+        .map((item) => {
+          const id = item.videoId;
+          const checked = selected.has(id);
+          return `<label class="retention-chip${checked ? " active" : ""}">
+            <input type="checkbox" data-video-id="${esc(id)}" ${checked ? "checked" : ""} />
+            <span title="${esc(item.title || id)}">${esc(retentionVideoTitle(retentionVideos, id, item.title))}</span>
+          </label>`;
+        })
+        .join("")}
+      <p class="retention-compare-hint">2개 이상 선택하면 시청 유지 곡선을 비교합니다. (조회 상위 콘텐츠)</p>`;
+
+    host.querySelectorAll("input[type='checkbox']").forEach((input) => {
+      input.addEventListener("change", () => {
+        const next = Array.from(host.querySelectorAll("input[type='checkbox']:checked")).map(
+          (el) => el.getAttribute("data-video-id")
+        );
+        if (next.length < 1) {
+          input.checked = true;
+          return;
+        }
+        retentionSelectedIds[format] = next;
+        renderRetentionChart(retentionData, retentionVideos, format);
+      });
+    });
+  }
+
   function renderRetentionChart(data, videos, format = activeRetentionFormat) {
     const ctx = document.getElementById("chart-retention");
     const labelEl = document.getElementById("retention-chart-label");
@@ -718,18 +860,25 @@
       }
       destroyCanvasChart(ctx);
       if (labelEl) labelEl.textContent = data?.message || "시청 유지 조회 실패";
+      const compareHost = document.getElementById("retention-compare");
+      if (compareHost) compareHost.innerHTML = "";
       return;
     }
 
     const block = retentionBlock(data, format);
     const formatLabel = format === "shorts" ? "쇼츠" : "롱폼";
-    const series = (block?.series || []).filter((item) => (item.points || []).length);
+    let series = (block?.series || []).filter((item) => (item.points || []).length);
+    renderRetentionComparePicker(series, format);
+    if (series.length > 1 || retentionSelectedIds[format]) {
+      const selected = new Set(retentionSelectedFor(format, series));
+      series = series.filter((item) => selected.has(item.videoId));
+    }
     let trend = block?.trend || [];
     if (!trend.length && format === "longform" && (data?.trend || []).length) {
       trend = data.trend;
     }
     const points = block?.points || data?.points || [];
-    const colors = ["#dc2626", "#2563eb", "#16a34a"];
+    const colors = RETENTION_COMPARE_COLORS;
     // Shorts can exceed 100% (rewatches); longform stays 0–100%.
     const watchYMax = format === "shorts" ? 200 : 100;
 
@@ -749,7 +898,7 @@
         labelEl.textContent =
           series.length === 1
             ? `시청 유지 (${formatLabel}) — ${retentionVideoTitle(videos, series[0].videoId, series[0].title)}`
-            : `시청 유지 (${formatLabel}) — 조회 상위 ${series.length}개`;
+            : `시청 유지 (${formatLabel}) — ${series.length}개 비교`;
       }
       charts.retention = new Chart(ctx, {
         type: "line",
@@ -1069,6 +1218,12 @@
     return data;
   }
   function sortPromotionsForDisplay(promotions) {
+    const groupRank = (p) => {
+      const g = promoGoalGroup(p);
+      if (g === "subscribe") return 0;
+      if (g === "views") return 1;
+      return 2;
+    };
     const rank = (status) => {
       const s = String(status || "");
       if (s === "진행중" || /ACTIVE/i.test(s)) return 0;
@@ -1083,6 +1238,8 @@
       return m ? m[1].replace(/-/g, "") : "0";
     };
     return [...(promotions || [])].sort((a, b) => {
+      const byGroup = groupRank(a) - groupRank(b);
+      if (byGroup) return byGroup;
       const byStatus = rank(a.status) - rank(b.status);
       if (byStatus) return byStatus;
       const byDate = Number(dateKey(b)) - Number(dateKey(a));
@@ -1116,49 +1273,282 @@
     });
   }
 
+  function promoGoalGroup(promo) {
+    const fromMetrics = promo?.metrics?.goalGroup;
+    if (fromMetrics === "subscribe" || fromMetrics === "views" || fromMetrics === "other") {
+      return fromMetrics;
+    }
+    const goal = String(promo?.goal || "");
+    const title = String(promo?.title || "");
+    if (/시청자층|구독/.test(goal) || /\(구독\)|구독\s*$/.test(title)) return "subscribe";
+    if (/조회/.test(goal) || /\(조회|조회수/.test(title)) return "views";
+    return "other";
+  }
+
+  function promoGroupLabel(group) {
+    if (group === "subscribe") return "구독 캠페인";
+    if (group === "views") return "조회수 캠페인";
+    return "기타 캠페인";
+  }
+
+  function renderPromoRow(p) {
+    const m = p.metrics || {};
+    const group = promoGoalGroup(p);
+    const effClass =
+      group === "subscribe"
+        ? m.cps && m.cps <= 400
+          ? "metric-good"
+          : ""
+        : m.cpv && m.cpv <= 30
+          ? "metric-good"
+          : m.cps && m.cps <= 400
+            ? "metric-good"
+            : "";
+    const statusLabel = String(p.status || "—");
+    const statusClass =
+      statusLabel === "완료" || /ENDED|COMPLETED|FINISHED/i.test(statusLabel)
+        ? " done"
+        : statusLabel === "진행중" || /ACTIVE/i.test(statusLabel)
+          ? " active"
+          : "";
+    const budget =
+      p.budget != null && p.budget !== ""
+        ? formatWon(p.budget)
+        : "—";
+    const cpvCell = group === "subscribe" ? "—" : m.cpv != null ? `${formatNum(m.cpv)}원` : "—";
+    const cpsCell = m.cps != null ? `${formatNum(m.cps)}원` : "—";
+    return `
+      <tr>
+        <td class="promo-name-cell">
+          <strong>${esc(p.title)}</strong><span class="badge${statusClass}">${esc(statusLabel)}</span>${sourceBadge(p.source)}
+        </td>
+        <td>${budget}</td>
+        <td>${formatWon(p.cost)}</td>
+        <td>${formatNum(p.impressions)}</td>
+        <td>${formatNum(p.views)}</td>
+        <td>${formatNum(p.subscribers)}</td>
+        <td>${cpvCell}</td>
+        <td>${cpsCell}</td>
+        <td class="${effClass}">${esc(m.efficiencyText || "—")}</td>
+      </tr>`;
+  }
+
   function renderPromotions(promotions) {
     if (promotions) allPromotions = promotions;
     const sorted = sortPromotionsForDisplay(allPromotions);
     if (!sorted.length) {
-      els.promoBody.innerHTML = `<tr><td colspan="8">등록된 프로모션이 없습니다. 아래 JSON 편집으로 추가하세요.</td></tr>`;
+      els.promoBody.innerHTML = `<tr><td colspan="9">등록된 프로모션이 없습니다. 아래 JSON 편집으로 추가하세요.</td></tr>`;
       renderPromoPagination(0, 0);
       return;
     }
-    const pages = Math.max(1, Math.ceil(sorted.length / PROMO_PAGE_SIZE));
+
+    const groups = { subscribe: [], views: [], other: [] };
+    sorted.forEach((p) => {
+      groups[promoGoalGroup(p)].push(p);
+    });
+    const orderedGroups = ["subscribe", "views", "other"].filter((key) => groups[key].length);
+
+    // Flat list for pagination, but keep group headers by rendering selected slice with section headers as needed.
+    const flat = orderedGroups.flatMap((key) => groups[key]);
+    const pages = Math.max(1, Math.ceil(flat.length / PROMO_PAGE_SIZE));
     if (promoPage >= pages) promoPage = pages - 1;
     if (promoPage < 0) promoPage = 0;
     const start = promoPage * PROMO_PAGE_SIZE;
-    const visible = sorted.slice(start, start + PROMO_PAGE_SIZE);
-    els.promoBody.innerHTML = visible
-      .map((p) => {
-        const m = p.metrics || {};
-        const effClass = m.cpv && m.cpv <= 30 ? "metric-good" : m.cps && m.cps <= 400 ? "metric-good" : "";
-        const statusLabel = String(p.status || "—");
-        const statusClass =
-          statusLabel === "완료" || /ENDED|COMPLETED|FINISHED/i.test(statusLabel)
-            ? " done"
-            : statusLabel === "진행중" || /ACTIVE/i.test(statusLabel)
-              ? " active"
-              : "";
-        return `
-        <tr>
-          <td class="promo-name-cell">
-            <strong>${esc(p.title)}</strong><span class="badge${statusClass}">${esc(statusLabel)}</span>${sourceBadge(p.source)}
-          </td>
-          <td>${formatWon(p.cost)}</td>
-          <td>${formatNum(p.impressions)}</td>
-          <td>${formatNum(p.views)}</td>
-          <td>${formatNum(p.subscribers)}</td>
-          <td>${m.cpv != null ? `${formatNum(m.cpv)}원` : "—"}</td>
-          <td>${m.cps != null ? `${formatNum(m.cps)}원` : "—"}</td>
-          <td class="${effClass}">${esc(m.efficiencyText || "—")}</td>
-        </tr>`;
-      })
-      .join("");
-    renderPromoPagination(sorted.length, promoPage);
+    const visible = flat.slice(start, start + PROMO_PAGE_SIZE);
+
+    const rows = [];
+    let lastGroup = null;
+    visible.forEach((p) => {
+      const group = promoGoalGroup(p);
+      if (group !== lastGroup) {
+        rows.push(
+          `<tr class="promo-group-row ${esc(group)}"><td colspan="9">${esc(promoGroupLabel(group))}</td></tr>`
+        );
+        lastGroup = group;
+      }
+      rows.push(renderPromoRow(p));
+    });
+    els.promoBody.innerHTML = rows.join("");
+    renderPromoPagination(flat.length, promoPage);
+  }
+
+  function isShortsVideo(video) {
+    const sec = Number(video?.durationSec);
+    return Number.isFinite(sec) && sec > 0 && sec <= 60;
+  }
+
+  function buildVideoAssessment(video) {
+    const lines = [];
+    const views = Number(video.views) || 0;
+    const likes = Number(video.likes) || 0;
+    const comments = Number(video.comments) || 0;
+    const duration = Number(video.durationSec) || 0;
+    const ctr = video.ctr != null ? Number(video.ctr) : null;
+    const likeRate = views > 0 ? (likes / views) * 100 : null;
+    const commentRate = views > 0 ? (comments / views) * 100 : null;
+
+    if (views >= 50000) lines.push("조회수 규모가 큰 콘텐츠입니다. 후속 시리즈·프로모 확장에 유리합니다.");
+    else if (views >= 10000) lines.push("조회수는 중간 규모입니다. 관련 주제·썸네일 변형으로 확장 여지가 있습니다.");
+    else lines.push("조회수가 아직 성장 구간입니다. 유입 경로·훅을 우선 점검하세요.");
+
+    if (likeRate != null) {
+      if (likeRate >= 4) lines.push(`좋아요 반응 ${likeRate.toFixed(1)}% · 반응이 강한 편입니다.`);
+      else if (likeRate >= 2) lines.push(`좋아요 반응 ${likeRate.toFixed(1)}% · 평균적인 반응입니다.`);
+      else lines.push(`좋아요 반응 ${likeRate.toFixed(1)}% · 후반 CTA·템포 개선 여지가 있습니다.`);
+    }
+
+    if (commentRate != null && commentRate >= 0.3) {
+      lines.push(`댓글 참여 ${commentRate.toFixed(2)}% · 토론·질문 유도가 잘 되어 있습니다.`);
+    } else if (commentRate != null) {
+      lines.push(`댓글 참여 ${commentRate.toFixed(2)}% · 질문 훅이나 선택지를 넣으면 참여가 늘 수 있습니다.`);
+    }
+
+    if (ctr != null) {
+      if (ctr >= 5) lines.push(`CTR ${ctr}% · 썸네일/제목 클릭력이 우수합니다.`);
+      else if (ctr >= 3) lines.push(`CTR ${ctr}% · 클릭률은 양호합니다.`);
+      else lines.push(`CTR ${ctr}% · 썸네일·제목 재작업 우선순위를 높여보세요.`);
+    }
+
+    if (duration > 0) {
+      if (duration <= 60) lines.push("쇼츠 포맷입니다. 초반 1–2초 훅과 루프 구조를 중심으로 보세요.");
+      else if (duration <= 480) lines.push("미드폼 길이입니다. 초반 20% 이탈과 챕터 구성이 핵심입니다.");
+      else lines.push("롱폼입니다. 챕터·중간 전환 리듬이 시청 유지에 큰 영향을 줍니다.");
+    }
+
+    if ((video.chapters || []).length) {
+      lines.push(`챕터 ${video.chapters.length}개가 인식됩니다. 챕터 카드 제목 품질을 유지하세요.`);
+    }
+
+    return lines;
+  }
+
+  function closeVideoAnalysisModal() {
+    const modal = document.getElementById("video-analysis-modal");
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.classList.remove("video-modal-open");
+    if (videoModalRetentionChart) {
+      try {
+        videoModalRetentionChart.destroy();
+      } catch {
+        /* ignore */
+      }
+      videoModalRetentionChart = null;
+    }
+  }
+
+  async function openVideoAnalysisModal(video) {
+    const modal = document.getElementById("video-analysis-modal");
+    const titleEl = document.getElementById("video-analysis-title");
+    const body = document.getElementById("video-analysis-body");
+    if (!modal || !body || !video) return;
+
+    const date = video.publishedAt ? new Date(video.publishedAt).toLocaleDateString("ko-KR") : "—";
+    const assessment = buildVideoAssessment(video);
+    titleEl.textContent = video.title || "영상 분석";
+    body.innerHTML = `
+      <div class="video-modal-hero">
+        <img src="${esc(video.thumbnail)}" alt="" />
+        <div class="video-modal-kpis">
+          <div class="item"><span>조회수</span><strong>${esc(video.viewsText || formatNum(video.views))}</strong></div>
+          <div class="item"><span>길이</span><strong>${esc(video.durationText || "—")}</strong></div>
+          <div class="item"><span>좋아요</span><strong>${formatNum(video.likes)}</strong></div>
+          <div class="item"><span>댓글</span><strong>${formatNum(video.comments)}</strong></div>
+          <div class="item"><span>게시</span><strong>${esc(date)}</strong></div>
+          <div class="item"><span>CTR</span><strong>${video.ctr != null ? `${esc(String(video.ctr))}%` : "—"}</strong></div>
+        </div>
+      </div>
+      <div class="video-modal-section">
+        <h4>빠른 진단</h4>
+        <ul>${assessment.map((line) => `<li>${esc(line)}</li>`).join("")}</ul>
+      </div>
+      ${
+        (video.chapters || []).length
+          ? `<div class="video-modal-section"><h4>챕터</h4><ul>${video.chapters
+              .slice(0, 12)
+              .map((ch) => `<li><strong>${esc(ch.timestamp)}</strong> ${esc(ch.title)}</li>`)
+              .join("")}</ul></div>`
+          : ""
+      }
+      <div class="video-modal-section">
+        <h4>시청 유지</h4>
+        <div class="video-modal-chart"><canvas id="chart-video-retention"></canvas></div>
+        <p class="video-note" id="video-retention-note" style="margin-top:8px;">불러오는 중…</p>
+      </div>
+      <div class="video-modal-links">
+        <a class="btn" href="${esc(video.url)}" target="_blank" rel="noopener">YouTube 열기</a>
+        ${
+          video.studioUrl
+            ? `<a class="btn btn-ghost" href="${esc(video.studioUrl)}" target="_blank" rel="noopener">Studio 분석</a>`
+            : ""
+        }
+      </div>`;
+
+    modal.hidden = false;
+    document.body.classList.add("video-modal-open");
+
+    const note = document.getElementById("video-retention-note");
+    const canvas = document.getElementById("chart-video-retention");
+    try {
+      const retention = await apiGet(
+        `/api/dddit/youtube/report/retention?video_id=${encodeURIComponent(video.id)}`,
+        { timeoutMs: 45_000 }
+      );
+      if (videoModalRetentionChart) {
+        try {
+          videoModalRetentionChart.destroy();
+        } catch {
+          /* ignore */
+        }
+        videoModalRetentionChart = null;
+      }
+      const points =
+        retention?.points?.length
+          ? retention.points
+          : retention?.series?.[0]?.points || [];
+      if (!retention?.ok || !points.length || !canvas) {
+        if (note) note.textContent = retention?.message || "시청 유지 곡선 없음";
+        return;
+      }
+      if (note) note.textContent = "해당 영상 시청 유지 곡선 (28일)";
+      videoModalRetentionChart = new Chart(canvas, {
+        type: "line",
+        data: {
+          labels: points.map((point) => `${Math.round(point.ratio * 100)}%`),
+          datasets: [
+            {
+              label: "시청 유지",
+              data: points.map((point) => (point.watchRatio || 0) * 100),
+              borderColor: "#2563eb",
+              backgroundColor: "rgba(37,99,235,0.12)",
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+              borderWidth: 2,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { maxTicksLimit: 6 } },
+            y: {
+              min: 0,
+              max: isShortsVideo(video) ? 200 : 100,
+              ticks: { callback: (value) => `${value}%` },
+            },
+          },
+        },
+      });
+    } catch (err) {
+      if (note) note.textContent = err.message || "시청 유지 조회 실패";
+    }
   }
 
   function renderVideos(videos) {
+    allReportVideos = videos || [];
     if (!videos?.length) {
       els.videoGrid.innerHTML = `<p class="video-note">영상 데이터가 없습니다. YOUTUBE_API_KEY를 확인하세요.</p>`;
       return;
@@ -1167,8 +1557,8 @@
       .map((v) => {
         const date = v.publishedAt ? new Date(v.publishedAt).toLocaleDateString("ko-KR") : "—";
         return `
-        <article class="video-card">
-          <img class="video-thumb" src="${esc(v.thumbnail)}" alt="" loading="lazy" />
+        <article class="video-card" data-video-id="${esc(v.id)}">
+          <img class="video-thumb" src="${esc(v.thumbnail)}" alt="" loading="lazy" role="button" tabindex="0" title="분석 보기" />
           <div class="video-body">
             <div class="video-title">${esc(v.title)}</div>
             <div class="video-stats">
@@ -1180,11 +1570,27 @@
             <div class="video-links">
               <a href="${esc(v.url)}" target="_blank" rel="noopener">YouTube</a>
               ${v.studioUrl ? `<a href="${esc(v.studioUrl)}" target="_blank" rel="noopener">Studio 분석</a>` : ""}
+              <button type="button" class="btn btn-ghost video-analyze-btn" style="padding:2px 8px;font-size:0.72rem;">분석</button>
             </div>
           </div>
         </article>`;
       })
       .join("");
+
+    els.videoGrid.querySelectorAll(".video-card").forEach((card) => {
+      const videoId = card.getAttribute("data-video-id");
+      const video = allReportVideos.find((item) => item.id === videoId);
+      if (!video) return;
+      const open = () => openVideoAnalysisModal(video);
+      card.querySelector(".video-thumb")?.addEventListener("click", open);
+      card.querySelector(".video-thumb")?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
+      card.querySelector(".video-analyze-btn")?.addEventListener("click", open);
+    });
   }
 
   async function loadEditors() {
@@ -1363,6 +1769,13 @@
     } catch (err) {
       showError(err.message || "동기화 코드 복사 실패");
     }
+  });
+
+  document.querySelectorAll("[data-close-video-modal]").forEach((el) => {
+    el.addEventListener("click", () => closeVideoAnalysisModal());
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeVideoAnalysisModal();
   });
 
   void bootReport();
