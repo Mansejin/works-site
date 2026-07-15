@@ -96,6 +96,125 @@ body {
   min-height: 1.2em;
 }
 
+.mood-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--slide-border);
+  flex-shrink: 0;
+}
+
+.mood-head-title {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.mood-head-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.mood-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.mood-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.mood-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.mood-grid[data-count="1"] {
+  grid-template-columns: 1fr;
+}
+
+.mood-grid[data-count="1"] .mood-item {
+  height: auto;
+}
+
+.mood-grid[data-count="1"] .mood-item img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.mood-grid[data-count="2"] {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.mood-grid[data-count="2"] .mood-item img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.mood-grid[data-count="3"] {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.mood-grid[data-count="5"] {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.mood-item {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mood-item img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--slide-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mood-item figcaption {
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.mood-item figcaption .ppm-editable {
+  display: block;
+}
+
+.slide--moodboard {
+  padding-top: 44px;
+  padding-bottom: 40px;
+}
+
 .ref-item .ppm-editable.ref-desc {
   display: inline;
 }

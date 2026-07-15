@@ -78,12 +78,6 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
     if (saveStatusEl) saveStatusEl.textContent = "slides.js 저장";
   }
 
-  function resetSlides() {
-    if (!confirm("편집 내용을 모두 지우고 기본 기획안으로 되돌릴까요?")) return;
-    localStorage.removeItem(STORAGE_KEY);
-    location.reload();
-  }
-
   function setByPath(path, value) {
     const parts = path.split(".");
     let cur = slides;
@@ -304,6 +298,31 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
           ${slide.note !== undefined ? edBlock(`${p}.note`, slide.note || "", "ref-note") : ""}`;
         return `<section class="slide" data-index="${index}">${inner}</section>`;
 
+      case "moodboard":
+        inner = `
+          <div class="mood-head">
+            <h2 class="slide-title mood-head-title">${ed(`${p}.title`, slide.title)}</h2>
+            <p class="mood-head-sub">${ed(`${p}.subtitle`, slide.subtitle || "")}</p>
+          </div>
+          <div class="mood-scroll">${(slide.sections || [])
+            .map(
+              (section, si) => `
+            <div class="mood-section">
+              <div class="mood-section-label">${ed(`${p}.sections.${si}.label`, section.label || "")}</div>
+              <div class="mood-grid" data-count="${(section.items || []).length}">${(section.items || [])
+                .map(
+                  (item, ii) => `
+                <figure class="mood-item">
+                  <img src="${escapeHtml(item.src)}" alt="" loading="lazy" />
+                  <figcaption>${ed(`${p}.sections.${si}.items.${ii}.caption`, item.caption || "")}</figcaption>
+                </figure>`
+                )
+                .join("")}</div>
+            </div>`
+            )
+            .join("")}</div>`;
+        return `<section class="slide slide--moodboard" data-index="${index}">${inner}</section>`;
+
       case "scenes":
         inner = `
           <h2 class="slide-title">${ed(`${p}.title`, slide.title)}</h2>
@@ -472,7 +491,6 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
   document.getElementById("navNext").addEventListener("click", next);
   document.getElementById("btnOverview").addEventListener("click", () => toggleOverview(true));
   document.getElementById("btnFullscreen").addEventListener("click", toggleFullscreen);
-  document.getElementById("btnReset").addEventListener("click", resetSlides);
   document.getElementById("btnExport").addEventListener("click", downloadSlidesJs);
 
   overviewPanel.addEventListener("click", (e) => {
