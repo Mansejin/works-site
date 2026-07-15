@@ -50,6 +50,27 @@ body {
   background: rgba(94, 179, 232, 0.1);
 }
 
+body:not(.is-edit-mode) .ppm-editable {
+  cursor: default;
+  user-select: text;
+}
+
+body:not(.is-edit-mode) .ppm-editable:hover,
+body:not(.is-edit-mode) .ppm-editable:focus {
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.slide-comment {
+  user-select: text;
+}
+
+body.is-edit-mode .ppm-editable {
+  cursor: text;
+  user-select: text;
+}
+
 .ppm-editable:focus {
   background: rgba(94, 179, 232, 0.14);
   box-shadow: 0 0 0 1px rgba(94, 179, 232, 0.4);
@@ -302,6 +323,152 @@ html:fullscreen .deck,
 
 .slide.active {
   display: flex;
+}
+
+.slide-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.slide--cover .slide-inner {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.slide--closing .slide-inner {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.slide-comment {
+  flex-shrink: 0;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  max-height: 68px;
+}
+
+.slide-comment--empty {
+  display: none;
+}
+
+body.is-edit-mode .slide-comment--empty {
+  display: flex;
+}
+
+.slide-comment-label {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding-top: 3px;
+  min-width: 52px;
+}
+
+.ppm-comment {
+  flex: 1;
+  min-height: 1.4em;
+  max-height: 52px;
+  overflow-y: auto;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+body.is-edit-mode .ppm-comment:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.slide--moodboard {
+  padding-bottom: 32px;
+}
+
+.edit-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+}
+
+.edit-modal[hidden] {
+  display: none;
+}
+
+.edit-modal-card {
+  width: min(360px, calc(100vw - 32px));
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid var(--slide-border);
+  background: var(--slide-bg);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+}
+
+.edit-modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.edit-modal-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.edit-modal-input {
+  width: 100%;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--slide-border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.edit-modal-input:focus {
+  outline: none;
+  border-color: rgba(94, 179, 232, 0.5);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.edit-modal-error {
+  font-size: 0.75rem;
+  color: #f87171;
+  margin-bottom: 8px;
+}
+
+.edit-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.deck-btn.is-active {
+  background: var(--accent-soft);
+  border-color: rgba(94, 179, 232, 0.45);
+  color: var(--accent);
 }
 
 @keyframes slideIn {
@@ -934,6 +1101,8 @@ html:fullscreen .deck,
   height: 36px;
   border-radius: 8px;
   color-scheme: dark;
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .lyrics-layout {

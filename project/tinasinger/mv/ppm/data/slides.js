@@ -2,7 +2,7 @@
  * 이겸비 (Tina Singer) — Right Here, Right Now MV PPM
  * 배포 기본값 — 편집 후 「slides.js 저장」 버튼 또는 scripts/export-slides.mjs
  */
-window.PPM_SLIDES_UPDATED = "2026-07-18";
+window.PPM_SLIDES_UPDATED = "2026-07-19";
 window.PPM_SLIDES = [
   {
     "type": "cover",
@@ -480,6 +480,7 @@ window.PPM_SLIDES = [
           "골든아워 역광 실루엣, 바람·머리카락, 자연스러운 미소·눈맞춤",
           "85mm 클로즈업 + 50mm 미디엄 위주 — ‘예쁜 컷’ 확보를 촬영 일정에 반영"
         ]
+      }
     ]
   },
   {

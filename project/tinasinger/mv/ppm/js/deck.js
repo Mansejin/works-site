@@ -2,16 +2,28 @@
   "use strict";
 
   const STORAGE_KEY = "works/project/tinasinger/mv/ppm/slides/v1";
+  const EDIT_AUTH_KEY = "works/project/tinasinger/mv/ppm/edit/v1";
+  /** Edit password SHA-256 hash — update when changing password */
+  const EDIT_PASS_SHA256 = "c74cead93d83c7317ad62515eec8333429048cc8e1ed5971eae50ae66f8d7fcb";
+
   const frame = document.getElementById("slideFrame");
   const counterEl = document.getElementById("slideCounter");
   const progressEl = document.getElementById("progressFill");
   const overviewPanel = document.getElementById("overviewPanel");
   const overviewGrid = document.getElementById("overviewGrid");
   const saveStatusEl = document.getElementById("saveStatus");
+  const deckHintsEl = document.getElementById("deckHints");
+  const editModal = document.getElementById("editModal");
+  const editForm = document.getElementById("editForm");
+  const editPasswordEl = document.getElementById("editPassword");
+  const editErrorEl = document.getElementById("editError");
+  const btnEdit = document.getElementById("btnEdit");
+  const btnExport = document.getElementById("btnExport");
 
   let slides = loadSlides();
   let current = 0;
   let saveTimer = null;
+  let editMode = sessionStorage.getItem(EDIT_AUTH_KEY) === "1";
 
   function deepClone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -97,12 +109,95 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
       .replace(/"/g, "&quot;");
   }
 
+  async function sha256(text) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  async function verifyPassword(password) {
+    return (await sha256(password)) === EDIT_PASS_SHA256;
+  }
+
+  function isEditable() {
+    return editMode;
+  }
+
   function ed(path, text, className) {
-    return `<span class="ppm-editable${className ? ` ${className}` : ""}" contenteditable="true" data-path="${path}" spellcheck="false">${escapeHtml(text)}</span>`;
+    const ce = isEditable() ? "true" : "false";
+    return `<span class="ppm-editable${className ? ` ${className}` : ""}" contenteditable="${ce}" data-path="${path}" spellcheck="false">${escapeHtml(text)}</span>`;
   }
 
   function edBlock(path, text, className) {
-    return `<div class="ppm-editable ppm-editable--block${className ? ` ${className}` : ""}" contenteditable="true" data-path="${path}" spellcheck="false">${escapeHtml(text)}</div>`;
+    const ce = isEditable() ? "true" : "false";
+    return `<div class="ppm-editable ppm-editable--block${className ? ` ${className}` : ""}" contenteditable="${ce}" data-path="${path}" spellcheck="false">${escapeHtml(text)}</div>`;
+  }
+
+  function renderComment(index) {
+    const text = slides[index]?.comment || "";
+    const hasComment = String(text).trim().length > 0;
+    const emptyClass = hasComment ? "" : " slide-comment--empty";
+    const ce = isEditable() ? "true" : "false";
+    return `
+      <div class="slide-comment${emptyClass}">
+        <span class="slide-comment-label">코멘트</span>
+        <div class="ppm-editable ppm-editable--block ppm-comment" contenteditable="${ce}" data-path="${index}.comment" data-placeholder="회의 메모·피드백…" spellcheck="false">${escapeHtml(text)}</div>
+      </div>`;
+  }
+
+  function wrapSlide(index, classNames, inner) {
+    return `<section class="slide${classNames ? ` ${classNames}` : ""}" data-index="${index}">
+      <div class="slide-inner">${inner}</div>
+      ${renderComment(index)}
+    </section>`;
+  }
+
+  function updateEditUI() {
+    document.body.classList.toggle("is-edit-mode", editMode);
+    if (btnEdit) {
+      btnEdit.textContent = editMode ? "편집 종료" : "편집";
+      btnEdit.classList.toggle("is-active", editMode);
+    }
+    if (btnExport) btnExport.hidden = !editMode;
+    if (saveStatusEl) saveStatusEl.hidden = !editMode;
+    if (deckHintsEl) {
+      deckHintsEl.textContent = editMode
+        ? "편집 모드 · Ctrl+Z · ← → Space · O 개요"
+        : "← → Space · O 개요";
+    }
+  }
+
+  function setEditMode(on) {
+    editMode = on;
+    if (on) sessionStorage.setItem(EDIT_AUTH_KEY, "1");
+    else sessionStorage.removeItem(EDIT_AUTH_KEY);
+    updateEditUI();
+    buildSlides();
+    goTo(current);
+  }
+
+  function openEditModal() {
+    if (!editModal) return;
+    editModal.hidden = false;
+    if (editErrorEl) editErrorEl.hidden = true;
+    if (editPasswordEl) {
+      editPasswordEl.value = "";
+      editPasswordEl.focus();
+    }
+  }
+
+  function closeEditModal() {
+    if (editModal) editModal.hidden = true;
+    if (editErrorEl) editErrorEl.hidden = true;
+  }
+
+  function toggleEditMode() {
+    if (editMode) {
+      setEditMode(false);
+      return;
+    }
+    openEditModal();
   }
 
   function renderBullets(items, pathPrefix, listKey) {
@@ -204,20 +299,23 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
   function renderSlide(slide, index) {
     const p = String(index);
     let inner = "";
+    let classNames = "";
 
     switch (slide.type) {
       case "cover":
+        classNames = "slide--cover";
         inner = `
           <div class="cover-title">${ed(`${p}.title`, slide.title)}</div>
           <div class="cover-subtitle">${ed(`${p}.subtitle`, slide.subtitle || "")}</div>
           <div class="cover-lines">${(slide.lines || [])
             .map((l, i) => `<span>${ed(`${p}.lines.${i}`, l)}</span>`)
             .join("")}</div>`;
-        return `<section class="slide slide--cover" data-index="${index}">${inner}</section>`;
+        break;
 
       case "toc":
+        classNames = "slide--toc";
         inner = renderToc(slide, p);
-        return `<section class="slide slide--toc" data-index="${index}">${inner}</section>`;
+        break;
 
       case "content":
         inner = `
@@ -225,13 +323,13 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
           <div class="content-body">${(slide.sections || [])
             .map((section, i) => renderSection(section, `${p}.sections.${i}`))
             .join("")}</div>`;
-        return `<section class="slide" data-index="${index}">${inner}</section>`;
+        break;
 
       case "two-col":
         inner = `
           <h2 class="slide-title">${ed(`${p}.title`, slide.title)}</h2>
           <div class="two-col">${renderColBlock(slide.left || {}, `${p}.left`)}${renderColBlock(slide.right || {}, `${p}.right`)}</div>`;
-        return `<section class="slide" data-index="${index}">${inner}</section>`;
+        break;
 
       case "lyrics":
         inner = `
@@ -253,7 +351,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
               )
               .join("")}</div>
           </div>`;
-        return `<section class="slide" data-index="${index}">${inner}</section>`;
+        break;
 
       case "story":
         inner = `
@@ -268,7 +366,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
             </div>`
             )
             .join("")}</div>`;
-        return `<section class="slide" data-index="${index}">${inner}</section>`;
+        break;
 
       case "palette":
         inner = `
@@ -284,7 +382,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
             )
             .join("")}</div>
           ${renderBullets(slide.notes, p, "notes")}`;
-        return `<section class="slide" data-index="${index}">${inner}</section>`;
+        break;
 
       case "refs":
         inner = `
@@ -296,9 +394,10 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
             )
             .join("")}</div>
           ${slide.note !== undefined ? edBlock(`${p}.note`, slide.note || "", "ref-note") : ""}`;
-        return `<section class="slide" data-index="${index}">${inner}</section>`;
+        break;
 
       case "moodboard":
+        classNames = "slide--moodboard";
         inner = `
           <div class="mood-head">
             <h2 class="slide-title mood-head-title">${ed(`${p}.title`, slide.title)}</h2>
@@ -321,7 +420,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
             </div>`
             )
             .join("")}</div>`;
-        return `<section class="slide slide--moodboard" data-index="${index}">${inner}</section>`;
+        break;
 
       case "scenes":
         inner = `
@@ -340,7 +439,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
               )
               .join("")}</tbody>
           </table>`;
-        return `<section class="slide" data-index="${index}">${inner}</section>`;
+        break;
 
       case "timeline":
         inner = `
@@ -358,20 +457,22 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
           <div class="checklist">${(slide.checklist || [])
             .map((c, i) => `<div>${ed(`${p}.checklist.${i}`, c)}</div>`)
             .join("")}</div>`;
-        return `<section class="slide" data-index="${index}">${inner}</section>`;
+        break;
 
       case "closing":
+        classNames = "slide--closing";
         inner = `
           <div class="closing-title">${ed(`${p}.title`, slide.title)}</div>
           <div class="closing-lines">${(slide.lines || [])
             .map((l, i) => `<span>${ed(`${p}.lines.${i}`, l)}</span>`)
             .join("")}</div>`;
-        return `<section class="slide slide--closing" data-index="${index}">${inner}</section>`;
+        break;
 
       default:
         inner = `<h2 class="slide-title">${ed(`${p}.title`, slide.title || "Slide")}</h2>`;
-        return `<section class="slide" data-index="${index}">${inner}</section>`;
     }
+
+    return wrapSlide(index, classNames, inner);
   }
 
   function updateOverviewTitle(slideIndex) {
@@ -382,6 +483,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
   function bindEditables() {
     frame.querySelectorAll(".ppm-editable").forEach((el) => {
       el.addEventListener("input", () => {
+        if (!isEditable()) return;
         const path = el.dataset.path;
         const value = el.classList.contains("ppm-editable--block")
           ? el.innerText.replace(/\r\n/g, "\n")
@@ -391,11 +493,19 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
         if (path.endsWith(".title")) {
           updateOverviewTitle(Number(path.split(".")[0]));
         }
+        if (path.endsWith(".comment")) {
+          const commentWrap = el.closest(".slide-comment");
+          if (commentWrap) {
+            commentWrap.classList.toggle("slide-comment--empty", !String(value).trim());
+          }
+        }
       });
 
-      el.addEventListener("click", (e) => e.stopPropagation());
-      el.addEventListener("mousedown", (e) => e.stopPropagation());
-      el.addEventListener("dblclick", (e) => e.stopPropagation());
+      if (isEditable()) {
+        el.addEventListener("click", (e) => e.stopPropagation());
+        el.addEventListener("mousedown", (e) => e.stopPropagation());
+        el.addEventListener("dblclick", (e) => e.stopPropagation());
+      }
     });
   }
 
@@ -415,7 +525,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
 
   function isEditingText() {
     const active = document.activeElement;
-    return active && active.classList.contains("ppm-editable");
+    return active && active.classList.contains("ppm-editable") && isEditable();
   }
 
   function goTo(index) {
@@ -481,6 +591,23 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
     }
   }
 
+  function initAudioProtection() {
+    const audioWrap = document.querySelector(".deck-audio");
+    const audio = document.getElementById("demoMix");
+    if (!audio) return;
+
+    audio.src = "assets/right-here-right-now-mix.mp3";
+    audio.setAttribute("controlsList", "nodownload noplaybackrate");
+    audio.disableRemotePlayback = true;
+
+    const block = (e) => e.preventDefault();
+    audio.addEventListener("contextmenu", block);
+    audio.addEventListener("dragstart", block);
+    audioWrap?.addEventListener("contextmenu", block);
+  }
+
+  updateEditUI();
+  initAudioProtection();
   buildSlides();
   initFromHash();
   goTo(current);
@@ -491,7 +618,25 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
   document.getElementById("navNext").addEventListener("click", next);
   document.getElementById("btnOverview").addEventListener("click", () => toggleOverview(true));
   document.getElementById("btnFullscreen").addEventListener("click", toggleFullscreen);
-  document.getElementById("btnExport").addEventListener("click", downloadSlidesJs);
+  btnEdit?.addEventListener("click", toggleEditMode);
+  btnExport?.addEventListener("click", downloadSlidesJs);
+
+  editForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const password = editPasswordEl?.value || "";
+    if (await verifyPassword(password)) {
+      closeEditModal();
+      setEditMode(true);
+      return;
+    }
+    if (editErrorEl) editErrorEl.hidden = false;
+    editPasswordEl?.select();
+  });
+
+  document.getElementById("editCancel")?.addEventListener("click", closeEditModal);
+  editModal?.addEventListener("click", (e) => {
+    if (e.target === editModal) closeEditModal();
+  });
 
   overviewPanel.addEventListener("click", (e) => {
     if (e.target === overviewPanel) toggleOverview(false);
@@ -548,6 +693,11 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
         if (!isEditingText()) toggleFullscreen();
         break;
       case "Escape":
+        if (!editModal?.hidden) {
+          closeEditModal();
+          e.preventDefault();
+          break;
+        }
         if (document.fullscreenElement) document.exitFullscreen();
         break;
     }
