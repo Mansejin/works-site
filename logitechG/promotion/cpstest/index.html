@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="description" content="SUPERSTRIKE 클릭 챌린지">
+    <link rel="canonical" href="https://works.mansejin.com/logitechG/promotion/cpstest/">
+    <title>SUPERSTRIKE 클릭 챌린지</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+
+        :root {
+            --logi-blue: #00B8FC;
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --panel-bg: #141414;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Noto Sans KR', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        .screen {
+            display: none;
+            width: 100vw;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .screen.active {
+            display: flex;
+            animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* ==========================================
+           1. 메인 화면
+           ========================================== */
+        #mainScreen {
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 70px 20px 50px 20px;
+            background: #000000 url('main-bg.jpg') no-repeat center center;
+            background-size: cover;
+        }
+
+        .main-header {
+            text-align: center;
+            z-index: 10;
+        }
+
+        .main-title {
+            font-size: 54px;
+            font-weight: 900;
+            margin: 0 0 15px 0;
+            letter-spacing: 1px;
+            color: #ffffff;
+            text-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+
+        .main-subtitle {
+            font-size: 18px;
+            font-weight: 400;
+            color: #cccccc;
+            line-height: 1.6;
+            margin: 0;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+        }
+
+        .main-bottom-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            z-index: 10;
+        }
+
+        .start-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #ffffff;
+            padding: 20px 100px;
+            font-size: 26px;
+            font-weight: 700;
+            border-radius: 45px;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            letter-spacing: 6px;
+            text-indent: 6px;
+            outline: none;
+            margin-bottom: 35px;
+        }
+
+        .start-btn:hover {
+            background: rgba(0, 184, 252, 0.08);
+            border-color: var(--logi-blue);
+            color: #ffffff;
+            box-shadow: 0 0 30px rgba(0, 184, 252, 0.35);
+            transform: translateY(-2px);
+        }
+
+        .main-brand-logo {
+            height: 60px;
+            object-fit: contain;
+        }
+
+        /* ==========================================
+           2. 게임 화면
+           ========================================== */
+        #gameScreen {
+            align-items: center;
+            justify-content: center;
+            background-color: #080808;
+        }
+
+        .game-container {
+            width: 90%;
+            max-width: 600px;
+            background-color: var(--panel-bg);
+            padding: 45px 40px;
+            border-radius: 16px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.8);
+            text-align: center;
+            border: 1px solid #1f1f1f;
+            box-sizing: border-box;
+        }
+
+        .game-logo {
+            height: 65px;
+            margin-bottom: 25px;
+            object-fit: contain;
+        }
+
+        .event-title {
+            font-size: 30px;
+            font-weight: 900;
+            margin-bottom: 8px;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+        }
+
+        .event-subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 35px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .stat-box {
+            background: #090909;
+            padding: 15px 20px;
+            border-radius: 8px;
+            border: 1px solid #202020;
+            width: 42%;
+        }
+
+        .stat-box span {
+            display: block;
+            font-size: 12px;
+            color: #555;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .click-area {
+            background-color: #1a1a1a;
+            border: 2px dashed var(--logi-blue);
+            border-radius: 12px;
+            height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            touch-action: none;
+        }
+
+        .click-area:active {
+            background-color: var(--logi-blue);
+            color: #000;
+            transform: scale(0.98);
+        }
+
+        .click-area.countdown-active:active {
+            background-color: #1a1a1a;
+            color: #fff;
+            transform: none;
+            cursor: default;
+        }
+
+        /* ==========================================
+           3. 결과 팝업
+           ========================================== */
+        .result-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.92);
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .result-box {
+            background: var(--panel-bg);
+            padding: 45px 40px;
+            border-radius: 16px;
+            text-align: center;
+            border: 2px solid var(--logi-blue);
+            box-shadow: 0 0 50px rgba(0, 184, 252, 0.25);
+            max-width: 450px;
+            width: 85%;
+        }
+
+        .result-box h2 {
+            color: var(--logi-blue);
+            font-size: 38px;
+            margin-top: 0;
+            margin-bottom: 6px;
+            letter-spacing: 2px;
+            font-weight: 900;
+        }
+
+        .result-record-subtitle {
+            color: #888888;
+            font-size: 15px;
+            font-weight: 700;
+            margin-top: 0;
+            margin-bottom: 25px;
+            letter-spacing: 0.5px;
+        }
+
+        .final-score {
+            font-size: 64px;
+            font-weight: 900;
+            margin: 15px 0;
+            color: #fff;
+        }
+
+        .result-buttons {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .main-btn {
+            background-color: var(--logi-blue);
+            color: #000000;
+            border: none;
+            padding: 16px 50px;
+            font-size: 18px;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            max-width: 260px;
+            box-sizing: border-box;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(10px);
+        }
+
+        .main-btn.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        .main-btn.active:hover {
+            background-color: #0098d1;
+            box-shadow: 0 0 20px rgba(0, 184, 252, 0.6);
+        }
+
+        @media (max-width: 640px) {
+            .main-title {
+                font-size: 32px;
+            }
+
+            .main-subtitle {
+                font-size: 15px;
+            }
+
+            .start-btn {
+                padding: 16px 48px;
+                font-size: 20px;
+                letter-spacing: 4px;
+                text-indent: 4px;
+            }
+
+            .main-brand-logo {
+                height: 40px;
+            }
+
+            .game-container {
+                padding: 30px 20px;
+            }
+
+            .event-title {
+                font-size: 22px;
+            }
+
+            .stats {
+                font-size: 20px;
+            }
+
+            .final-score {
+                font-size: 44px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- [1번 페이지] 메인 화면 -->
+    <div id="mainScreen" class="screen active">
+        <div class="main-header">
+            <h1 class="main-title">SUPERSTRIKE 클릭 챌린지</h1>
+            <p class="main-subtitle">10초 동안 가장 많은 클릭을 하신 1분께<br>PRO X2 SUPERSTRIKE를 드립니다!</p>
+        </div>
+
+        <div class="main-bottom-area">
+            <button class="start-btn" onclick="goToGame()">도전하기</button>
+            <img src="Logitech_G_Horizontal_Logo_Digital_Cyan_2.png" alt="Logitech G" class="main-brand-logo">
+        </div>
+    </div>
+
+    <!-- [2번 페이지] 게임 플레이 화면 -->
+    <div id="gameScreen" class="screen">
+        <div class="game-container">
+            <img src="Logitech_G_Horizontal_Logo_Digital_Cyan_2.png" alt="Logitech G" class="game-logo">
+
+            <div class="event-title">SUPERSTRIKE 클릭 챌린지</div>
+            <div class="event-subtitle">지슈스 마우스로 경험하는 최상의 한계 속도 테스트</div>
+
+            <div class="stats">
+                <div class="stat-box">
+                    <span>Time Left</span>
+                    <div id="timeDisplay" style="color: #fff;">10.00</div>
+                </div>
+                <div class="stat-box">
+                    <span>Clicks</span>
+                    <div id="clickDisplay" style="color: var(--logi-blue);">0</div>
+                </div>
+            </div>
+
+            <div class="click-area" id="clickArea">
+                여기를 클릭하여 대기
+            </div>
+        </div>
+    </div>
+
+    <!-- 결과 화면 팝업 -->
+    <div class="result-overlay" id="resultOverlay">
+        <div class="result-box">
+            <h2>TIME OVER</h2>
+            <div class="result-record-subtitle">SUPERSTRIKE 클릭 챌린지 기록</div>
+
+            <div class="final-score"><span id="finalClicks">0</span>회 클릭</div>
+            <p style="color: #aaa; font-size: 20px; margin: 5px 0 25px 0;">초당 클릭 수 (CPS) : <span id="finalCps" style="color: var(--logi-blue); font-weight: bold;">0</span></p>
+
+            <div class="result-buttons">
+                <button class="main-btn" id="mainBtn" onclick="goToMain()">메인 화면으로</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let clicks = 0;
+        const timeLimit = 10.00;
+        let timeLeft = timeLimit;
+        let timer = null;
+        let countdownTimer = null;
+        let resultButtonTimer = null;
+        let resultShowTimer = null;
+        let gameStartTime = 0;
+
+        let isCountingDown = false;
+        let isGaming = false;
+        let isFinished = false;
+
+        const clickArea = document.getElementById('clickArea');
+        const clickDisplay = document.getElementById('clickDisplay');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const resultOverlay = document.getElementById('resultOverlay');
+        const finalClicks = document.getElementById('finalClicks');
+        const finalCps = document.getElementById('finalCps');
+        const mainBtn = document.getElementById('mainBtn');
+
+        function clearAllTimers() {
+            if (timer !== null) {
+                clearInterval(timer);
+                timer = null;
+            }
+            if (countdownTimer !== null) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+            if (resultButtonTimer !== null) {
+                clearTimeout(resultButtonTimer);
+                resultButtonTimer = null;
+            }
+            if (resultShowTimer !== null) {
+                clearTimeout(resultShowTimer);
+                resultShowTimer = null;
+            }
+        }
+
+        function goToGame() {
+            document.getElementById('mainScreen').classList.remove('active');
+            document.getElementById('gameScreen').classList.add('active');
+            resetGame();
+        }
+
+        function goToMain() {
+            clearAllTimers();
+            document.getElementById('gameScreen').classList.remove('active');
+            document.getElementById('mainScreen').classList.add('active');
+            resultOverlay.style.display = 'none';
+            mainBtn.classList.remove('active');
+        }
+
+        // pointerdown 하나로 마우스/터치 중복 카운트 방지
+        clickArea.addEventListener('pointerdown', function (e) {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            e.preventDefault();
+            handleUserClick();
+        });
+
+        function handleUserClick() {
+            if (isFinished || isCountingDown) return;
+
+            if (!isGaming) {
+                startCountdown();
+                return;
+            }
+
+            clicks++;
+            clickDisplay.textContent = clicks;
+        }
+
+        function startCountdown() {
+            clearAllTimers();
+            isCountingDown = true;
+            clickArea.classList.add('countdown-active');
+            let count = 3;
+
+            clickArea.style.fontSize = '80px';
+            clickArea.textContent = count;
+
+            countdownTimer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    clickArea.textContent = count;
+                } else {
+                    clearInterval(countdownTimer);
+                    countdownTimer = null;
+                    startGame();
+                }
+            }, 1000);
+        }
+
+        function startGame() {
+            isCountingDown = false;
+            isGaming = true;
+            clickArea.classList.remove('countdown-active');
+
+            clickArea.style.fontSize = '24px';
+            clickArea.textContent = '클릭! 클릭! 클릭!';
+
+            gameStartTime = performance.now();
+
+            timer = setInterval(() => {
+                const elapsed = (performance.now() - gameStartTime) / 1000;
+                timeLeft = Math.max(0, timeLimit - elapsed);
+                timeDisplay.textContent = timeLeft.toFixed(2);
+
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 16);
+        }
+
+        function endGame() {
+            clearAllTimers();
+            isGaming = false;
+            isFinished = true;
+            timeLeft = 0;
+            timeDisplay.textContent = '0.00';
+            clickArea.textContent = '종료!';
+
+            finalClicks.textContent = clicks;
+            finalCps.textContent = (clicks / timeLimit).toFixed(1);
+
+            resultShowTimer = setTimeout(() => {
+                resultOverlay.style.display = 'flex';
+
+                resultButtonTimer = setTimeout(() => {
+                    mainBtn.classList.add('active');
+                }, 1500);
+            }, 300);
+        }
+
+        function resetGame() {
+            clearAllTimers();
+
+            clicks = 0;
+            timeLeft = timeLimit;
+            isCountingDown = false;
+            isGaming = false;
+            isFinished = false;
+
+            mainBtn.classList.remove('active');
+            clickDisplay.textContent = '0';
+            timeDisplay.textContent = '10.00';
+            clickArea.classList.remove('countdown-active');
+            clickArea.style.fontSize = '24px';
+            clickArea.textContent = '여기를 클릭하여 대기';
+            resultOverlay.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
