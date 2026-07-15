@@ -461,28 +461,28 @@
     "link": "https://brand.naver.com/xenicsholic/products/11389749801"
   },
   {
-    "name": "",
-    "color": "",
+    "name": "STORMX VM2 무선 무소음 버티컬 마우스",
+    "color": "화이트",
     "qty": "1",
-    "link": ""
+    "link": "https://www.xenics.co.kr/goods/goods_view.php?goodsNo=1000000210"
   },
   {
-    "name": "",
-    "color": "",
+    "name": "STORMX ZERO 게이밍/게임용 기계식키보드",
+    "color": "화이트 (단일색상)",
     "qty": "1",
-    "link": ""
+    "link": "https://www.xenics.co.kr/goods/goods_view.php?goodsNo=445"
   },
   {
-    "name": "",
-    "color": "",
+    "name": "제닉스 TITAN G 8K 무선 경량 게이밍 마우스",
+    "color": "화이트",
     "qty": "1",
-    "link": ""
+    "link": "https://www.xenics.co.kr/goods/goods_view.php?goodsNo=1000001300"
   },
   {
-    "name": "",
-    "color": "",
+    "name": "제닉스 TITAN WH6 가상7.1채널 무선 게이밍 헤드셋",
+    "color": "화이트",
     "qty": "1",
-    "link": ""
+    "link": "https://brand.naver.com/xenicsholic/products/6770825780"
   },
   {
     "name": "",
@@ -507,6 +507,7 @@
 
   <script>
     const STORAGE_KEY = "works/dddit/xenics/productlist";
+    const SEED_REVISION = 2;
     const LEGACY_STORAGE_KEYS = [
       "works/dddit/productlist/xenics",
       "works/dddit/productlist",
@@ -702,7 +703,10 @@
     }
 
     function saveToLocalStorage(rows) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ updatedAt: Date.now(), rows }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ updatedAt: Date.now(), revision: SEED_REVISION, rows })
+      );
     }
 
     function loadFromLocalStorage() {
@@ -718,7 +722,9 @@
           }
         }
         if (!raw) return null;
-        return JSON.parse(raw).rows || null;
+        const parsed = JSON.parse(raw);
+        if (Number(parsed.revision || 0) < SEED_REVISION) return null;
+        return parsed.rows || null;
       } catch {
         return null;
       }

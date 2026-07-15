@@ -1,6 +1,6 @@
 /**
  * 디디딧 내부 페이지 팀 게이트 (works.mansejin.com)
- * 브랜드 공유 페이지(plan/conti/productlist)는 제외.
+ * 브랜드 공유 페이지(브랜드 홈·plan/conti/productlist)는 제외.
  * NAS DDDIT_TEAM_GATE_PASSCODE 설정 시에만 활성화됩니다.
  */
 (function () {
@@ -19,6 +19,7 @@
     "scripts",
     "gate.html",
   ]);
+  const BRAND_SHARE_SECTIONS = new Set(["productlist", "plan", "conti"]);
 
   const IS_PROD =
     location.protocol === "https:" && /^works\.mansejin\.com$/i.test(location.hostname);
@@ -35,10 +36,16 @@
   }
 
   function isPublicBrandSharePath() {
-    const path = location.pathname.replace(/\/+$/, "");
-    const match = path.match(/\/dddit\/([^/]+)\/(productlist|plan|conti)$/);
-    if (!match) return false;
-    return !INTERNAL_TOP.has(match[1]);
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    // /dddit/{brand} — 브랜드에 공유하는 프로젝트 홈
+    const brandRoot = path.match(/^\/dddit\/([^/]+)$/);
+    if (brandRoot && !INTERNAL_TOP.has(brandRoot[1])) return true;
+
+    // /dddit/{brand}/(productlist|plan|conti)[/...]
+    const shareTool = path.match(/^\/dddit\/([^/]+)\/([^/]+)(?:\/.*)?$/);
+    if (!shareTool) return false;
+    if (INTERNAL_TOP.has(shareTool[1])) return false;
+    return BRAND_SHARE_SECTIONS.has(shareTool[2]);
   }
 
   function revealPage() {
