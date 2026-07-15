@@ -62,10 +62,6 @@ body:not(.is-edit-mode) .ppm-editable:focus {
   outline: none;
 }
 
-.slide-comment {
-  user-select: text;
-}
-
 body.is-edit-mode .ppm-editable {
   cursor: text;
   user-select: text;
@@ -345,49 +341,98 @@ html:fullscreen .deck,
   text-align: center;
 }
 
-.slide-comment {
+.slide-comments {
   flex-shrink: 0;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed rgba(255, 255, 255, 0.1);
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  max-height: 68px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--slide-border);
 }
 
-.slide-comment--empty {
+.slide-comments-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.slide-comments-toggle:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--accent);
+}
+
+.slide-comments.is-open .slide-comments-toggle {
+  color: var(--accent);
+}
+
+.slide-comments-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+.slide-comments-chevron {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+  margin-top: -3px;
+  opacity: 0.7;
+}
+
+.slide-comments.is-open .slide-comments-chevron {
+  transform: rotate(-135deg);
+  margin-top: 3px;
+}
+
+.slide-comments-panel {
+  padding: 6px 8px 2px;
+}
+
+.slide-comments-panel[hidden] {
   display: none;
 }
 
-body.is-edit-mode .slide-comment--empty {
-  display: flex;
-}
-
-.slide-comment-label {
-  flex-shrink: 0;
-  font-size: 0.62rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent);
-  padding-top: 3px;
-  min-width: 52px;
-}
-
-.ppm-comment {
-  flex: 1;
-  min-height: 1.4em;
-  max-height: 52px;
+.ppm-comment-input {
+  min-height: 52px;
+  max-height: 96px;
   overflow-y: auto;
-  font-size: 0.72rem;
-  line-height: 1.45;
-  color: var(--text-muted);
-  border-radius: 6px;
-  padding: 2px 6px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--slide-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  outline: none;
+  cursor: text;
+  user-select: text;
+  white-space: pre-wrap;
+  scrollbar-width: thin;
 }
 
-body.is-edit-mode .ppm-comment:empty::before {
+.ppm-comment-input:focus {
+  border-color: rgba(94, 179, 232, 0.45);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.ppm-comment-input:empty::before {
   content: attr(data-placeholder);
   color: var(--text-muted);
   opacity: 0.45;
@@ -395,7 +440,7 @@ body.is-edit-mode .ppm-comment:empty::before {
 }
 
 .slide--moodboard {
-  padding-bottom: 32px;
+  padding-bottom: 28px;
 }
 
 .edit-modal {

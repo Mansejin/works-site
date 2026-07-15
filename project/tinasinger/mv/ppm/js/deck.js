@@ -2,6 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "works/project/tinasinger/mv/ppm/slides/v1";
+  const COMMENTS_OPEN_KEY = "works/project/tinasinger/mv/ppm/comments/open/v1";
   const EDIT_AUTH_KEY = "works/project/tinasinger/mv/ppm/edit/v1";
   /** Edit password SHA-256 hash — update when changing password */
   const EDIT_PASS_SHA256 = "c74cead93d83c7317ad62515eec8333429048cc8e1ed5971eae50ae66f8d7fcb";
@@ -134,22 +135,61 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
     return `<div class="ppm-editable ppm-editable--block${className ? ` ${className}` : ""}" contenteditable="${ce}" data-path="${path}" spellcheck="false">${escapeHtml(text)}</div>`;
   }
 
-  function renderComment(index) {
+  function renderCommentPanel(index) {
     const text = slides[index]?.comment || "";
     const hasComment = String(text).trim().length > 0;
-    const emptyClass = hasComment ? "" : " slide-comment--empty";
-    const ce = isEditable() ? "true" : "false";
+    const isOpen = isCommentOpen(index);
     return `
-      <div class="slide-comment${emptyClass}">
-        <span class="slide-comment-label">코멘트</span>
-        <div class="ppm-editable ppm-editable--block ppm-comment" contenteditable="${ce}" data-path="${index}.comment" data-placeholder="회의 메모·피드백…" spellcheck="false">${escapeHtml(text)}</div>
+      <div class="slide-comments${isOpen ? " is-open" : ""}" data-slide="${index}">
+        <button type="button" class="slide-comments-toggle" aria-expanded="${isOpen}" aria-controls="slide-comments-panel-${index}">
+          <span class="slide-comments-toggle-text">댓글</span>
+          ${hasComment ? '<span class="slide-comments-dot" aria-label="댓글 있음"></span>' : ""}
+          <span class="slide-comments-chevron" aria-hidden="true"></span>
+        </button>
+        <div class="slide-comments-panel" id="slide-comments-panel-${index}"${isOpen ? "" : " hidden"}>
+          <div class="ppm-comment-input" contenteditable="true" data-path="${index}.comment" data-placeholder="의견·피드백을 남겨주세요…" spellcheck="true">${escapeHtml(text)}</div>
+        </div>
       </div>`;
+  }
+
+  function loadCommentOpenState() {
+    try {
+      return JSON.parse(localStorage.getItem(COMMENTS_OPEN_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  function isCommentOpen(index) {
+    return !!loadCommentOpenState()[String(index)];
+  }
+
+  function setCommentOpen(index, open) {
+    const state = loadCommentOpenState();
+    const key = String(index);
+    if (open) state[key] = true;
+    else delete state[key];
+    localStorage.setItem(COMMENTS_OPEN_KEY, JSON.stringify(state));
+  }
+
+  function syncCommentDot(wrap, hasText) {
+    const toggle = wrap.querySelector(".slide-comments-toggle");
+    if (!toggle) return;
+    let dot = toggle.querySelector(".slide-comments-dot");
+    if (hasText && !dot) {
+      toggle.querySelector(".slide-comments-toggle-text")?.insertAdjacentHTML(
+        "afterend",
+        '<span class="slide-comments-dot" aria-label="댓글 있음"></span>'
+      );
+    } else if (!hasText && dot) {
+      dot.remove();
+    }
   }
 
   function wrapSlide(index, classNames, inner) {
     return `<section class="slide${classNames ? ` ${classNames}` : ""}" data-index="${index}">
       <div class="slide-inner">${inner}</div>
-      ${renderComment(index)}
+      ${renderCommentPanel(index)}
     </section>`;
   }
 
@@ -164,7 +204,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
     if (deckHintsEl) {
       deckHintsEl.textContent = editMode
         ? "편집 모드 · Ctrl+Z · ← → Space · O 개요"
-        : "← → Space · O 개요";
+        : "← → Space · O 개요 · 슬라이드 하단 댓글";
     }
   }
 
@@ -493,12 +533,6 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
         if (path.endsWith(".title")) {
           updateOverviewTitle(Number(path.split(".")[0]));
         }
-        if (path.endsWith(".comment")) {
-          const commentWrap = el.closest(".slide-comment");
-          if (commentWrap) {
-            commentWrap.classList.toggle("slide-comment--empty", !String(value).trim());
-          }
-        }
       });
 
       if (isEditable()) {
@@ -506,6 +540,38 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
         el.addEventListener("mousedown", (e) => e.stopPropagation());
         el.addEventListener("dblclick", (e) => e.stopPropagation());
       }
+    });
+  }
+
+  function bindComments() {
+    frame.querySelectorAll(".slide-comments-toggle").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const wrap = btn.closest(".slide-comments");
+        if (!wrap) return;
+        const index = Number(wrap.dataset.slide);
+        const open = !wrap.classList.contains("is-open");
+        setCommentOpen(index, open);
+        wrap.classList.toggle("is-open", open);
+        btn.setAttribute("aria-expanded", String(open));
+        const panel = wrap.querySelector(".slide-comments-panel");
+        if (panel) panel.hidden = !open;
+        if (open) wrap.querySelector(".ppm-comment-input")?.focus();
+      });
+    });
+
+    frame.querySelectorAll(".ppm-comment-input").forEach((el) => {
+      el.addEventListener("input", () => {
+        const path = el.dataset.path;
+        const value = el.innerText.replace(/\r\n/g, "\n");
+        setByPath(path, value);
+        scheduleSave();
+        syncCommentDot(el.closest(".slide-comments"), !!String(value).trim());
+      });
+
+      el.addEventListener("click", (e) => e.stopPropagation());
+      el.addEventListener("mousedown", (e) => e.stopPropagation());
+      el.addEventListener("dblclick", (e) => e.stopPropagation());
     });
   }
 
@@ -521,11 +587,14 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
       )
       .join("");
     bindEditables();
+    bindComments();
   }
 
   function isEditingText() {
     const active = document.activeElement;
-    return active && active.classList.contains("ppm-editable") && isEditable();
+    if (!active) return false;
+    if (active.classList.contains("ppm-comment-input")) return true;
+    return active.classList.contains("ppm-editable") && isEditable();
   }
 
   function goTo(index) {
