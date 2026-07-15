@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="canonical" href="https://works.mansejin.com/project/tinasinger/mv/ppm/" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="css/deck.css" />
+  <title>이겸비 · Right Here, Right Now · MV PPM</title>
+</head>
+<body>
+  <div class="deck">
+    <div class="slide-frame" id="slideFrame" aria-live="polite"></div>
+  </div>
+
+  <div class="nav-zone nav-zone--prev" id="navPrev" aria-label="이전 슬라이드"></div>
+  <div class="nav-zone nav-zone--next" id="navNext" aria-label="다음 슬라이드"></div>
+
+  <footer class="deck-ui">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <span class="slide-counter" id="slideCounter"><strong>1</strong> / 1</span>
+    <div class="deck-audio">
+      <span class="deck-audio-label">Demo Mix</span>
+      <audio controls preload="metadata" src="assets/right-here-right-now-mix.mp3" title="Right Here, Right Now — 초기 믹스"></audio>
+    </div>
+    <span class="deck-hints">텍스트 클릭 편집 · ← → Space · O 개요</span>
+    <div class="deck-actions">
+      <span class="save-status" id="saveStatus">저장됨</span>
+      <button type="button" class="deck-btn deck-btn--ghost" id="btnExport" title="data/slides.js로 배포할 파일 다운로드">slides.js 저장</button>
+      <button type="button" class="deck-btn deck-btn--ghost" id="btnReset">초기화</button>
+      <button type="button" class="deck-btn" id="btnOverview">개요</button>
+      <button type="button" class="deck-btn" id="btnFullscreen">전체화면</button>
+    </div>
+  </footer>
+
+  <div class="overview-panel" id="overviewPanel">
+    <h2>슬라이드 개요 — 클릭하여 이동 · Esc 닫기</h2>
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
+
+  <script src="data/slides.js"></script>
+  <script src="js/deck.js"></script>
+</body>
+</html>
