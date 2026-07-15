@@ -104,9 +104,6 @@
             to { opacity: 1; }
         }
 
-        /* ==========================================
-           1. 메인 화면
-           ========================================== */
         #mainScreen {
             flex-direction: column;
             align-items: center;
@@ -179,13 +176,12 @@
             object-fit: contain;
         }
 
-        /* ==========================================
-           2. 게임 화면
-           ========================================== */
         #gameScreen {
             align-items: center;
             justify-content: center;
             background-color: #080808;
+            overflow-y: auto;
+            padding: 20px 0;
         }
 
         .game-container {
@@ -273,9 +269,71 @@
             cursor: default;
         }
 
-        /* ==========================================
-           3. 결과 팝업
-           ========================================== */
+        .cps-panel {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #1f1f1f;
+            text-align: left;
+        }
+
+        .cps-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .cps-panel-title {
+            font-size: 12px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .cps-live-group {
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+        }
+
+        .cps-live-item {
+            text-align: right;
+        }
+
+        .cps-live-label {
+            display: block;
+            font-size: 10px;
+            color: #555;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .cps-live-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--logi-blue);
+            line-height: 1;
+        }
+
+        .cps-live-value.dim {
+            color: #888;
+            font-size: 16px;
+        }
+
+        .cps-chart-wrap {
+            background: #090909;
+            border: 1px solid #202020;
+            border-radius: 8px;
+            padding: 10px 8px 6px;
+        }
+
+        #cpsChart {
+            width: 100%;
+            height: 130px;
+            display: block;
+        }
+
         .result-overlay {
             display: none;
             position: fixed;
@@ -297,7 +355,7 @@
             text-align: center;
             border: 2px solid var(--logi-blue);
             box-shadow: 0 0 50px rgba(0, 184, 252, 0.25);
-            max-width: 450px;
+            max-width: 480px;
             width: 85%;
         }
 
@@ -326,37 +384,69 @@
             color: #fff;
         }
 
+        .result-chart-wrap {
+            background: #090909;
+            border: 1px solid #202020;
+            border-radius: 8px;
+            padding: 10px 8px 6px;
+            margin: 0 0 20px;
+        }
+
+        #resultChart {
+            width: 100%;
+            height: 100px;
+            display: block;
+        }
+
+        .auto-return-note {
+            margin: 0 0 20px;
+            font-size: 14px;
+            color: #888;
+        }
+
+        .auto-return-note span {
+            color: var(--logi-blue);
+            font-weight: 700;
+        }
+
         .result-buttons {
             display: flex;
+            gap: 12px;
             justify-content: center;
-            margin-top: 30px;
+        }
+
+        .result-btn {
+            border: none;
+            padding: 16px 24px;
+            font-size: 16px;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+            max-width: 180px;
+            box-sizing: border-box;
+            font-family: var(--font-brand);
+        }
+
+        .retry-btn {
+            background: transparent;
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+        }
+
+        .retry-btn:hover {
+            border-color: var(--logi-blue);
+            color: var(--logi-blue);
+            box-shadow: 0 0 16px rgba(0, 184, 252, 0.25);
         }
 
         .main-btn {
             background-color: var(--logi-blue);
             color: #000000;
-            border: none;
-            padding: 16px 50px;
-            font-size: 18px;
-            font-weight: 700;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            width: 100%;
-            max-width: 260px;
-            box-sizing: border-box;
-            opacity: 0;
-            pointer-events: none;
-            transform: translateY(10px);
         }
 
-        .main-btn.active {
-            opacity: 1;
-            pointer-events: auto;
-            transform: translateY(0);
-        }
-
-        .main-btn.active:hover {
+        .main-btn:hover {
             background-color: #0098d1;
             box-shadow: 0 0 20px rgba(0, 184, 252, 0.6);
         }
@@ -396,12 +486,20 @@
             .final-score {
                 font-size: 44px;
             }
+
+            .cps-live-value {
+                font-size: 18px;
+            }
+
+            .result-btn {
+                font-size: 14px;
+                padding: 14px 16px;
+            }
         }
     </style>
 </head>
 <body>
 
-    <!-- [1번 페이지] 메인 화면 -->
     <div id="mainScreen" class="screen active">
         <div class="main-header">
             <h1 class="main-title">SUPERSTRIKE 클릭 챌린지</h1>
@@ -414,7 +512,6 @@
         </div>
     </div>
 
-    <!-- [2번 페이지] 게임 플레이 화면 -->
     <div id="gameScreen" class="screen">
         <div class="game-container">
             <img src="Logitech_G_Horizontal_Logo_Digital_Cyan_2.png" alt="Logitech G" class="game-logo">
@@ -436,33 +533,63 @@
             <div class="click-area" id="clickArea">
                 여기를 클릭하여 대기
             </div>
+
+            <div class="cps-panel">
+                <div class="cps-panel-header">
+                    <div class="cps-panel-title">실시간 CPS 차트</div>
+                    <div class="cps-live-group">
+                        <div class="cps-live-item">
+                            <span class="cps-live-label">현재 CPS</span>
+                            <span class="cps-live-value" id="liveCps">0.0</span>
+                        </div>
+                        <div class="cps-live-item">
+                            <span class="cps-live-label">평균 CPS</span>
+                            <span class="cps-live-value dim" id="avgCps">0.0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="cps-chart-wrap">
+                    <canvas id="cpsChart" aria-label="실시간 CPS 차트"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- 결과 화면 팝업 -->
     <div class="result-overlay" id="resultOverlay">
         <div class="result-box">
             <h2>TIME OVER</h2>
             <div class="result-record-subtitle">SUPERSTRIKE 클릭 챌린지 기록</div>
 
             <div class="final-score"><span id="finalClicks">0</span>회 클릭</div>
-            <p style="color: #aaa; font-size: 20px; margin: 5px 0 25px 0;">초당 클릭 수 (CPS) : <span id="finalCps" style="color: var(--logi-blue); font-weight: bold;">0</span></p>
+            <p style="color: #aaa; font-size: 20px; margin: 5px 0 20px 0;">초당 클릭 수 (CPS) : <span id="finalCps" style="color: var(--logi-blue); font-weight: bold;">0</span></p>
+
+            <div class="result-chart-wrap">
+                <canvas id="resultChart" aria-label="CPS 기록 차트"></canvas>
+            </div>
+
+            <p class="auto-return-note"><span id="autoReturnCount">10</span>초 후 메인 화면으로 이동합니다</p>
 
             <div class="result-buttons">
-                <button class="main-btn" id="mainBtn" onclick="goToMain()">메인 화면으로</button>
+                <button class="result-btn retry-btn" id="retryBtn" onclick="retryGame()">재도전</button>
+                <button class="result-btn main-btn" id="mainBtn" onclick="goToMain()">메인 화면으로</button>
             </div>
         </div>
     </div>
 
     <script>
+        const timeLimit = 10;
+        const AUTO_RETURN_SECONDS = 10;
+        const SECOND_BUCKETS = 10;
+
         let clicks = 0;
-        const timeLimit = 10.00;
         let timeLeft = timeLimit;
         let timer = null;
         let countdownTimer = null;
-        let resultButtonTimer = null;
         let resultShowTimer = null;
+        let autoReturnInterval = null;
         let gameStartTime = 0;
+        let autoReturnLeft = AUTO_RETURN_SECONDS;
+        let clickTimestamps = [];
 
         let isCountingDown = false;
         let isGaming = false;
@@ -474,7 +601,13 @@
         const resultOverlay = document.getElementById('resultOverlay');
         const finalClicks = document.getElementById('finalClicks');
         const finalCps = document.getElementById('finalCps');
-        const mainBtn = document.getElementById('mainBtn');
+        const liveCpsEl = document.getElementById('liveCps');
+        const avgCpsEl = document.getElementById('avgCps');
+        const autoReturnCount = document.getElementById('autoReturnCount');
+        const cpsChart = document.getElementById('cpsChart');
+        const resultChart = document.getElementById('resultChart');
+        const cpsCtx = cpsChart.getContext('2d');
+        const resultCtx = resultChart.getContext('2d');
 
         function clearAllTimers() {
             if (timer !== null) {
@@ -485,14 +618,138 @@
                 clearInterval(countdownTimer);
                 countdownTimer = null;
             }
-            if (resultButtonTimer !== null) {
-                clearTimeout(resultButtonTimer);
-                resultButtonTimer = null;
-            }
             if (resultShowTimer !== null) {
                 clearTimeout(resultShowTimer);
                 resultShowTimer = null;
             }
+            clearAutoReturn();
+        }
+
+        function clearAutoReturn() {
+            if (autoReturnInterval !== null) {
+                clearInterval(autoReturnInterval);
+                autoReturnInterval = null;
+            }
+        }
+
+        function getElapsedSeconds() {
+            if (!gameStartTime) return 0;
+            return Math.min(timeLimit, (performance.now() - gameStartTime) / 1000);
+        }
+
+        function getClickBuckets() {
+            const buckets = new Array(SECOND_BUCKETS).fill(0);
+            for (const t of clickTimestamps) {
+                const idx = Math.min(Math.floor(t), SECOND_BUCKETS - 1);
+                if (idx >= 0) buckets[idx]++;
+            }
+            return buckets;
+        }
+
+        function getCurrentSecondCps() {
+            if (!isGaming && !isFinished) return 0;
+            const elapsed = getElapsedSeconds();
+            const currentIdx = Math.min(Math.floor(elapsed), SECOND_BUCKETS - 1);
+            const bucketStart = currentIdx;
+            const count = clickTimestamps.filter((t) => t >= bucketStart && t < bucketStart + 1).length;
+            return count;
+        }
+
+        function getAverageCps() {
+            const elapsed = getElapsedSeconds();
+            if (elapsed <= 0) return 0;
+            return clicks / elapsed;
+        }
+
+        function setupCanvas(canvas, ctx) {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = Math.floor(rect.width * dpr);
+            canvas.height = Math.floor(rect.height * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            return { width: rect.width, height: rect.height };
+        }
+
+        function drawCpsChart(canvas, ctx, options) {
+            const { highlightCurrent = false, elapsedOverride = null } = options;
+            const size = setupCanvas(canvas, ctx);
+            const width = size.width;
+            const height = size.height;
+            const padding = { top: 8, right: 8, bottom: 22, left: 28 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+            const buckets = getClickBuckets();
+            const maxValue = Math.max(1, ...buckets);
+            const barGap = 6;
+            const barWidth = (chartWidth - barGap * (SECOND_BUCKETS - 1)) / SECOND_BUCKETS;
+            const elapsed = elapsedOverride !== null ? elapsedOverride : getElapsedSeconds();
+            const currentIdx = Math.min(Math.floor(elapsed), SECOND_BUCKETS - 1);
+
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.strokeStyle = '#252525';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 3; i++) {
+                const y = padding.top + (chartHeight / 3) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(width - padding.right, y);
+                ctx.stroke();
+            }
+
+            for (let i = 0; i < SECOND_BUCKETS; i++) {
+                const value = buckets[i];
+                const barHeight = (value / maxValue) * chartHeight;
+                const x = padding.left + i * (barWidth + barGap);
+                const y = padding.top + chartHeight - barHeight;
+                const isCurrent = highlightCurrent && i === currentIdx && isGaming;
+
+                ctx.fillStyle = isCurrent ? '#00B8FC' : (value > 0 ? 'rgba(0, 184, 252, 0.55)' : '#1a1a1a');
+                ctx.fillRect(x, y, barWidth, barHeight);
+
+                ctx.fillStyle = '#555';
+                ctx.font = '10px BrownPro, Noto Sans KR, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(String(i + 1), x + barWidth / 2, height - 6);
+
+                if (value > 0) {
+                    ctx.fillStyle = isCurrent ? '#fff' : '#aaa';
+                    ctx.font = 'bold 10px BrownPro, Noto Sans KR, sans-serif';
+                    ctx.fillText(String(value), x + barWidth / 2, Math.max(padding.top + 10, y - 4));
+                }
+            }
+
+            ctx.fillStyle = '#666';
+            ctx.font = '10px BrownPro, Noto Sans KR, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(String(maxValue), padding.left - 6, padding.top + 8);
+        }
+
+        function updateLiveStats() {
+            liveCpsEl.textContent = getCurrentSecondCps().toFixed(1);
+            avgCpsEl.textContent = getAverageCps().toFixed(1);
+            drawCpsChart(cpsChart, cpsCtx, { highlightCurrent: true });
+        }
+
+        function resetChartDisplay() {
+            clickTimestamps = [];
+            liveCpsEl.textContent = '0.0';
+            avgCpsEl.textContent = '0.0';
+            drawCpsChart(cpsChart, cpsCtx, { highlightCurrent: false, elapsedOverride: 0 });
+        }
+
+        function startAutoReturnCountdown() {
+            clearAutoReturn();
+            autoReturnLeft = AUTO_RETURN_SECONDS;
+            autoReturnCount.textContent = autoReturnLeft;
+
+            autoReturnInterval = setInterval(() => {
+                autoReturnLeft -= 1;
+                autoReturnCount.textContent = Math.max(autoReturnLeft, 0);
+                if (autoReturnLeft <= 0) {
+                    goToMain();
+                }
+            }, 1000);
         }
 
         function goToGame() {
@@ -506,10 +763,14 @@
             document.getElementById('gameScreen').classList.remove('active');
             document.getElementById('mainScreen').classList.add('active');
             resultOverlay.style.display = 'none';
-            mainBtn.classList.remove('active');
         }
 
-        // pointerdown 하나로 마우스/터치 중복 카운트 방지
+        function retryGame() {
+            clearAllTimers();
+            resultOverlay.style.display = 'none';
+            resetGame();
+        }
+
         clickArea.addEventListener('pointerdown', function (e) {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
             e.preventDefault();
@@ -525,7 +786,9 @@
             }
 
             clicks++;
+            clickTimestamps.push(getElapsedSeconds());
             clickDisplay.textContent = clicks;
+            updateLiveStats();
         }
 
         function startCountdown() {
@@ -558,11 +821,13 @@
             clickArea.textContent = '클릭! 클릭! 클릭!';
 
             gameStartTime = performance.now();
+            resetChartDisplay();
 
             timer = setInterval(() => {
-                const elapsed = (performance.now() - gameStartTime) / 1000;
+                const elapsed = getElapsedSeconds();
                 timeLeft = Math.max(0, timeLimit - elapsed);
                 timeDisplay.textContent = timeLeft.toFixed(2);
+                updateLiveStats();
 
                 if (timeLeft <= 0) {
                     endGame();
@@ -580,13 +845,12 @@
 
             finalClicks.textContent = clicks;
             finalCps.textContent = (clicks / timeLimit).toFixed(1);
+            updateLiveStats();
 
             resultShowTimer = setTimeout(() => {
+                drawCpsChart(resultChart, resultCtx, { highlightCurrent: false, elapsedOverride: timeLimit });
                 resultOverlay.style.display = 'flex';
-
-                resultButtonTimer = setTimeout(() => {
-                    mainBtn.classList.add('active');
-                }, 1500);
+                startAutoReturnCountdown();
             }, 300);
         }
 
@@ -595,18 +859,30 @@
 
             clicks = 0;
             timeLeft = timeLimit;
+            gameStartTime = 0;
             isCountingDown = false;
             isGaming = false;
             isFinished = false;
 
-            mainBtn.classList.remove('active');
             clickDisplay.textContent = '0';
             timeDisplay.textContent = '10.00';
             clickArea.classList.remove('countdown-active');
             clickArea.style.fontSize = '24px';
             clickArea.textContent = '여기를 클릭하여 대기';
             resultOverlay.style.display = 'none';
+            autoReturnLeft = AUTO_RETURN_SECONDS;
+            autoReturnCount.textContent = AUTO_RETURN_SECONDS;
+            resetChartDisplay();
         }
+
+        window.addEventListener('resize', () => {
+            drawCpsChart(cpsChart, cpsCtx, { highlightCurrent: isGaming, elapsedOverride: isFinished ? timeLimit : null });
+            if (resultOverlay.style.display === 'flex') {
+                drawCpsChart(resultChart, resultCtx, { highlightCurrent: false, elapsedOverride: timeLimit });
+            }
+        });
+
+        resetChartDisplay();
     </script>
 </body>
 </html>
