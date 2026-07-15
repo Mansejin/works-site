@@ -3,8 +3,27 @@
   const DEFAULT_STATE = window.DdditPlanDefaults?.vendict;
   if (!DEFAULT_STATE) throw new Error("DdditPlanDefaults.vendict 로드 실패");
 
+  const GUIDE_KEYS = [
+    "summary",
+    "concept",
+    "keyMessage",
+    "structure",
+    "brandMust",
+    "brandAvoid",
+    "reviewGuide",
+    "shootChecklist",
+    "tags",
+    "descriptionDraft",
+    "notes",
+    "uploadDate",
+    "scheduleUpload",
+    "targetLength",
+    "title",
+  ];
+
   let state = structuredClone(DEFAULT_STATE);
   let saveTimer = null;
+  let storageRevision = Number(DEFAULT_STATE.defaultsRevision || 1);
 
   const fields = {
     title: document.getElementById("f-title"),
@@ -36,7 +55,14 @@
 
   function persist() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ updatedAt: Date.now(), data: state }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          updatedAt: Date.now(),
+          revision: storageRevision,
+          data: state,
+        })
+      );
     } catch {
       /* ignore */
     }
@@ -47,7 +73,19 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      if (parsed?.data) state = { ...DEFAULT_STATE, ...parsed.data };
+      if (!parsed?.data) return;
+      state = { ...DEFAULT_STATE, ...parsed.data };
+      const currentRev = Number(DEFAULT_STATE.defaultsRevision || 1);
+      const savedRev = Number(parsed.revision || 0);
+      // Brand guide SSOT refresh — overwrite guide fields when defaults bump.
+      if (savedRev < currentRev) {
+        GUIDE_KEYS.forEach((key) => {
+          if (DEFAULT_STATE[key] != null) state[key] = DEFAULT_STATE[key];
+        });
+        storageRevision = currentRev;
+      } else {
+        storageRevision = savedRev || currentRev;
+      }
     } catch {
       /* keep defaults */
     }
