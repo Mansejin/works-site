@@ -75,12 +75,6 @@
       display: none;
     }
     .error.show { display: block; }
-    .hint {
-      margin-top: 14px;
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
     html.team-gate-pending body { visibility: hidden; }
   </style>
   <style>html.team-gate-pending body { visibility: hidden; }</style>
@@ -88,14 +82,13 @@
 <body>
   <div class="card">
     <h1>디디딧 팀 로그인</h1>
-    <p>워크스페이스·콘티 작성기 등 내부 페이지는 팀 비밀번호가 필요합니다. 브랜드 담당자용 공유 링크(제품 리스트 등)는 이 화면 없이 열립니다.</p>
+    <p>워크스페이스 내부 페이지는 팀 비밀번호가 필요합니다.</p>
     <form id="gate-form">
-      <label for="passcode">팀 비밀번호</label>
-      <input id="passcode" type="password" autocomplete="current-password" placeholder="팀 전용 비밀번호" required />
-      <button id="btn-login" type="submit">입장</button>
+      <label for="passcode">비밀번호</label>
+      <input id="passcode" type="password" autocomplete="current-password" placeholder="비밀번호 입력" required />
+      <button id="btn-login" type="submit">로그인</button>
     </form>
     <p id="gate-error" class="error" role="alert"></p>
-    <p class="hint">비밀번호는 NAS works-api 환경변수 <code>DDDIT_TEAM_GATE_PASSCODE</code> 와 동일합니다. 브라우저를 닫기 전까지 이 기기에서 유지됩니다.</p>
   </div>
 
   <script>
