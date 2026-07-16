@@ -34,11 +34,6 @@
     analyticsBanner: document.getElementById("analytics-banner"),
     analyticsKpiGrid: document.getElementById("analytics-kpi-grid"),
     analyticsStatus: document.getElementById("analytics-status"),
-    adsSyncStatus: null,
-    studioSyncStatus: document.getElementById("studio-sync-status"),
-    issuesEditor: document.getElementById("issues-editor"),
-    promotionsEditor: document.getElementById("promotions-editor"),
-    snapshotsEditor: document.getElementById("snapshots-editor"),
     promoPagination: document.getElementById("promo-pagination"),
     saveStatus: document.getElementById("save-status"),
   };
@@ -1394,56 +1389,6 @@
     }
   }
 
-  function renderAdsSyncStatus() {
-    /* Ads 끔 인디케이터 제거 — Studio 동기화만 표시 */
-  }
-
-  function renderStudioSyncStatus(studio) {
-    if (!els.studioSyncStatus) return;
-    if (!studio) {
-      els.studioSyncStatus.textContent = "Studio —";
-      return;
-    }
-    if (studio.lastSync) {
-      const when = new Date(studio.lastSync).toLocaleString("ko-KR");
-      els.studioSyncStatus.textContent = `Studio · ${when}`;
-      els.studioSyncStatus.className = "status-pill ok";
-      els.studioSyncStatus.title = studio.message || "";
-      return;
-    }
-    if (studio.ready) {
-      els.studioSyncStatus.textContent = "Studio 준비됨";
-      els.studioSyncStatus.className = "status-pill ok";
-      els.studioSyncStatus.title =
-        studio.message ||
-        `캡처·쿠키 설정됨${studio.cookieCount ? ` (${studio.cookieCount}개)` : ""}${
-          studio.authUser != null ? ` · authuser=${studio.authUser}` : ""
-        }`;
-      return;
-    }
-    if (studio.captureConfigured || studio.cookiesConfigured) {
-      els.studioSyncStatus.textContent = studio.cookiesConfigured ? "Studio 부분설정" : "쿠키 없음";
-      els.studioSyncStatus.className = studio.cookiesConfigured ? "status-pill" : "status-pill error";
-      els.studioSyncStatus.title =
-        studio.message ||
-        (studio.cookiesConfigured
-          ? "캡처 또는 쿠키가 부족합니다"
-          : "캡처 저장을 다시 하세요 (cURL에 -b 쿠키 필요)");
-      return;
-    }
-    els.studioSyncStatus.textContent = "Studio 캡처 필요";
-    els.studioSyncStatus.className = "status-pill";
-    els.studioSyncStatus.title = "프로모션 목록 cURL을 아래 편집란에 저장하세요";
-  }
-
-  async function refreshStudioPromoStatus() {
-    const studio = await apiGet("/api/dddit/youtube/report/studio-promotions/status", {
-      timeoutMs: 15_000,
-    });
-    renderStudioSyncStatus(studio);
-    return studio;
-  }
-
   async function refreshPromotionsTable() {
     const data = await apiGet("/api/dddit/youtube/report/promotions", { timeoutMs: 15_000 });
     promoPage = 0;
@@ -2091,8 +2036,6 @@
 
       renderKpis(overview.kpis || {}, overview.channel?.subscriberCount);
       renderAnalyticsOverview(overview.analytics);
-      renderAdsSyncStatus();
-      renderStudioSyncStatus(overview.studioPromoSync);
       renderInsights(overview.insights || []);
       promoPage = 0;
       videoPage = 0;
@@ -2195,44 +2138,6 @@
     } catch (err) {
       els.saveStatus.textContent = err.message || "저장 실패";
       els.saveStatus.className = "status-pill error";
-    }
-  });
-
-  document.getElementById("btn-promo-cleanup")?.addEventListener("click", async () => {
-    try {
-      setStatus("깨진 Studio 행 정리 중…");
-      const out = await apiPost("/api/dddit/youtube/report/studio-promotions/cleanup");
-      if (!out?.ok) throw new Error(out?.message || "정리 실패");
-      setStatus(out.message || "정리 완료", "ok");
-      promoPage = 0;
-      await refreshPromotionsTable();
-      try {
-        alert(out.message || "정리 완료");
-      } catch (_) {}
-    } catch (err) {
-      showError(err.message || "정리 실패");
-    }
-  });
-
-  document.getElementById("btn-copy-bookmarklet")?.addEventListener("click", async () => {
-    try {
-      const snippetUrl = new URL("js/studio-promo-sync-snippet.js", location.href).href + "?v=4";
-      const res = await fetch(snippetUrl, { cache: "no-store" });
-      if (!res.ok) throw new Error("동기화 코드를 불러오지 못했습니다");
-      let code = (await res.text()).trim();
-      // Strip leading block comment so paste runs immediately in Console.
-      code = code.replace(/^\/\*[\s\S]*?\*\/\s*/, "");
-      await navigator.clipboard.writeText(code);
-      setStatus("동기화 코드 복사됨 — Studio Console에 붙여넣기", "ok");
-      alert(
-        "동기화 코드가 복사되었습니다.\n\n" +
-          "1) Studio → 프로모션 탭\n" +
-          "2) F12 → Console\n" +
-          "3) 붙여넣기 → Enter\n" +
-          "4) 우측 상단 토스트/알림 확인 후 이 페이지 새로고침"
-      );
-    } catch (err) {
-      showError(err.message || "동기화 코드 복사 실패");
     }
   });
 
