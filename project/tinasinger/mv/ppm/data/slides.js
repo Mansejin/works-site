@@ -2,17 +2,15 @@
  * 이겸비 (Tina Singer) — Right Here, Right Now MV PPM
  * 배포 기본값 — 편집 후 「slides.js 저장」 버튼 또는 scripts/export-slides.mjs
  */
-window.PPM_SLIDES_UPDATED = "2026-07-19";
+window.PPM_SLIDES_UPDATED = "2026-07-20";
 window.PPM_SLIDES = [
   {
     "type": "cover",
     "title": "RIGHT HERE, RIGHT NOW",
-    "subtitle": "이겸비 (Tina Singer) · Music Video PPM",
-    "lines": [
-      "가수 · 이겸비 (AKA 망한 가수, Tina Singer)",
-      "앨범 오프닝 트랙 · 와디즈 펀딩 성공",
-      "Production · Mansejin Works",
-      "2026.07 · Draft v0.1"
+    "subtitle": "이겸비 · Tina Singer",
+    "meta": [
+      { "v": "Album Opening Track" },
+      { "v": "Mansejin Works · 2026" }
     ]
   },
   {
@@ -111,13 +109,13 @@ window.PPM_SLIDES = [
           "곡명: Right Here, Right Now",
           "포지션: 앨범 오프닝 트랙 — ‘시작’의 의미를 가장 직관적으로 전달",
           "현재 상태: 초기 믹싱 완료 (데모 청취 가능)",
-          "MV 목표: 청량·희망·‘지금 여기서 시작한다’는 감정을 한 번에 전달",
+          "MV 목표: 희망·‘지금 여기서 시작한다’는 감정 — 일상 B-roll 톤, 과포화 컬러 지양",
           "아티스트 비주얼: 이겸비의 외적 매력·무대 존재감이 잘 드러나는 씬을 충분히 확보"
         ]
       },
       {
         "heading": "제작 방향 한 줄",
-        "body": "어린 시절의 꿈 → 오래 기다린 시간 → 지금 이 순간의 해방. 여행 다큐처럼 밝고 솔직하게."
+        "body": "어린 시절의 꿈 → 오래 기다린 시간 → 지금 이 순간의 해방. 여행 다큐처럼 솔직하고 무드 있게."
       }
     ]
   },
@@ -177,7 +175,7 @@ window.PPM_SLIDES = [
       {
         "heading": "Mood Keywords",
         "tags": [
-          "청량",
+          "자연광",
           "희망",
           "시작",
           "여행",
@@ -189,7 +187,7 @@ window.PPM_SLIDES = [
       {
         "heading": "연출 톤",
         "bullets": [
-          "직관적 이미지 우선 — 곡을 들으면 바로 떠오르는 밝고 시원한 그림",
+          "직관적 이미지 우선 — 곡을 들으면 바로 떠오르는 자연스럽고 시원한 그림 (쨍한 원색 지양)",
           "볼빨간사춘기 「Travel」 — 여행·일상 다큐 감성, 자연광, 핸드헬드",
           "1·2절: 따뜻한 회상 + 작업실·일상 (intimate)",
           "후크: 바다·해변·뛰는 장면 — 공간·색·움직임으로 감정 폭발",
@@ -246,33 +244,35 @@ window.PPM_SLIDES = [
   {
     "type": "palette",
     "title": "05 · 비주얼 아이덴티티",
+    "moodImage": "assets/moodboard/verse-car-headphones.png",
+    "moodCaption": "목표 무드 — 일상 B-roll, 창밖 자연광, 헤드폰, 관찰자 시점",
     "colors": [
       {
-        "name": "Sky Blue",
-        "hex": "#87CEEB",
-        "role": "하늘 · 청량감 · 베이스"
+        "name": "Window Warm",
+        "hex": "#C8B8A4",
+        "role": "실내·골든아워 실루엣"
       },
       {
-        "name": "Sun Gold",
-        "hex": "#FFD166",
-        "role": "햇빛 · 희망 · 후크 포인트"
+        "name": "Soft Sky",
+        "hex": "#8FA3AD",
+        "role": "하늘·창밖 — 채도 낮춤"
       },
       {
-        "name": "Ocean Teal",
-        "hex": "#2A9D8F",
-        "role": "바다 · 깊이 · 대비"
+        "name": "Street Grey",
+        "hex": "#6E757C",
+        "role": "도로·일상 배경"
       },
       {
-        "name": "Sand White",
-        "hex": "#FAF6F0",
-        "role": "모래 · 하이라이트 · 의상"
+        "name": "Film Cream",
+        "hex": "#E8E2D8",
+        "role": "하이라이트·의상 베이스"
       }
     ],
     "notes": [
-      "전체: 하이키·웜톤 — 어둡거나 누아르 톤 지양",
-      "아카이브 클립: 살짝 desaturated + grain (VHS/폰 촬영감)",
-      "현재(해변·일상): 선명한 채도, 자연광 skin tone",
-      "타이틀 카드: 산세리프 bold + 여백 넉넉한 미니멀"
+      "지양: 쨍한 원색·네온·과포화 컬러 — 아티스트 피드백 반영",
+      "추구: 일상 B-roll 톤 — 자연광, 부드러운 대비, 필름 그레인",
+      "아카이브: desaturated + grain (VHS/폰 촬영감)",
+      "현재 씬: warm lifted shadows, muted sky, skin tone 자연스럽게"
     ]
   },
   {
@@ -281,11 +281,11 @@ window.PPM_SLIDES = [
     "refs": [
       {
         "label": "메인",
-        "desc": "볼빨간사춘기 「Travel」 MV — 여행·일상 다큐, 밝은 자연광, 솔직한 카메라"
+        "desc": "볼빨간사춘기 「Travel」 MV — 여행·일상 다큐, 자연광, 솔직한 카메라"
       },
       {
         "label": "무드",
-        "desc": "청량 Pop MV — 곡 첫 10초에 ‘시원함·희망’이 바로 오는 직관적 이미지"
+        "desc": "일상 Pop MV — 곡 첫 10초에 ‘시원함·희망’이 바로 오는 직관적 이미지 (muted 톤)"
       },
       {
         "label": "아카이브",
@@ -296,7 +296,7 @@ window.PPM_SLIDES = [
         "desc": "앨범 오프닝 = ‘시작’ — 과거→현재 교차로 ‘드디어 시작한다’ 전달"
       }
     ],
-    "note": "뻔해 보일 수 있지만, 이 곡·이 시점(첫 앨범·펀딩 직후)에는 직관적·밝은 연출이 가장 효과적."
+    "note": "뻔해 보일 수 있지만, 이 곡·이 시점(첫 앨범·펀딩 직후)에는 직관적·무드 있는 연출이 가장 효과적."
   },
   {
     "type": "moodboard",
@@ -308,7 +308,7 @@ window.PPM_SLIDES = [
         "items": [
           {
             "src": "assets/moodboard/ref-bol4-travel.png",
-            "caption": "볼빨간사춘기 「Travel」 — 여행·일상 다큐, 밝은 하늘과 로드무비"
+            "caption": "볼빨간사춘기 「Travel」 — 여행·일상 다큐, muted 하늘과 로드무비"
           }
         ]
       },
@@ -460,9 +460,9 @@ window.PPM_SLIDES = [
       {
         "heading": "Look B — Chorus / 해변",
         "bullets": [
-          "화이트·베이지·스카이 블루 계열 — 바람에 날리는 실루엣",
+          "화이트·베이지·소프트 그레이 계열 — 바람에 날리는 실루엣",
           "맨발 or 샌들, 움직임 편한 실루엣",
-          "톤: 자유롭고 밝 — ‘Right here right now’ 에너지"
+          "톤: 자유롭고 가벼운 — ‘Right here right now’ 에너지 (과포화 지양)"
         ]
       },
       {
@@ -523,7 +523,7 @@ window.PPM_SLIDES = [
       {
         "heading": "컬러",
         "bullets": [
-          "현재: warm, lifted shadows, sky blue grade",
+          "현재: warm lifted shadows, muted sky, skin tone 자연스럽게",
           "아카이브: -10% saturation, fine grain",
           "전체: 톤앤매너 필름 그레인 가볍게 — 너무 깔끔한 톤은 지양"
         ]
@@ -554,9 +554,14 @@ window.PPM_SLIDES = [
         "task": "스토리보드 · 로케 섭외 · 아카이브 큐레이션"
       },
       {
-        "phase": "Shoot",
-        "date": "TBD",
-        "task": "본 촬영 1–2일 (해변 + 실내)"
+        "phase": "Shoot · 1차",
+        "date": "2026.07.25",
+        "task": "서울 근교 — 작업실·일상·아카이브"
+      },
+      {
+        "phase": "Shoot · 2차",
+        "date": "2026.08.14–15",
+        "task": "동해 로케이션 — 해변·키 비주얼"
       },
       {
         "phase": "Post",

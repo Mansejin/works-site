@@ -324,6 +324,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
 
   function wrapSlide(index, classNames, inner) {
     return `<section class="slide${classNames ? ` ${classNames}` : ""}" data-index="${index}">
+      <div class="slide-watermark" aria-hidden="true"></div>
       <div class="slide-inner">${inner}</div>
     </section>`;
   }
@@ -480,10 +481,15 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
       case "cover":
         classNames = "slide--cover";
         inner = `
+          <div class="cover-eyebrow">Music Video · Pre-Production</div>
           <div class="cover-title">${ed(`${p}.title`, slide.title)}</div>
           <div class="cover-subtitle">${ed(`${p}.subtitle`, slide.subtitle || "")}</div>
-          <div class="cover-lines">${(slide.lines || [])
-            .map((l, i) => `<span>${ed(`${p}.lines.${i}`, l)}</span>`)
+          <div class="cover-meta">${(slide.meta || slide.lines || [])
+            .map((item, i) => {
+              const path = slide.meta ? `${p}.meta.${i}.v` : `${p}.lines.${i}`;
+              const text = slide.meta ? item.v : item;
+              return `<span class="cover-meta-item">${ed(path, text)}</span>`;
+            })
             .join("")}</div>`;
         break;
 
@@ -546,17 +552,28 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
       case "palette":
         inner = `
           <h2 class="slide-title">${ed(`${p}.title`, slide.title)}</h2>
-          <div class="palette-row">${(slide.colors || [])
-            .map(
-              (c, i) => `
-            <div class="swatch">
-              <div class="swatch-color" style="background:${escapeHtml(c.hex)}"></div>
-              <div class="swatch-name">${ed(`${p}.colors.${i}.name`, c.name)}</div>
-              <div class="swatch-role">${ed(`${p}.colors.${i}.role`, c.role)}</div>
-            </div>`
-            )
-            .join("")}</div>
-          ${renderBullets(slide.notes, p, "notes")}`;
+          <div class="palette-layout">
+            ${slide.moodImage ? `
+            <div class="palette-mood">
+              <img src="${escapeHtml(slide.moodImage)}" alt="" loading="lazy" />
+              <p class="palette-mood-caption">${ed(`${p}.moodCaption`, slide.moodCaption || "")}</p>
+            </div>` : ""}
+            <div class="palette-side">
+              <div class="palette-row">${(slide.colors || [])
+                .map(
+                  (c, i) => `
+                <div class="swatch">
+                  <div class="swatch-color" style="background:${escapeHtml(c.hex)}"></div>
+                  <div class="swatch-info">
+                    <div class="swatch-name">${ed(`${p}.colors.${i}.name`, c.name)}</div>
+                    <div class="swatch-role">${ed(`${p}.colors.${i}.role`, c.role)}</div>
+                  </div>
+                </div>`
+                )
+                .join("")}</div>
+              ${renderBullets(slide.notes, p, "notes")}
+            </div>
+          </div>`;
         break;
 
       case "refs":
