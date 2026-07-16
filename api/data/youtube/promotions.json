@@ -45,7 +45,22 @@
       "subscribers": 125,
       "followOnViews": 1,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-14", "활성 · 이번 배치 캡처 제외 · 수치 유지"]
+      "notes": ["Studio 캡처 2026-07-14", "활성 · 구독 캠페인"]
+    },
+    {
+      "id": "lenovo-ideatab11-views",
+      "title": "레노버 아이디어 탭 11 (조회수)",
+      "videoTitle": "펜까지 기본인데 26만 원? 레노버 아이디어 탭 11 솔직 리뷰 #태블릿 #레노버 #아이디어탭11",
+      "videoId": "",
+      "status": "진행중",
+      "goal": "동영상 조회수",
+      "cost": 3660,
+      "impressions": 366,
+      "views": 67,
+      "subscribers": 0,
+      "followOnViews": 0,
+      "source": "manual",
+      "notes": ["Studio 캡처 2026-07-16", "활성"]
     },
     {
       "id": "dreame-mf10-views",
