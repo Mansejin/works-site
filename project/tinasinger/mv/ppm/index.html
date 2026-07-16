@@ -10,12 +10,32 @@
   <title>이겸비 · Right Here, Right Now · MV PPM</title>
 </head>
 <body>
-  <div class="deck">
-    <div class="slide-frame" id="slideFrame" aria-live="polite"></div>
-  </div>
+  <div class="deck-layout" id="deckLayout">
+    <div class="deck-stage">
+      <div class="deck">
+        <div class="slide-frame" id="slideFrame" aria-live="polite"></div>
+      </div>
 
-  <div class="nav-zone nav-zone--prev" id="navPrev" aria-label="이전 슬라이드"></div>
-  <div class="nav-zone nav-zone--next" id="navNext" aria-label="다음 슬라이드"></div>
+      <div class="nav-zone nav-zone--prev" id="navPrev" aria-label="이전 슬라이드"></div>
+      <div class="nav-zone nav-zone--next" id="navNext" aria-label="다음 슬라이드"></div>
+    </div>
+
+    <aside class="comments-rail" id="commentsRail" hidden aria-label="슬라이드 댓글">
+      <div class="comments-rail-head">
+        <div class="comments-rail-title-wrap">
+          <h3 class="comments-rail-title">댓글</h3>
+          <p class="comments-rail-sub" id="commentsRailSub">슬라이드</p>
+        </div>
+        <button type="button" class="comments-rail-close" id="btnCommentsClose" aria-label="댓글 닫기">×</button>
+      </div>
+      <div class="comments-list" id="commentsList"></div>
+      <form class="comments-compose" id="commentsForm">
+        <input type="text" class="comments-author-input" id="commentAuthor" placeholder="이름" maxlength="24" autocomplete="nickname" />
+        <textarea class="comments-body-input" id="commentBody" placeholder="댓글을 입력하세요…" rows="3" maxlength="2000"></textarea>
+        <button type="submit" class="deck-btn comments-submit">게시</button>
+      </form>
+    </aside>
+  </div>
 
   <footer class="deck-ui">
     <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
@@ -29,9 +49,11 @@
       <span class="save-status" id="saveStatus" hidden>저장됨</span>
       <button type="button" class="deck-btn deck-btn--ghost" id="btnEdit">편집</button>
       <button type="button" class="deck-btn deck-btn--ghost" id="btnExport" title="data/slides.js로 배포할 파일 다운로드" hidden>slides.js 저장</button>
+      <button type="button" class="deck-btn deck-btn--ghost" id="btnComments" hidden>
+        댓글 <span class="comments-badge" id="commentsBadge" hidden></span>
+      </button>
       <button type="button" class="deck-btn" id="btnOverview">개요</button>
       <button type="button" class="deck-btn" id="btnFullscreen">전체화면</button>
-    </div>
   </footer>
 
   <div class="overview-panel" id="overviewPanel">

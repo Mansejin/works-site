@@ -2,7 +2,9 @@
   "use strict";
 
   const STORAGE_KEY = "works/project/tinasinger/mv/ppm/slides/v1";
-  const COMMENTS_OPEN_KEY = "works/project/tinasinger/mv/ppm/comments/open/v1";
+  const COMMENTS_STORE_KEY = "works/project/tinasinger/mv/ppm/thread-comments/v1";
+  const COMMENT_AUTHOR_KEY = "works/project/tinasinger/mv/ppm/comment-author/v1";
+  const COMMENTS_RAIL_OPEN_KEY = "works/project/tinasinger/mv/ppm/comments-rail-open/v1";
   const EDIT_AUTH_KEY = "works/project/tinasinger/mv/ppm/edit/v1";
   /** Edit password SHA-256 hash — update when changing password */
   const EDIT_PASS_SHA256 = "c74cead93d83c7317ad62515eec8333429048cc8e1ed5971eae50ae66f8d7fcb";
@@ -20,11 +22,22 @@
   const editErrorEl = document.getElementById("editError");
   const btnEdit = document.getElementById("btnEdit");
   const btnExport = document.getElementById("btnExport");
+  const btnComments = document.getElementById("btnComments");
+  const commentsBadge = document.getElementById("commentsBadge");
+  const commentsRail = document.getElementById("commentsRail");
+  const commentsRailSub = document.getElementById("commentsRailSub");
+  const commentsList = document.getElementById("commentsList");
+  const commentsForm = document.getElementById("commentsForm");
+  const commentAuthorEl = document.getElementById("commentAuthor");
+  const commentBodyEl = document.getElementById("commentBody");
+  const btnCommentsClose = document.getElementById("btnCommentsClose");
 
   let slides = loadSlides();
   let current = 0;
   let saveTimer = null;
   let editMode = sessionStorage.getItem(EDIT_AUTH_KEY) === "1";
+  let commentsRailOpen = sessionStorage.getItem(COMMENTS_RAIL_OPEN_KEY) === "1";
+  let commentStore = loadCommentStore();
 
   function deepClone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -135,61 +148,183 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
     return `<div class="ppm-editable ppm-editable--block${className ? ` ${className}` : ""}" contenteditable="${ce}" data-path="${path}" spellcheck="false">${escapeHtml(text)}</div>`;
   }
 
-  function renderCommentPanel(index) {
-    const text = slides[index]?.comment || "";
-    const hasComment = String(text).trim().length > 0;
-    const isOpen = isCommentOpen(index);
-    return `
-      <div class="slide-comments${isOpen ? " is-open" : ""}" data-slide="${index}">
-        <button type="button" class="slide-comments-toggle" aria-expanded="${isOpen}" aria-controls="slide-comments-panel-${index}">
-          <span class="slide-comments-toggle-text">댓글</span>
-          ${hasComment ? '<span class="slide-comments-dot" aria-label="댓글 있음"></span>' : ""}
-          <span class="slide-comments-chevron" aria-hidden="true"></span>
-        </button>
-        <div class="slide-comments-panel" id="slide-comments-panel-${index}"${isOpen ? "" : " hidden"}>
-          <div class="ppm-comment-input" contenteditable="true" data-path="${index}.comment" data-placeholder="의견·피드백을 남겨주세요…" spellcheck="true">${escapeHtml(text)}</div>
-        </div>
-      </div>`;
+  function canUseComments(index) {
+    return index > 0 && index < slides.length - 1;
   }
 
-  function loadCommentOpenState() {
+  function loadCommentStore() {
     try {
-      return JSON.parse(localStorage.getItem(COMMENTS_OPEN_KEY) || "{}");
+      const raw = localStorage.getItem(COMMENTS_STORE_KEY);
+      return raw ? JSON.parse(raw) : {};
     } catch {
       return {};
     }
   }
 
-  function isCommentOpen(index) {
-    return !!loadCommentOpenState()[String(index)];
+  function saveCommentStore() {
+    localStorage.setItem(COMMENTS_STORE_KEY, JSON.stringify(commentStore));
   }
 
-  function setCommentOpen(index, open) {
-    const state = loadCommentOpenState();
-    const key = String(index);
-    if (open) state[key] = true;
-    else delete state[key];
-    localStorage.setItem(COMMENTS_OPEN_KEY, JSON.stringify(state));
+  function getSlideComments(index) {
+    return Array.isArray(commentStore[String(index)]) ? commentStore[String(index)] : [];
   }
 
-  function syncCommentDot(wrap, hasText) {
-    const toggle = wrap.querySelector(".slide-comments-toggle");
-    if (!toggle) return;
-    let dot = toggle.querySelector(".slide-comments-dot");
-    if (hasText && !dot) {
-      toggle.querySelector(".slide-comments-toggle-text")?.insertAdjacentHTML(
-        "afterend",
-        '<span class="slide-comments-dot" aria-label="댓글 있음"></span>'
-      );
-    } else if (!hasText && dot) {
-      dot.remove();
+  function migrateLegacyComments() {
+    let changed = false;
+    slides.forEach((slide, i) => {
+      const text = slide?.comment;
+      if (!text || !String(text).trim()) return;
+      const key = String(i);
+      if (!commentStore[key]?.length) {
+        commentStore[key] = [
+          {
+            id: `legacy-${i}-${Date.now()}`,
+            author: "익명",
+            text: String(text).trim(),
+            createdAt: Date.now()
+          }
+        ];
+        delete slide.comment;
+        changed = true;
+      }
+    });
+    if (changed) {
+      saveCommentStore();
+      persist();
     }
+  }
+
+  function formatCommentTime(ts) {
+    try {
+      return new Intl.DateTimeFormat("ko-KR", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit"
+      }).format(new Date(ts));
+    } catch {
+      return "";
+    }
+  }
+
+  function renderCommentItems(index) {
+    const items = getSlideComments(index);
+    if (!items.length) {
+      return '<p class="comments-empty">아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</p>';
+    }
+    return items
+      .map(
+        (item) => `
+      <article class="comment-item">
+        <div class="comment-item-head">
+          <span class="comment-item-author">${escapeHtml(item.author || "익명")}</span>
+          <time class="comment-item-time" datetime="${escapeHtml(String(item.createdAt || ""))}">${escapeHtml(formatCommentTime(item.createdAt))}</time>
+        </div>
+        <p class="comment-item-text">${escapeHtml(item.text || "")}</p>
+      </article>`
+      )
+      .join("");
+  }
+
+  function updateCommentsRailUI() {
+    const allowed = canUseComments(current);
+    if (btnComments) btnComments.hidden = !allowed;
+
+    const count = allowed ? getSlideComments(current).length : 0;
+    if (commentsBadge) {
+      commentsBadge.hidden = !count;
+      commentsBadge.textContent = String(count);
+    }
+    if (btnComments) btnComments.classList.toggle("is-active", commentsRailOpen && allowed);
+
+    if (!allowed) {
+      if (commentsRailOpen) toggleCommentsRail(false);
+      return;
+    }
+
+    if (commentsRailSub) {
+      commentsRailSub.textContent = `${current + 1} · ${slideLabel(slides[current], current)}`;
+    }
+    if (commentsList) {
+      commentsList.innerHTML = renderCommentItems(current);
+      commentsList.scrollTop = commentsList.scrollHeight;
+    }
+    if (commentAuthorEl && !commentAuthorEl.value) {
+      commentAuthorEl.value = localStorage.getItem(COMMENT_AUTHOR_KEY) || "";
+    }
+
+    document.body.classList.toggle("comments-rail-open", commentsRailOpen && allowed);
+    if (commentsRail) commentsRail.hidden = !commentsRailOpen || !allowed;
+  }
+
+  function toggleCommentsRail(open) {
+    const allowed = canUseComments(current);
+    if (!allowed) {
+      commentsRailOpen = false;
+      sessionStorage.removeItem(COMMENTS_RAIL_OPEN_KEY);
+      updateCommentsRailUI();
+      requestAnimationFrame(updateSlideScale);
+      return;
+    }
+
+    commentsRailOpen = open !== undefined ? open : !commentsRailOpen;
+    if (commentsRailOpen) sessionStorage.setItem(COMMENTS_RAIL_OPEN_KEY, "1");
+    else sessionStorage.removeItem(COMMENTS_RAIL_OPEN_KEY);
+
+    updateCommentsRailUI();
+    requestAnimationFrame(updateSlideScale);
+    if (commentsRailOpen) commentBodyEl?.focus();
+  }
+
+  function postComment() {
+    if (!canUseComments(current)) return;
+    const author = (commentAuthorEl?.value || "").trim() || "익명";
+    const text = (commentBodyEl?.value || "").trim();
+    if (!text) {
+      commentBodyEl?.focus();
+      return;
+    }
+
+    localStorage.setItem(COMMENT_AUTHOR_KEY, author);
+    const key = String(current);
+    const entry = {
+      id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      author,
+      text,
+      createdAt: Date.now()
+    };
+    if (!commentStore[key]) commentStore[key] = [];
+    commentStore[key].push(entry);
+    saveCommentStore();
+
+    if (commentBodyEl) commentBodyEl.value = "";
+    updateCommentsRailUI();
+  }
+
+  function initCommentsRail() {
+    migrateLegacyComments();
+
+    btnComments?.addEventListener("click", () => toggleCommentsRail());
+    btnCommentsClose?.addEventListener("click", () => toggleCommentsRail(false));
+
+    commentsForm?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      postComment();
+    });
+
+    commentAuthorEl?.addEventListener("input", () => {
+      localStorage.setItem(COMMENT_AUTHOR_KEY, commentAuthorEl.value);
+    });
+
+    [commentAuthorEl, commentBodyEl].forEach((el) => {
+      el?.addEventListener("click", (e) => e.stopPropagation());
+      el?.addEventListener("mousedown", (e) => e.stopPropagation());
+    });
   }
 
   function wrapSlide(index, classNames, inner) {
     return `<section class="slide${classNames ? ` ${classNames}` : ""}" data-index="${index}">
       <div class="slide-inner">${inner}</div>
-      ${renderCommentPanel(index)}
     </section>`;
   }
 
@@ -204,7 +339,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
     if (deckHintsEl) {
       deckHintsEl.textContent = editMode
         ? "편집 모드 · Ctrl+Z · ← → Space · O 개요"
-        : "← → Space · O 개요 · 슬라이드 하단 댓글";
+        : "← → Space · O 개요 · 댓글";
     }
   }
 
@@ -543,38 +678,6 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
     });
   }
 
-  function bindComments() {
-    frame.querySelectorAll(".slide-comments-toggle").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const wrap = btn.closest(".slide-comments");
-        if (!wrap) return;
-        const index = Number(wrap.dataset.slide);
-        const open = !wrap.classList.contains("is-open");
-        setCommentOpen(index, open);
-        wrap.classList.toggle("is-open", open);
-        btn.setAttribute("aria-expanded", String(open));
-        const panel = wrap.querySelector(".slide-comments-panel");
-        if (panel) panel.hidden = !open;
-        if (open) wrap.querySelector(".ppm-comment-input")?.focus();
-      });
-    });
-
-    frame.querySelectorAll(".ppm-comment-input").forEach((el) => {
-      el.addEventListener("input", () => {
-        const path = el.dataset.path;
-        const value = el.innerText.replace(/\r\n/g, "\n");
-        setByPath(path, value);
-        scheduleSave();
-        syncCommentDot(el.closest(".slide-comments"), !!String(value).trim());
-      });
-
-      el.addEventListener("click", (e) => e.stopPropagation());
-      el.addEventListener("mousedown", (e) => e.stopPropagation());
-      el.addEventListener("dblclick", (e) => e.stopPropagation());
-    });
-  }
-
   function buildSlides() {
     frame.innerHTML = slides.map(renderSlide).join("");
     overviewGrid.innerHTML = slides
@@ -587,13 +690,12 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
       )
       .join("");
     bindEditables();
-    bindComments();
   }
 
   function isEditingText() {
     const active = document.activeElement;
     if (!active) return false;
-    if (active.classList.contains("ppm-comment-input")) return true;
+    if (active === commentAuthorEl || active === commentBodyEl) return true;
     return active.classList.contains("ppm-editable") && isEditable();
   }
 
@@ -609,6 +711,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
     counterEl.innerHTML = `<strong>${current + 1}</strong> / ${slides.length}`;
     progressEl.style.width = `${((current + 1) / slides.length) * 100}%`;
     history.replaceState(null, "", `#${current + 1}`);
+    updateCommentsRailUI();
   }
 
   function next() {
@@ -648,6 +751,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
 
   const scaleObserver = new ResizeObserver(() => updateSlideScale());
   scaleObserver.observe(frame);
+  if (commentsRail) scaleObserver.observe(commentsRail);
   window.addEventListener("resize", updateSlideScale);
   document.addEventListener("fullscreenchange", syncFullscreenClass);
   document.addEventListener("webkitfullscreenchange", syncFullscreenClass);
@@ -676,6 +780,7 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
   }
 
   updateEditUI();
+  initCommentsRail();
   initAudioProtection();
   buildSlides();
   initFromHash();
@@ -764,6 +869,11 @@ window.PPM_SLIDES = ${JSON.stringify(data, null, 2)};
       case "Escape":
         if (!editModal?.hidden) {
           closeEditModal();
+          e.preventDefault();
+          break;
+        }
+        if (commentsRailOpen) {
+          toggleCommentsRail(false);
           e.preventDefault();
           break;
         }
