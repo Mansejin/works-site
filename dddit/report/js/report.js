@@ -60,6 +60,9 @@
   let videoPage = 0;
   let videoFormatFilter = "all";
   let retentionCompareLoading = false;
+  let retentionDraftIds = { longform: null, shorts: null };
+  let retentionPickerFormat = null;
+  let retentionPickerOutsideHandler = null;
   let subscriberPollTimer = null;
   let videoModalRetentionChart = null;
 
@@ -847,12 +850,16 @@
       btn.onclick = () => {
         if (btn.disabled) return;
         activeRetentionFormat = format;
+        retentionPickerFormat = null;
+        retentionDraftIds[format] = null;
         tabs.querySelectorAll(".retention-tab").forEach((tabBtn) => {
           tabBtn.classList.toggle("active", tabBtn === btn);
         });
         renderRetentionChart(retentionData, retentionVideos, format);
       };
     });
+
+    mountRetentionComparePicker([], activeRetentionFormat);
 
     if (data?.formats) {
       const activeBlock = retentionBlock(data, activeRetentionFormat);
@@ -896,137 +903,202 @@
     return filtered;
   }
 
-  function renderRetentionComparePicker(series, format) {
-    const host = document.getElementById("retention-compare");
-    if (!host) return;
-
-    const catalog = (allReportVideos || []).filter((video) => {
+  function retentionCatalog(format) {
+    return (allReportVideos || []).filter((video) => {
       if (format === "shorts") return isShortsVideo(video);
       if (format === "longform") return !isShortsVideo(video);
       return true;
     });
-    const availableIds = new Set(
-      (series || []).map((item) => item.videoId).filter(Boolean)
-    );
-    catalog.forEach((video) => availableIds.add(video.id));
-
-    const selected = new Set(retentionSelectedFor(format, series));
-
-    host.innerHTML = `
-      <div class="retention-picker">
-        <input type="search" class="retention-search" id="retention-search" placeholder="영상 제목 검색…" autocomplete="off" />
-        <div class="retention-dropdown">
-          <button type="button" class="retention-dropdown-toggle" id="retention-dropdown-toggle" aria-expanded="false">
-            비교할 영상 선택 (${selected.size}개)
-          </button>
-          <div class="retention-dropdown-menu" id="retention-dropdown-menu" hidden></div>
-        </div>
-        <div class="retention-selected-tags" id="retention-selected-tags"></div>
-        <p class="retention-compare-hint">2개 이상 선택하면 시청 유지 곡선을 비교합니다. 업로드된 전체 영상에서 선택할 수 있습니다.</p>
-      </div>`;
-
-    const searchEl = host.querySelector("#retention-search");
-    const menuEl = host.querySelector("#retention-dropdown-menu");
-    const toggleEl = host.querySelector("#retention-dropdown-toggle");
-    const tagsEl = host.querySelector("#retention-selected-tags");
-
-    function renderMenu(query = "") {
-      const q = String(query || "").trim().toLowerCase();
-      const items = catalog.filter((video) => !q || String(video.title || "").toLowerCase().includes(q));
-      if (!items.length) {
-        menuEl.innerHTML = `<p class="video-note" style="margin:0;">검색 결과 없음</p>`;
-        return;
-      }
-      menuEl.innerHTML = items
-        .map((video) => {
-          const checked = selected.has(video.id);
-          return `<label class="retention-option">
-            <input type="checkbox" data-video-id="${esc(video.id)}" ${checked ? "checked" : ""} />
-            <span title="${esc(video.title)}">${esc(video.title)}</span>
-          </label>`;
-        })
-        .join("");
-      menuEl.querySelectorAll("input[type='checkbox']").forEach((input) => {
-        input.addEventListener("change", async () => {
-          const id = input.getAttribute("data-video-id");
-          if (!id) return;
-          if (input.checked) selected.add(id);
-          else selected.delete(id);
-          if (!selected.size) {
-            input.checked = true;
-            selected.add(id);
-            return;
-          }
-          retentionSelectedIds[format] = Array.from(selected);
-          renderTags();
-          toggleEl.textContent = `비교할 영상 선택 (${selected.size}개)`;
-          await refreshRetentionCompare(format);
-        });
-      });
-    }
-
-    function renderTags() {
-      const tagged = catalog.filter((video) => selected.has(video.id));
-      tagsEl.innerHTML = tagged
-        .map(
-          (video) => `<span class="retention-tag">${esc(retentionVideoTitle(retentionVideos, video.id, video.title))}
-            <button type="button" data-remove-id="${esc(video.id)}" aria-label="선택 해제">×</button></span>`
-        )
-        .join("");
-      tagsEl.querySelectorAll("[data-remove-id]").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          const id = btn.getAttribute("data-remove-id");
-          if (!id || selected.size <= 1) return;
-          selected.delete(id);
-          retentionSelectedIds[format] = Array.from(selected);
-          renderMenu(searchEl?.value || "");
-          renderTags();
-          toggleEl.textContent = `비교할 영상 선택 (${selected.size}개)`;
-          await refreshRetentionCompare(format);
-        });
-      });
-    }
-
-    toggleEl?.addEventListener("click", () => {
-      const open = menuEl.hidden;
-      menuEl.hidden = !open;
-      toggleEl.setAttribute("aria-expanded", open ? "true" : "false");
-      if (open) renderMenu(searchEl?.value || "");
-    });
-    searchEl?.addEventListener("input", () => renderMenu(searchEl.value));
-    document.addEventListener("click", (event) => {
-      if (!host.contains(event.target)) menuEl.hidden = true;
-    });
-
-    renderMenu();
-    renderTags();
   }
 
-  async function refreshRetentionCompare(format = activeRetentionFormat) {
+  function retentionIdsEqual(a, b) {
+    const left = [...(a || [])].sort().join(",");
+    const right = [...(b || [])].sort().join(",");
+    return left === right;
+  }
+
+  function ensureRetentionDraft(format, series) {
+    if (!retentionDraftIds[format]?.length) {
+      retentionDraftIds[format] = [...retentionSelectedFor(format, series)];
+    }
+    return retentionDraftIds[format];
+  }
+
+  function updateRetentionPickerChrome(format) {
+    const host = document.getElementById("retention-compare");
+    if (!host) return;
+    const draft = ensureRetentionDraft(format, []);
+    const applied = retentionSelectedIds[format] || [];
+    const countEl = host.querySelector(".retention-combo-count");
+    const applyBtn = host.querySelector(".retention-apply-btn");
+    const dirty = !retentionIdsEqual(draft, applied);
+    if (countEl) {
+      countEl.textContent = `${draft.length}개`;
+      countEl.classList.toggle("pending", dirty);
+      countEl.title = dirty ? "선택 변경됨 · 비교 적용을 눌러 반영" : "현재 비교 중";
+    }
+    if (applyBtn) {
+      const canApply = draft.length >= 2 && dirty && !retentionCompareLoading;
+      applyBtn.disabled = !canApply;
+      applyBtn.textContent = retentionCompareLoading ? "불러오는 중…" : "비교 적용";
+      applyBtn.classList.toggle("is-loading", retentionCompareLoading);
+    }
+  }
+
+  function closeRetentionComboMenu() {
+    const menu = document.getElementById("retention-combo-menu");
+    const input = document.getElementById("retention-combo-input");
+    if (menu) menu.hidden = true;
+    if (input) input.setAttribute("aria-expanded", "false");
+  }
+
+  function renderRetentionComboMenu(format, query = "") {
+    const menu = document.getElementById("retention-combo-menu");
+    if (!menu) return;
+    const catalog = retentionCatalog(format);
+    const draft = new Set(ensureRetentionDraft(format, []));
+    const q = String(query || "").trim().toLowerCase();
+    const items = catalog.filter((video) => !q || String(video.title || "").toLowerCase().includes(q));
+    if (!items.length) {
+      menu.innerHTML = `<p class="video-note" style="margin:0;">검색 결과 없음</p>`;
+      return;
+    }
+    menu.innerHTML = items
+      .map((video) => {
+        const checked = draft.has(video.id);
+        return `<label class="retention-option">
+          <input type="checkbox" data-video-id="${esc(video.id)}" ${checked ? "checked" : ""} />
+          <span title="${esc(video.title)}">${esc(video.title)}</span>
+        </label>`;
+      })
+      .join("");
+    menu.querySelectorAll("input[type='checkbox']").forEach((input) => {
+      input.addEventListener("change", () => {
+        const id = input.getAttribute("data-video-id");
+        if (!id) return;
+        const next = new Set(ensureRetentionDraft(format, []));
+        if (input.checked) next.add(id);
+        else next.delete(id);
+        if (!next.size) {
+          input.checked = true;
+          next.add(id);
+        }
+        retentionDraftIds[format] = Array.from(next);
+        updateRetentionPickerChrome(format);
+      });
+    });
+  }
+
+  function mountRetentionComparePicker(series, format) {
+    const host = document.getElementById("retention-compare");
+    if (!host) return;
+
+    if (retentionPickerFormat !== format || !host.querySelector(".retention-combo")) {
+      retentionPickerFormat = format;
+      retentionDraftIds[format] = [...retentionSelectedFor(format, series)];
+
+      if (retentionPickerOutsideHandler) {
+        document.removeEventListener("click", retentionPickerOutsideHandler);
+        retentionPickerOutsideHandler = null;
+      }
+
+      host.innerHTML = `
+        <div class="retention-picker">
+          <div class="retention-combo-row">
+            <div class="retention-combo">
+              <div class="retention-combo-input-wrap">
+                <input
+                  type="search"
+                  class="retention-combo-input"
+                  id="retention-combo-input"
+                  placeholder="영상 검색·선택"
+                  autocomplete="off"
+                  aria-expanded="false"
+                  aria-controls="retention-combo-menu"
+                />
+                <span class="retention-combo-count" title="선택 개수">0개</span>
+              </div>
+              <div class="retention-combo-menu" id="retention-combo-menu" hidden></div>
+            </div>
+            <button type="button" class="btn retention-apply-btn" id="retention-apply-btn" disabled>비교 적용</button>
+          </div>
+          <p class="retention-compare-hint">목록에서 체크 후 「비교 적용」 — 2개 이상 선택 시 곡선을 갱신합니다.</p>
+        </div>`;
+
+      const input = host.querySelector("#retention-combo-input");
+      const menu = host.querySelector("#retention-combo-menu");
+      const applyBtn = host.querySelector("#retention-apply-btn");
+
+      input?.addEventListener("focus", () => {
+        menu.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+        renderRetentionComboMenu(format, input.value);
+      });
+      input?.addEventListener("input", () => {
+        menu.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+        renderRetentionComboMenu(format, input.value);
+      });
+      input?.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeRetentionComboMenu();
+          input.blur();
+        }
+      });
+
+      applyBtn?.addEventListener("click", () => {
+        void applyRetentionCompare(format);
+      });
+
+      retentionPickerOutsideHandler = (event) => {
+        if (!host.contains(event.target)) closeRetentionComboMenu();
+      };
+      document.addEventListener("click", retentionPickerOutsideHandler);
+    }
+
+    updateRetentionPickerChrome(format);
+    renderRetentionComboMenu(format, host.querySelector("#retention-combo-input")?.value || "");
+  }
+
+  async function applyRetentionCompare(format = activeRetentionFormat) {
+    const draft = ensureRetentionDraft(format, []);
+    if (draft.length < 2 || retentionCompareLoading) return;
+    retentionSelectedIds[format] = [...draft];
+    await refreshRetentionCompare(format, { fromApply: true });
+    updateRetentionPickerChrome(format);
+    closeRetentionComboMenu();
+  }
+
+  async function refreshRetentionCompare(format = activeRetentionFormat, options = {}) {
     const ids = retentionSelectedFor(format, []);
-    if (retentionCompareLoading || ids.length < 2) {
-      renderRetentionChart(retentionData, retentionVideos, format);
+    if (retentionCompareLoading) return;
+    if (ids.length < 2) {
+      renderRetentionChart(retentionData, retentionVideos, format, { skipPicker: true });
       return;
     }
     retentionCompareLoading = true;
-    setPageLoading(true, "시청 유지 비교 불러오는 중…", `${ids.length}개 영상`);
+    updateRetentionPickerChrome(format);
+    if (!options.fromApply) {
+      setPageLoading(true, "시청 유지 비교 불러오는 중…", `${ids.length}개 영상`);
+    }
     try {
       const retention = await apiGet(
         `/api/dddit/youtube/report/retention?video_ids=${encodeURIComponent(ids.join(","))}`,
         { timeoutMs: 60_000 }
       );
       retentionData = retention;
-      renderRetentionChart(retention, allReportVideos, format);
+      renderRetentionChart(retention, allReportVideos, format, { skipPicker: true });
     } catch (err) {
       const labelEl = document.getElementById("retention-chart-label");
       if (labelEl) labelEl.textContent = err.message || "시청 유지 비교 실패";
     } finally {
       retentionCompareLoading = false;
+      updateRetentionPickerChrome(format);
       setPageLoading(false);
     }
   }
 
-  function renderRetentionChart(data, videos, format = activeRetentionFormat) {
+  function renderRetentionChart(data, videos, format = activeRetentionFormat, options = {}) {
     const ctx = document.getElementById("chart-retention");
     const labelEl = document.getElementById("retention-chart-label");
     if (!ctx) return;
@@ -1044,13 +1116,18 @@
       if (labelEl) labelEl.textContent = data?.message || "시청 유지 조회 실패";
       const compareHost = document.getElementById("retention-compare");
       if (compareHost) compareHost.innerHTML = "";
+      retentionPickerFormat = null;
       return;
     }
 
     const block = retentionBlock(data, format);
     const formatLabel = format === "shorts" ? "쇼츠" : "롱폼";
     let series = (block?.series || []).filter((item) => (item.points || []).length);
-    renderRetentionComparePicker(series, format);
+    if (!options.skipPicker) {
+      mountRetentionComparePicker(series, format);
+    } else {
+      updateRetentionPickerChrome(format);
+    }
     if (series.length > 1 || retentionSelectedIds[format]) {
       const selected = new Set(retentionSelectedFor(format, series));
       series = series.filter((item) => selected.has(item.videoId));
