@@ -418,40 +418,77 @@
     .content-pagination.hidden { display: none; }
     .retention-picker {
       margin-top: 8px;
-      display: grid;
-      gap: 8px;
-    }
-    .retention-search {
-      width: 100%;
-      padding: 7px 10px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font: inherit;
-      font-size: 0.78rem;
-      background: #fff;
-    }
-    .retention-dropdown {
       position: relative;
     }
-    .retention-dropdown-toggle {
-      width: 100%;
-      text-align: left;
-      padding: 7px 10px;
+    .retention-combo-row {
+      display: flex;
+      gap: 6px;
+      align-items: stretch;
+    }
+    .retention-combo {
+      position: relative;
+      flex: 1;
+      min-width: 0;
+    }
+    .retention-combo-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       border: 1px solid var(--border);
       border-radius: 8px;
       background: #fff;
+      padding: 0 8px 0 10px;
+    }
+    .retention-combo-input-wrap:focus-within {
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .retention-combo-input {
+      flex: 1;
+      min-width: 0;
+      border: none;
+      background: transparent;
+      padding: 7px 0;
       font: inherit;
       font-size: 0.78rem;
-      cursor: pointer;
-      color: var(--text);
+      outline: none;
     }
-    .retention-dropdown-menu {
+    .retention-combo-count {
+      flex: 0 0 auto;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border-radius: 999px;
+      padding: 2px 7px;
+      white-space: nowrap;
+    }
+    .retention-combo-count.pending {
+      color: #b45309;
+      background: #fffbeb;
+    }
+    .retention-apply-btn {
+      flex: 0 0 auto;
+      padding: 7px 12px;
+      font-size: 0.74rem;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+    .retention-apply-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .retention-apply-btn.is-loading {
+      pointer-events: none;
+      opacity: 0.7;
+    }
+    .retention-combo-menu {
       position: absolute;
       z-index: 12;
       left: 0;
       right: 0;
       top: calc(100% + 4px);
-      max-height: 220px;
+      max-height: min(240px, 40vh);
       overflow: auto;
       border: 1px solid var(--border);
       border-radius: 10px;
@@ -459,7 +496,7 @@
       box-shadow: var(--shadow);
       padding: 6px;
     }
-    .retention-dropdown-menu[hidden] { display: none !important; }
+    .retention-combo-menu[hidden] { display: none !important; }
     .retention-option {
       display: flex;
       align-items: flex-start;
@@ -477,31 +514,10 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    .retention-selected-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .retention-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      border: 1px solid #93c5fd;
-      color: var(--accent);
+    .retention-compare-hint {
+      margin: 6px 0 0;
       font-size: 0.68rem;
-      font-weight: 700;
-    }
-    .retention-tag button {
-      border: none;
-      background: transparent;
-      color: inherit;
-      cursor: pointer;
-      font-size: 0.8rem;
-      line-height: 1;
-      padding: 0;
+      color: var(--text-muted);
     }
     .video-note {
       margin-top: 8px;
@@ -1117,6 +1133,6 @@
 
   <script src="../js/api-auth.js"></script>
   <script src="../js/theme.js"></script>
-  <script src="js/report.js?v=37"></script>
+  <script src="js/report.js?v=38"></script>
 </body>
 </html>

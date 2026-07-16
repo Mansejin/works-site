@@ -100,7 +100,11 @@ html[data-theme="dark"] .theme-switch input:checked + .theme-switch-ui {
 html[data-theme="dark"] .page-loading {
   background: rgba(11, 18, 32, 0.78);
 }
-html[data-theme="dark"] .promo-head-actions,
+html[data-theme="dark"] .retention-combo-input-wrap,
+html[data-theme="dark"] .retention-combo-menu {
+  background: var(--surface);
+  color: var(--text);
+}
 html[data-theme="dark"] .content-format-tabs,
 html[data-theme="dark"] .header-toolbar,
 html[data-theme="dark"] .retention-dropdown-toggle,
