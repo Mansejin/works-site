@@ -280,20 +280,24 @@
       const sponsorCount = state.sponsorships.filter((s) => s.project === project.id).length;
       return `
         <div class="project-wrap">
-          <a class="link-card is-ready" href="${escapeHtml(project.path)}">
-            <div class="card-meta">
-              <span>${escapeHtml(project.status)}</span>
-              <span>${escapeHtml(project.brand)}</span>
+          <div class="link-card is-ready project-card">
+            <a class="project-main" href="${escapeHtml(project.path)}">
+              <div class="card-meta">
+                <span>${escapeHtml(project.status)}</span>
+                <span>${escapeHtml(project.brand)}</span>
+              </div>
+              <h3>${escapeHtml(project.name)}</h3>
+              <p>${escapeHtml(project.summary)}</p>
+              <div class="card-meta">
+                <span>일정 ${scheduleCount}</span>
+                <span>협업 ${sponsorCount}</span>
+              </div>
+            </a>
+            <div class="project-card-actions">
+              <button type="button" class="project-pill project-share" data-share="${escapeHtml(`${location.origin}/dddit/${project.id}/productlist/`)}">담당자 공유 링크</button>
+              <a class="project-pill" href="script/?project=${escapeHtml(project.id)}">콘티 작성기</a>
             </div>
-            <h3>${escapeHtml(project.name)}</h3>
-            <p>${escapeHtml(project.summary)}</p>
-            <div class="card-meta">
-              <span>일정 ${scheduleCount}</span>
-              <span>협업 ${sponsorCount}</span>
-            </div>
-          </a>
-          <button type="button" class="project-pill project-share" data-share="${escapeHtml(`${location.origin}/dddit/${project.id}/productlist/`)}">담당자 공유 링크</button>
-          <a class="project-pill" href="script/?project=${escapeHtml(project.id)}">콘티 작성기</a>
+          </div>
         </div>
       `;
     }).join("");

@@ -23,6 +23,7 @@ from app.youtube_analytics import (
     fetch_demographics,
     fetch_retention,
     fetch_traffic_sources,
+    fetch_video_detail_analytics,
 )
 from app.youtube_report_store import (
     read_merged_promotions,
@@ -181,23 +182,41 @@ def _promotion_metrics(promo: dict[str, Any]) -> dict[str, Any]:
     cpv = None if group == "subscribe" else raw_cpv
 
     efficiency = ""
+    efficiency_rating = "—"
     if group == "subscribe":
         if cps is not None:
             efficiency = f"구독자 1명당 약 {cps:,}원"
             if cps <= 400:
+                efficiency_rating = "효율 매우 좋음"
                 efficiency += " · 효율 매우 좋음"
             elif cps <= 700:
+                efficiency_rating = "효율 보통"
                 efficiency += " · 효율 보통"
+            else:
+                efficiency_rating = "효율 낮음"
+                efficiency += " · 효율 낮음"
     elif cpv is not None:
         efficiency = f"조회 1회당 약 {cpv:,.0f}원"
         if cpv <= 30:
+            efficiency_rating = "효율 좋음"
             efficiency += " · 효율 좋음"
         elif cpv <= 60:
+            efficiency_rating = "효율 보통"
             efficiency += " · 효율 보통"
+        else:
+            efficiency_rating = "효율 낮음"
+            efficiency += " · 효율 낮음"
     elif cps is not None:
         efficiency = f"구독자 1명당 약 {cps:,}원"
         if cps <= 400:
+            efficiency_rating = "효율 매우 좋음"
             efficiency += " · 효율 매우 좋음"
+        elif cps <= 700:
+            efficiency_rating = "효율 보통"
+            efficiency += " · 효율 보통"
+        else:
+            efficiency_rating = "효율 낮음"
+            efficiency += " · 효율 낮음"
 
     return {
         "cpv": cpv,
@@ -207,6 +226,7 @@ def _promotion_metrics(promo: dict[str, Any]) -> dict[str, Any]:
         "ctr": ctr,
         "goalGroup": group,
         "efficiencyText": efficiency,
+        "efficiencyRating": efficiency_rating,
     }
 
 
@@ -235,7 +255,7 @@ async def _fetch_channel_bundle(client: httpx.AsyncClient, handle: str, api_key:
 
 
 async def _fetch_playlist_videos(
-    client: httpx.AsyncClient, api_key: str, playlist_id: str, max_results: int = 20
+    client: httpx.AsyncClient, api_key: str, playlist_id: str, max_results: int = 100
 ) -> list[str]:
     video_ids: list[str] = []
     page_token = ""
@@ -511,7 +531,7 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
                 stats = bundle["statistics"]
                 uploads = bundle.get("uploadsPlaylistId")
                 video_ids = (
-                    await _fetch_playlist_videos(client, api_key, uploads, 20) if uploads else []
+                    await _fetch_playlist_videos(client, api_key, uploads, 100) if uploads else []
                 )
                 videos = await _fetch_video_details(client, api_key, video_ids)
                 live_subs = _parse_int(stats.get("subscriberCount"))
@@ -756,6 +776,14 @@ async def report_retention(
 @router.get("/demographics")
 async def report_demographics(refresh: bool = Query(False)) -> dict[str, Any]:
     return await fetch_demographics(refresh=refresh)
+
+
+@router.get("/video-analytics")
+async def report_video_analytics(
+    video_id: str = Query(..., min_length=6),
+    refresh: bool = Query(False),
+) -> dict[str, Any]:
+    return await fetch_video_detail_analytics(video_id=video_id, refresh=refresh)
 
 
 @router.get("/ads/status")

@@ -297,7 +297,27 @@
     .project-wrap {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 0;
+    }
+
+    .project-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-bottom: 12px;
+    }
+
+    .project-main {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .project-card-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 2px;
     }
 
     .project-pill {
@@ -571,10 +591,11 @@
         <h1>디디딧 워크스페이스</h1>
         <p>채널 현황 · 프로젝트 · 팀 업무</p>
       </div>
-      <button type="button" class="theme-toggle" data-theme-toggle>
-        <span data-theme-icon aria-hidden="true">☾</span>
-        <span data-theme-label>다크</span>
-      </button>
+      <label class="theme-switch" data-theme-toggle title="다크 모드">
+        <input type="checkbox" data-theme-input aria-label="다크 모드 전환" />
+        <span class="theme-switch-ui" aria-hidden="true"></span>
+        <span class="theme-switch-label" data-theme-label>다크</span>
+      </label>
     </header>
 
     <div class="dashboard">

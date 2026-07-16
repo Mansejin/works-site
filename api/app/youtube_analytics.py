@@ -277,6 +277,102 @@ async def fetch_analytics_overview(refresh: bool = False) -> dict[str, Any]:
         }
 
 
+_TRAFFIC_SOURCE_LABELS: dict[str, str] = {
+    "ADVERTISING": "YouTube 광고",
+    "ANNOTATION": "주석",
+    "CAMPAIGN_CARD": "캠페인 카드",
+    "END_SCREEN": "종료 화면",
+    "EXT_URL": "외부",
+    "HASHTAGS": "해시태그",
+    "LIVE_REDIRECT": "라이브",
+    "NO_LINK_EMBEDDED": "임베드",
+    "NO_LINK_OTHER": "기타",
+    "NOTIFICATION": "알림",
+    "PLAYLIST": "재생목록",
+    "PRODUCT_PAGE": "상품",
+    "PROMOTED": "프로모션",
+    "RELATED_VIDEO": "관련 영상",
+    "SHORTS": "Shorts 피드",
+    "SOUND_PAGE": "사운드",
+    "SUBSCRIBER": "구독 피드",
+    "YT_CHANNEL": "채널 페이지",
+    "YT_OTHER_PAGE": "YouTube 홈",
+    "YT_PLAYLIST_PAGE": "재생목록 페이지",
+    "YT_SEARCH": "YouTube 검색",
+    "VIDEO_REMIXES": "리믹스",
+    "YT_REDIRECT": "리다이렉트",
+}
+
+# Studio-style top-level buckets (matches YouTube Studio grouping more closely).
+_TRAFFIC_GROUP_MAP: dict[str, str] = {
+    "RELATED_VIDEO": "YouTube 맞춤 동영상",
+    "YT_OTHER_PAGE": "YouTube 맞춤 동영상",
+    "SUBSCRIBER": "YouTube 맞춤 동영상",
+    "NOTIFICATION": "YouTube 맞춤 동영상",
+    "END_SCREEN": "YouTube 맞춤 동영상",
+    "PLAYLIST": "YouTube 맞춤 동영상",
+    "HASHTAGS": "YouTube 맞춤 동영상",
+    "VIDEO_REMIXES": "YouTube 맞춤 동영상",
+    "YT_REDIRECT": "YouTube 맞춤 동영상",
+    "SOUND_PAGE": "YouTube 맞춤 동영상",
+    "PROMOTED": "YouTube 맞춤 동영상",
+    "SHORTS": "Shorts 피드",
+    "ADVERTISING": "YouTube 광고",
+    "YT_SEARCH": "YouTube 검색",
+    "YT_CHANNEL": "채널 페이지",
+    "YT_PLAYLIST_PAGE": "재생목록",
+    "EXT_URL": "외부",
+    "NO_LINK_EMBEDDED": "임베드",
+    "NO_LINK_OTHER": "기타",
+    "ANNOTATION": "기타",
+    "CAMPAIGN_CARD": "기타",
+    "PRODUCT_PAGE": "기타",
+    "LIVE_REDIRECT": "기타",
+    "UNKNOWN": "기타",
+}
+
+
+def _traffic_label(source: str) -> str:
+    key = str(source or "UNKNOWN").strip() or "UNKNOWN"
+    return _TRAFFIC_SOURCE_LABELS.get(key, key.replace("_", " ").title())
+
+
+def _traffic_group_label(source: str) -> str:
+    key = str(source or "UNKNOWN").strip() or "UNKNOWN"
+    return _TRAFFIC_GROUP_MAP.get(key, _traffic_label(key))
+
+
+def _group_traffic_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        raw_source = str(row.get("source") or "UNKNOWN")
+        views = _safe_int(row.get("views"))
+        group_label = _traffic_group_label(raw_source)
+        bucket = grouped.setdefault(
+            group_label,
+            {"source": group_label, "label": group_label, "views": 0, "details": []},
+        )
+        bucket["views"] += views
+        detail_label = _traffic_label(raw_source)
+        if detail_label != group_label:
+            bucket["details"].append(
+                {"source": raw_source, "label": detail_label, "views": views}
+            )
+    total_views = sum(item["views"] for item in grouped.values()) or 1
+    result: list[dict[str, Any]] = []
+    for label, item in sorted(grouped.items(), key=lambda pair: -pair[1]["views"]):
+        result.append(
+            {
+                "source": label,
+                "label": label,
+                "views": item["views"],
+                "share": round(item["views"] / total_views * 100, 1),
+                "details": sorted(item["details"], key=lambda d: -d["views"]),
+            }
+        )
+    return result
+
+
 async def fetch_traffic_sources(refresh: bool = False) -> dict[str, Any]:
     cache_key = "traffic-sources"
     if not refresh:
@@ -302,23 +398,26 @@ async def fetch_traffic_sources(refresh: bool = False) -> dict[str, Any]:
                 sort="-views",
             )
             rows = _parse_rows(body)
-            total_views = sum(_safe_int(r.get("views")) for r in rows)
-            sources = []
+            raw_sources = []
             for row in rows:
                 views = _safe_int(row.get("views"))
-                sources.append(
+                raw_source = str(row.get("insightTrafficSourceType") or "UNKNOWN")
+                raw_sources.append(
                     {
-                        "source": row.get("insightTrafficSourceType") or "UNKNOWN",
+                        "source": raw_source,
+                        "label": _traffic_label(raw_source),
                         "views": views,
-                        "share": round(views / total_views * 100, 1) if total_views else 0,
                     }
                 )
+            sources = _group_traffic_rows(raw_sources)
+            total_views = sum(item["views"] for item in sources)
 
             payload = {
                 "ok": True,
                 "configured": True,
                 "period": {"startDate": start_date, "endDate": end_date},
                 "sources": sources,
+                "rawSources": raw_sources,
                 "totalViews": total_views,
                 "message": None,
             }
@@ -842,4 +941,224 @@ async def fetch_demographics(refresh: bool = False) -> dict[str, Any]:
             "ageGroups": [],
             "gender": [],
             "geo": [],
+        }
+
+
+async def fetch_video_detail_analytics(video_id: str, refresh: bool = False) -> dict[str, Any]:
+    video_id = str(video_id or "").strip()
+    if not video_id:
+        return {"ok": False, "configured": True, "message": "video_id가 필요합니다."}
+
+    cache_key = f"video-analytics:{video_id}"
+    if not refresh:
+        cached = _cache_get(cache_key)
+        if cached:
+            return cached
+
+    if not _configured():
+        return {**_not_configured_payload("video-analytics"), "videoId": video_id}
+
+    start_date, end_date = _date_range(28)
+    video_filter = f"video=={video_id}"
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            token, channel_id = await _get_token_and_channel(client)
+
+            overview_body = await _analytics_get_safe(
+                client,
+                token,
+                channel_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics=(
+                    "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,"
+                    "subscribersGained,likes,comments,shares"
+                ),
+                filters=video_filter,
+            )
+            traffic_body = await _analytics_get_safe(
+                client,
+                token,
+                channel_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics="views,estimatedMinutesWatched",
+                dimensions="insightTrafficSourceType",
+                filters=video_filter,
+                sort="-views",
+            )
+            search_body = await _analytics_get_safe(
+                client,
+                token,
+                channel_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics="views",
+                dimensions="insightTrafficSourceDetail",
+                filters=f"{video_filter};insightTrafficSourceType==YT_SEARCH",
+                sort="-views",
+                max_results=15,
+            )
+            device_body = await _analytics_get_safe(
+                client,
+                token,
+                channel_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics="views,estimatedMinutesWatched",
+                dimensions="deviceType",
+                filters=video_filter,
+                sort="-views",
+            )
+            audience_body = await _analytics_get_safe(
+                client,
+                token,
+                channel_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics="views,estimatedMinutesWatched",
+                dimensions="subscribedStatus",
+                filters=video_filter,
+                sort="-views",
+            )
+            age_body = await _analytics_get_safe(
+                client,
+                token,
+                channel_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics="viewerPercentage",
+                dimensions="ageGroup",
+                filters=video_filter,
+                sort="-viewerPercentage",
+            )
+            gender_body = await _analytics_get_safe(
+                client,
+                token,
+                channel_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics="viewerPercentage",
+                dimensions="gender",
+                filters=video_filter,
+                sort="-viewerPercentage",
+            )
+            impressions_body = await _analytics_get_safe(
+                client,
+                token,
+                channel_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics="impressions,views,estimatedMinutesWatched",
+                filters=video_filter,
+            )
+
+            overview_row = (_parse_rows(overview_body) or [{}])[0]
+            impressions_row = (_parse_rows(impressions_body) or [{}])[0]
+            traffic_raw = [
+                {
+                    "source": str(row.get("insightTrafficSourceType") or "UNKNOWN"),
+                    "views": _safe_int(row.get("views")),
+                }
+                for row in _parse_rows(traffic_body)
+            ]
+            traffic_sources = _group_traffic_rows(traffic_raw)
+
+            search_terms = [
+                {
+                    "term": str(row.get("insightTrafficSourceDetail") or "").strip() or "—",
+                    "views": _safe_int(row.get("views")),
+                }
+                for row in _parse_rows(search_body)
+                if _safe_int(row.get("views")) > 0
+            ]
+
+            device_types = [
+                {
+                    "device": str(row.get("deviceType") or "UNKNOWN"),
+                    "views": _safe_int(row.get("views")),
+                    "watchMinutes": _safe_float(row.get("estimatedMinutesWatched")) or 0,
+                }
+                for row in _parse_rows(device_body)
+            ]
+            total_device_views = sum(item["views"] for item in device_types) or 1
+            for item in device_types:
+                item["share"] = round(item["views"] / total_device_views * 100, 1)
+
+            audience_status = []
+            for row in _parse_rows(audience_body):
+                status = str(row.get("subscribedStatus") or "UNKNOWN")
+                label = {
+                    "SUBSCRIBED": "구독자",
+                    "UNSUBSCRIBED": "비구독자",
+                }.get(status, status)
+                audience_status.append(
+                    {
+                        "status": status,
+                        "label": label,
+                        "views": _safe_int(row.get("views")),
+                        "watchMinutes": _safe_float(row.get("estimatedMinutesWatched")) or 0,
+                    }
+                )
+            total_audience_views = sum(item["views"] for item in audience_status) or 1
+            for item in audience_status:
+                item["share"] = round(item["views"] / total_audience_views * 100, 1)
+
+            age_groups = [
+                {
+                    "ageGroup": str(row.get("ageGroup") or ""),
+                    "viewerPercentage": _safe_float(row.get("viewerPercentage")) or 0,
+                }
+                for row in _parse_rows(age_body)
+            ]
+            gender = [
+                {
+                    "gender": str(row.get("gender") or ""),
+                    "viewerPercentage": _safe_float(row.get("viewerPercentage")) or 0,
+                }
+                for row in _parse_rows(gender_body)
+            ]
+
+            impressions = _safe_int(impressions_row.get("impressions"))
+            views = _safe_int(overview_row.get("views"))
+            watch_minutes = _safe_float(overview_row.get("estimatedMinutesWatched")) or 0
+            avg_duration = _safe_float(overview_row.get("averageViewDuration")) or 0
+
+            payload = {
+                "ok": True,
+                "configured": True,
+                "videoId": video_id,
+                "period": {"startDate": start_date, "endDate": end_date},
+                "dashboard": {
+                    "views": views,
+                    "likes": _safe_int(overview_row.get("likes")),
+                    "comments": _safe_int(overview_row.get("comments")),
+                    "shares": _safe_int(overview_row.get("shares")),
+                    "watchMinutes": round(watch_minutes, 1),
+                    "averageViewDurationSec": round(avg_duration, 1),
+                    "averageViewPercentage": _safe_float(overview_row.get("averageViewPercentage")),
+                    "subscribersGained": _safe_int(overview_row.get("subscribersGained")),
+                },
+                "trafficSources": traffic_sources,
+                "reachFunnel": {
+                    "impressions": impressions if impressions > 0 else None,
+                    "views": views,
+                    "watchMinutes": round(watch_minutes, 1),
+                    "averageViewDurationSec": round(avg_duration, 1),
+                },
+                "searchTerms": search_terms,
+                "audienceBySubscription": audience_status,
+                "deviceTypes": device_types,
+                "ageGroups": age_groups,
+                "gender": gender,
+                "message": None,
+            }
+            _cache_set(cache_key, payload)
+            return payload
+    except Exception as exc:
+        return {
+            "ok": False,
+            "configured": True,
+            "videoId": video_id,
+            "message": f"영상 Analytics 조회 실패: {exc}",
         }
