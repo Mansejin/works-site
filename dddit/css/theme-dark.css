@@ -27,34 +27,94 @@ html[data-theme="dark"] body {
 }
 
 /* Controls */
-.theme-toggle {
+.theme-toggle,
+.theme-switch {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 5px 10px 5px 6px;
   font: inherit;
   font-size: 0.78rem;
   font-weight: 650;
   cursor: pointer;
   white-space: nowrap;
+  user-select: none;
 }
-.theme-toggle:hover {
+.theme-toggle:hover,
+.theme-switch:hover {
   border-color: #93c5fd;
   background: var(--accent-soft);
-  color: var(--accent);
 }
 .theme-toggle [data-theme-icon] {
   font-size: 0.92rem;
   line-height: 1;
 }
-
-html[data-theme="dark"] .btn {
-  color: #fff;
+.theme-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
 }
+.theme-switch-ui {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  position: relative;
+  transition: background 0.18s ease;
+}
+.theme-switch-ui::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+  transition: transform 0.18s ease;
+}
+.theme-switch input:checked + .theme-switch-ui {
+  background: #2563eb;
+}
+html[data-theme="dark"] .theme-switch input:checked + .theme-switch-ui {
+  background: #3b82f6;
+}
+.theme-switch input:checked + .theme-switch-ui::after {
+  transform: translateX(18px);
+}
+.theme-switch-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 2.2em;
+}
+
+html[data-theme="dark"] .page-loading {
+  background: rgba(11, 18, 32, 0.78);
+}
+html[data-theme="dark"] .promo-head-actions,
+html[data-theme="dark"] .content-format-tabs,
+html[data-theme="dark"] .header-toolbar,
+html[data-theme="dark"] .retention-dropdown-toggle,
+html[data-theme="dark"] .retention-search,
+html[data-theme="dark"] .retention-dropdown-menu,
+html[data-theme="dark"] .icon-link-btn,
+html[data-theme="dark"] .criteria-dialog,
+html[data-theme="dark"] .eff-help-btn {
+  background: var(--surface);
+  color: var(--text);
+}
+html[data-theme="dark"] .funnel-step.impressions { background: #1e2a44; }
+html[data-theme="dark"] .funnel-step.views { background: #1a2740; }
+html[data-theme="dark"] .funnel-step.watch { background: #15233a; }
 html[data-theme="dark"] .btn-ghost,
 html[data-theme="dark"] button.btn-ghost {
   background: transparent;

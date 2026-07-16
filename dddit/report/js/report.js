@@ -6,6 +6,7 @@
   const REFRESH_TTL_MS = 24 * 60 * 60 * 1000;
   const SUBSCRIBER_POLL_MS = 90_000;
   const PROMO_PAGE_SIZE = 12;
+  const VIDEO_PAGE_SIZE = 8;
   const API_TIMEOUT_MS = 90_000;
   const CAPTURE_TIMEOUT_MS = 45_000;
   const RETENTION_COMPARE_COLORS = ["#dc2626", "#2563eb", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
@@ -13,16 +14,19 @@
   const els = {
     root: document.getElementById("report-root"),
     loading: document.getElementById("loading"),
+    pageLoading: document.getElementById("page-loading"),
+    pageLoadingText: document.getElementById("page-loading-text"),
+    pageLoadingSub: document.getElementById("page-loading-sub"),
     status: document.getElementById("report-status"),
     error: document.getElementById("error-banner"),
     title: document.getElementById("report-title"),
     subtitle: document.getElementById("report-subtitle"),
     kpiGrid: document.getElementById("kpi-grid"),
     insights: document.getElementById("insights-list"),
-    memoDisplay: document.getElementById("memo-display"),
     memoEditor: document.getElementById("memo-editor"),
     promoBody: document.getElementById("promo-table-body"),
     videoGrid: document.getElementById("video-grid"),
+    contentPagination: document.getElementById("content-pagination"),
     channelLink: document.getElementById("channel-link"),
     subscriberNote: document.getElementById("subscriber-trend-note"),
     viewsTrendNote: document.getElementById("views-trend-note"),
@@ -30,7 +34,7 @@
     analyticsBanner: document.getElementById("analytics-banner"),
     analyticsKpiGrid: document.getElementById("analytics-kpi-grid"),
     analyticsStatus: document.getElementById("analytics-status"),
-    adsSyncStatus: document.getElementById("ads-sync-status"),
+    adsSyncStatus: null,
     studioSyncStatus: document.getElementById("studio-sync-status"),
     issuesEditor: document.getElementById("issues-editor"),
     promotionsEditor: document.getElementById("promotions-editor"),
@@ -53,6 +57,9 @@
   let activeRetentionFormat = "longform";
   let retentionSelectedIds = { longform: null, shorts: null };
   let allReportVideos = [];
+  let videoPage = 0;
+  let videoFormatFilter = "all";
+  let retentionCompareLoading = false;
   let subscriberPollTimer = null;
   let videoModalRetentionChart = null;
 
@@ -65,6 +72,7 @@
     HASHTAGS: "해시태그",
     LIVE_REDIRECT: "라이브",
     NO_LINK_EMBEDDED: "임베드",
+    NO_LINK_OTHER: "기타",
     NOTIFICATION: "알림",
     PLAYLIST: "재생목록",
     PRODUCT_PAGE: "상품",
@@ -98,6 +106,27 @@
     age65_: "65+",
     age65: "65+",
   };
+
+  const DEVICE_LABELS = {
+    DESKTOP: "데스크톱",
+    MOBILE: "모바일",
+    TABLET: "태블릿",
+    TV: "TV",
+    GAME_CONSOLE: "게임 콘솔",
+    UNKNOWN: "기타",
+  };
+
+  function setPageLoading(active, text, sub) {
+    if (!els.pageLoading) return;
+    els.pageLoading.hidden = !active;
+    if (els.pageLoadingText && text) els.pageLoadingText.textContent = text;
+    if (els.pageLoadingSub && sub) els.pageLoadingSub.textContent = sub;
+  }
+
+  function trafficLabel(source, fallbackLabel) {
+    if (fallbackLabel) return fallbackLabel;
+    return TRAFFIC_LABELS[source] || String(source || "기타").replace(/_/g, " ");
+  }
 
   let loadSeq = 0;
   let allPromotions = [];
@@ -569,9 +598,8 @@
     }
   }
 
-  function renderMemo(text) {
-    if (!els.memoDisplay) return;
-    els.memoDisplay.textContent = String(text || "").trim();
+  function renderMemo() {
+    /* 메모 카드 제거됨 */
   }
 
   function sourceBadge(source) {
@@ -730,7 +758,7 @@
       type: "doughnut",
       data: {
         labels: sources.map((s) => {
-          const name = TRAFFIC_LABELS[s.source] || s.source;
+          const name = trafficLabel(s.source, s.label);
           const share =
             s.share != null
               ? Number(s.share)
@@ -843,54 +871,159 @@
   }
 
   function retentionSelectedFor(format, series) {
-    const available = (series || []).map((item) => item.videoId).filter(Boolean);
+    let available = (series || []).map((item) => item.videoId).filter(Boolean);
+    if (!available.length && allReportVideos.length) {
+      available = allReportVideos
+        .filter((video) => {
+          if (format === "shorts") return isShortsVideo(video);
+          if (format === "longform") return !isShortsVideo(video);
+          return true;
+        })
+        .slice(0, 6)
+        .map((video) => video.id);
+    }
     let selected = retentionSelectedIds[format];
     if (!selected || !selected.length) {
       selected = available.slice(0, Math.min(3, available.length));
       retentionSelectedIds[format] = selected;
     }
-    const filtered = selected.filter((id) => available.includes(id));
+    const filtered = selected.filter((id) => available.includes(id) || allReportVideos.some((v) => v.id === id));
     if (!filtered.length && available.length) {
       retentionSelectedIds[format] = available.slice(0, Math.min(2, available.length));
       return retentionSelectedIds[format];
     }
+    retentionSelectedIds[format] = filtered;
     return filtered;
   }
 
   function renderRetentionComparePicker(series, format) {
     const host = document.getElementById("retention-compare");
     if (!host) return;
-    if (!series.length) {
-      host.innerHTML = "";
-      return;
-    }
+
+    const catalog = (allReportVideos || []).filter((video) => {
+      if (format === "shorts") return isShortsVideo(video);
+      if (format === "longform") return !isShortsVideo(video);
+      return true;
+    });
+    const availableIds = new Set(
+      (series || []).map((item) => item.videoId).filter(Boolean)
+    );
+    catalog.forEach((video) => availableIds.add(video.id));
+
     const selected = new Set(retentionSelectedFor(format, series));
+
     host.innerHTML = `
-      ${series
-        .map((item) => {
-          const id = item.videoId;
-          const checked = selected.has(id);
-          return `<label class="retention-chip${checked ? " active" : ""}">
-            <input type="checkbox" data-video-id="${esc(id)}" ${checked ? "checked" : ""} />
-            <span title="${esc(item.title || id)}">${esc(retentionVideoTitle(retentionVideos, id, item.title))}</span>
+      <div class="retention-picker">
+        <input type="search" class="retention-search" id="retention-search" placeholder="영상 제목 검색…" autocomplete="off" />
+        <div class="retention-dropdown">
+          <button type="button" class="retention-dropdown-toggle" id="retention-dropdown-toggle" aria-expanded="false">
+            비교할 영상 선택 (${selected.size}개)
+          </button>
+          <div class="retention-dropdown-menu" id="retention-dropdown-menu" hidden></div>
+        </div>
+        <div class="retention-selected-tags" id="retention-selected-tags"></div>
+        <p class="retention-compare-hint">2개 이상 선택하면 시청 유지 곡선을 비교합니다. 업로드된 전체 영상에서 선택할 수 있습니다.</p>
+      </div>`;
+
+    const searchEl = host.querySelector("#retention-search");
+    const menuEl = host.querySelector("#retention-dropdown-menu");
+    const toggleEl = host.querySelector("#retention-dropdown-toggle");
+    const tagsEl = host.querySelector("#retention-selected-tags");
+
+    function renderMenu(query = "") {
+      const q = String(query || "").trim().toLowerCase();
+      const items = catalog.filter((video) => !q || String(video.title || "").toLowerCase().includes(q));
+      if (!items.length) {
+        menuEl.innerHTML = `<p class="video-note" style="margin:0;">검색 결과 없음</p>`;
+        return;
+      }
+      menuEl.innerHTML = items
+        .map((video) => {
+          const checked = selected.has(video.id);
+          return `<label class="retention-option">
+            <input type="checkbox" data-video-id="${esc(video.id)}" ${checked ? "checked" : ""} />
+            <span title="${esc(video.title)}">${esc(video.title)}</span>
           </label>`;
         })
-        .join("")}
-      <p class="retention-compare-hint">2개 이상 선택하면 시청 유지 곡선을 비교합니다. (조회 상위 콘텐츠)</p>`;
-
-    host.querySelectorAll("input[type='checkbox']").forEach((input) => {
-      input.addEventListener("change", () => {
-        const next = Array.from(host.querySelectorAll("input[type='checkbox']:checked")).map(
-          (el) => el.getAttribute("data-video-id")
-        );
-        if (next.length < 1) {
-          input.checked = true;
-          return;
-        }
-        retentionSelectedIds[format] = next;
-        renderRetentionChart(retentionData, retentionVideos, format);
+        .join("");
+      menuEl.querySelectorAll("input[type='checkbox']").forEach((input) => {
+        input.addEventListener("change", async () => {
+          const id = input.getAttribute("data-video-id");
+          if (!id) return;
+          if (input.checked) selected.add(id);
+          else selected.delete(id);
+          if (!selected.size) {
+            input.checked = true;
+            selected.add(id);
+            return;
+          }
+          retentionSelectedIds[format] = Array.from(selected);
+          renderTags();
+          toggleEl.textContent = `비교할 영상 선택 (${selected.size}개)`;
+          await refreshRetentionCompare(format);
+        });
       });
+    }
+
+    function renderTags() {
+      const tagged = catalog.filter((video) => selected.has(video.id));
+      tagsEl.innerHTML = tagged
+        .map(
+          (video) => `<span class="retention-tag">${esc(retentionVideoTitle(retentionVideos, video.id, video.title))}
+            <button type="button" data-remove-id="${esc(video.id)}" aria-label="선택 해제">×</button></span>`
+        )
+        .join("");
+      tagsEl.querySelectorAll("[data-remove-id]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-remove-id");
+          if (!id || selected.size <= 1) return;
+          selected.delete(id);
+          retentionSelectedIds[format] = Array.from(selected);
+          renderMenu(searchEl?.value || "");
+          renderTags();
+          toggleEl.textContent = `비교할 영상 선택 (${selected.size}개)`;
+          await refreshRetentionCompare(format);
+        });
+      });
+    }
+
+    toggleEl?.addEventListener("click", () => {
+      const open = menuEl.hidden;
+      menuEl.hidden = !open;
+      toggleEl.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) renderMenu(searchEl?.value || "");
     });
+    searchEl?.addEventListener("input", () => renderMenu(searchEl.value));
+    document.addEventListener("click", (event) => {
+      if (!host.contains(event.target)) menuEl.hidden = true;
+    });
+
+    renderMenu();
+    renderTags();
+  }
+
+  async function refreshRetentionCompare(format = activeRetentionFormat) {
+    const ids = retentionSelectedFor(format, []);
+    if (retentionCompareLoading || ids.length < 2) {
+      renderRetentionChart(retentionData, retentionVideos, format);
+      return;
+    }
+    retentionCompareLoading = true;
+    setPageLoading(true, "시청 유지 비교 불러오는 중…", `${ids.length}개 영상`);
+    try {
+      const retention = await apiGet(
+        `/api/dddit/youtube/report/retention?video_ids=${encodeURIComponent(ids.join(","))}`,
+        { timeoutMs: 60_000 }
+      );
+      retentionData = retention;
+      renderRetentionChart(retention, allReportVideos, format);
+    } catch (err) {
+      const labelEl = document.getElementById("retention-chart-label");
+      if (labelEl) labelEl.textContent = err.message || "시청 유지 비교 실패";
+    } finally {
+      retentionCompareLoading = false;
+      setPageLoading(false);
+    }
   }
 
   function renderRetentionChart(data, videos, format = activeRetentionFormat) {
@@ -1184,34 +1317,8 @@
     }
   }
 
-  function renderAdsSyncStatus(adsSync) {
-    const btn = document.getElementById("btn-ads-sync");
-    if (!els.adsSyncStatus || !adsSync) return;
-    if (adsSync.enabled === false) {
-      if (btn) btn.style.display = "none";
-      els.adsSyncStatus.textContent = "Ads 끔";
-      els.adsSyncStatus.className = "status-pill";
-      els.adsSyncStatus.title =
-        adsSync.message || "Google Ads 동기화 꺼짐 — Studio 동기화/수동 입력 사용";
-      return;
-    }
-    if (btn) btn.style.display = "";
-    if (!adsSync.configured) {
-      els.adsSyncStatus.textContent = "Ads 미설정";
-      els.adsSyncStatus.className = "status-pill";
-      els.adsSyncStatus.title = adsSync.message || "";
-      return;
-    }
-    if (adsSync.lastSync) {
-      const when = new Date(adsSync.lastSync).toLocaleString("ko-KR");
-      els.adsSyncStatus.textContent = `Ads · ${when}`;
-      els.adsSyncStatus.className = "status-pill ok";
-      els.adsSyncStatus.title = adsSync.message || "";
-      return;
-    }
-    els.adsSyncStatus.textContent = "Ads 미동기화";
-    els.adsSyncStatus.className = "status-pill";
-    els.adsSyncStatus.title = adsSync.message || "Ads 동기화 버튼을 눌러 연동하세요";
+  function renderAdsSyncStatus() {
+    /* Ads 끔 인디케이터 제거 — Studio 동기화만 표시 */
   }
 
   function renderStudioSyncStatus(studio) {
@@ -1378,7 +1485,7 @@
         <td>${formatNum(p.subscribers)}</td>
         <td>${cpvCell}</td>
         <td>${cpsCell}</td>
-        <td class="${effClass}">${esc(m.efficiencyText || "—")}</td>
+        <td class="${effClass}">${esc(m.efficiencyRating || m.efficiencyText || "—")}</td>
       </tr>`;
   }
 
@@ -1486,6 +1593,46 @@
     }
   }
 
+  function formatMinutes(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return "—";
+    if (n >= 60) return `${Math.floor(n / 60)}시간 ${Math.round(n % 60)}분`;
+    return `${Math.round(n)}분`;
+  }
+
+  function formatDurationSec(sec) {
+    const n = Number(sec);
+    if (!Number.isFinite(n) || n <= 0) return "—";
+    const m = Math.floor(n / 60);
+    const s = Math.round(n % 60);
+    return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `0:${String(s).padStart(2, "0")}`;
+  }
+
+  function renderModalTableRows(rows, cols) {
+    if (!rows?.length) return `<p class="video-note">데이터 없음</p>`;
+    return `<table class="video-modal-table"><thead><tr>${cols
+      .map((col) => `<th>${esc(col.label)}</th>`)
+      .join("")}</tr></thead><tbody>${rows
+      .map(
+        (row) =>
+          `<tr>${cols.map((col) => `<td>${esc(col.render(row))}</td>`).join("")}</tr>`
+      )
+      .join("")}</tbody></table>`;
+  }
+
+  function renderReachFunnel(funnel) {
+    if (!funnel) return `<p class="video-note">노출 데이터 없음</p>`;
+    const impressions = funnel.impressions;
+    const views = funnel.views;
+    const watch = funnel.watchMinutes;
+    if (!impressions && !views && !watch) return `<p class="video-note">노출·시청 데이터 없음</p>`;
+    return `<div class="funnel-pyramid">
+      <div class="funnel-step impressions"><span>노출수</span><strong>${impressions != null ? formatNum(impressions) : "—"}</strong></div>
+      <div class="funnel-step views"><span>조회수</span><strong>${formatNum(views)}</strong></div>
+      <div class="funnel-step watch"><span>시청 시간</span><strong>${formatMinutes(watch)}</strong></div>
+    </div>`;
+  }
+
   async function openVideoAnalysisModal(video) {
     const modal = document.getElementById("video-analysis-modal");
     const titleEl = document.getElementById("video-analysis-title");
@@ -1500,11 +1647,14 @@
         <img src="${esc(video.thumbnail)}" alt="" />
         <div class="video-modal-kpis">
           <div class="item"><span>조회수</span><strong>${esc(video.viewsText || formatNum(video.views))}</strong></div>
-          <div class="item"><span>길이</span><strong>${esc(video.durationText || "—")}</strong></div>
           <div class="item"><span>좋아요</span><strong>${formatNum(video.likes)}</strong></div>
           <div class="item"><span>댓글</span><strong>${formatNum(video.comments)}</strong></div>
+          <div class="item"><span>길이</span><strong>${esc(video.durationText || "—")}</strong></div>
+          <div class="item"><span>시청 시간</span><strong id="modal-watch-minutes">불러오는 중…</strong></div>
+          <div class="item"><span>구독자</span><strong id="modal-subs-gained">불러오는 중…</strong></div>
           <div class="item"><span>게시</span><strong>${esc(date)}</strong></div>
           <div class="item"><span>CTR</span><strong>${video.ctr != null ? `${esc(String(video.ctr))}%` : "—"}</strong></div>
+          <div class="item"><span>평균 시청</span><strong id="modal-avg-watch">불러오는 중…</strong></div>
         </div>
       </div>
       <div class="video-modal-section">
@@ -1520,15 +1670,42 @@
           : ""
       }
       <div class="video-modal-section">
+        <h4>시청 트래픽 소스</h4>
+        <div id="modal-traffic">불러오는 중…</div>
+      </div>
+      <div class="video-modal-section">
+        <h4>노출수 → 시청 시간</h4>
+        <div id="modal-funnel">불러오는 중…</div>
+      </div>
+      <div class="video-modal-section">
+        <h4>검색어</h4>
+        <div id="modal-search">불러오는 중…</div>
+      </div>
+      <div class="video-modal-section">
+        <h4>시청자 구분 (구독 여부)</h4>
+        <div id="modal-audience">불러오는 중…</div>
+      </div>
+      <div class="video-modal-section">
+        <h4>기기 유형</h4>
+        <div id="modal-devices">불러오는 중…</div>
+      </div>
+      <div class="video-modal-section">
+        <h4>연령 및 성별</h4>
+        <div class="grid grid-2">
+          <div id="modal-age">불러오는 중…</div>
+          <div id="modal-gender">불러오는 중…</div>
+        </div>
+      </div>
+      <div class="video-modal-section">
         <h4>시청 유지</h4>
         <div class="video-modal-chart"><canvas id="chart-video-retention"></canvas></div>
         <p class="video-note" id="video-retention-note" style="margin-top:8px;">불러오는 중…</p>
       </div>
       <div class="video-modal-links">
-        <a class="btn" href="${esc(video.url)}" target="_blank" rel="noopener">YouTube 열기</a>
+        <a class="icon-link-btn yt" href="${esc(video.url)}" target="_blank" rel="noopener" title="YouTube">YT</a>
         ${
           video.studioUrl
-            ? `<a class="btn btn-ghost" href="${esc(video.studioUrl)}" target="_blank" rel="noopener">Studio 분석</a>`
+            ? `<a class="icon-link-btn studio" href="${esc(video.studioUrl)}" target="_blank" rel="noopener" title="Studio 분석">S</a>`
             : ""
         }
       </div>`;
@@ -1538,11 +1715,87 @@
 
     const note = document.getElementById("video-retention-note");
     const canvas = document.getElementById("chart-video-retention");
+
     try {
-      const retention = await apiGet(
-        `/api/dddit/youtube/report/retention?video_id=${encodeURIComponent(video.id)}`,
-        { timeoutMs: 45_000 }
-      );
+      const [retention, analytics] = await Promise.all([
+        apiGet(`/api/dddit/youtube/report/retention?video_id=${encodeURIComponent(video.id)}`, {
+          timeoutMs: 45_000,
+        }),
+        apiGet(`/api/dddit/youtube/report/video-analytics?video_id=${encodeURIComponent(video.id)}`, {
+          timeoutMs: 45_000,
+        }).catch(() => null),
+      ]);
+
+      const dash = analytics?.dashboard || {};
+      const watchEl = document.getElementById("modal-watch-minutes");
+      const subsEl = document.getElementById("modal-subs-gained");
+      const avgEl = document.getElementById("modal-avg-watch");
+      if (watchEl) {
+        watchEl.textContent =
+          dash.watchMinutes != null ? formatMinutes(dash.watchMinutes) : "—";
+      }
+      if (subsEl) {
+        subsEl.textContent =
+          dash.subscribersGained != null ? `+${formatNum(dash.subscribersGained)}` : "—";
+      }
+      if (avgEl) {
+        avgEl.textContent = dash.averageViewDurationSec
+          ? formatDurationSec(dash.averageViewDurationSec)
+          : dash.averageViewPercentage != null
+            ? `${Number(dash.averageViewPercentage).toFixed(1)}%`
+            : "—";
+      }
+
+      const trafficHost = document.getElementById("modal-traffic");
+      if (trafficHost) {
+        trafficHost.innerHTML = renderModalTableRows(analytics?.trafficSources || [], [
+          { label: "소스", render: (row) => trafficLabel(row.source, row.label) },
+          { label: "조회", render: (row) => formatNum(row.views) },
+          { label: "비율", render: (row) => (row.share != null ? `${row.share}%` : "—") },
+        ]);
+      }
+      const funnelHost = document.getElementById("modal-funnel");
+      if (funnelHost) funnelHost.innerHTML = renderReachFunnel(analytics?.reachFunnel);
+      const searchHost = document.getElementById("modal-search");
+      if (searchHost) {
+        searchHost.innerHTML = renderModalTableRows(analytics?.searchTerms || [], [
+          { label: "검색어", render: (row) => row.term || "—" },
+          { label: "조회", render: (row) => formatNum(row.views) },
+        ]);
+      }
+      const audienceHost = document.getElementById("modal-audience");
+      if (audienceHost) {
+        audienceHost.innerHTML = renderModalTableRows(analytics?.audienceBySubscription || [], [
+          { label: "시청자", render: (row) => row.label || row.status || "—" },
+          { label: "조회", render: (row) => formatNum(row.views) },
+          { label: "시청 시간", render: (row) => formatMinutes(row.watchMinutes) },
+          { label: "비율", render: (row) => (row.share != null ? `${row.share}%` : "—") },
+        ]);
+      }
+      const devicesHost = document.getElementById("modal-devices");
+      if (devicesHost) {
+        devicesHost.innerHTML = renderModalTableRows(analytics?.deviceTypes || [], [
+          { label: "기기", render: (row) => DEVICE_LABELS[row.device] || row.device || "—" },
+          { label: "조회", render: (row) => formatNum(row.views) },
+          { label: "시청 시간", render: (row) => formatMinutes(row.watchMinutes) },
+          { label: "비율", render: (row) => (row.share != null ? `${row.share}%` : "—") },
+        ]);
+      }
+      const ageHost = document.getElementById("modal-age");
+      if (ageHost) {
+        ageHost.innerHTML = renderModalTableRows(analytics?.ageGroups || [], [
+          { label: "연령", render: (row) => formatAgeLabel(row.ageGroup) },
+          { label: "비율", render: (row) => `${Number(row.viewerPercentage || 0).toFixed(1)}%` },
+        ]);
+      }
+      const genderHost = document.getElementById("modal-gender");
+      if (genderHost) {
+        genderHost.innerHTML = renderModalTableRows(analytics?.gender || [], [
+          { label: "성별", render: (row) => GENDER_LABELS[row.gender] || row.gender || "—" },
+          { label: "비율", render: (row) => `${Number(row.viewerPercentage || 0).toFixed(1)}%` },
+        ]);
+      }
+
       if (videoModalRetentionChart) {
         try {
           videoModalRetentionChart.destroy();
@@ -1552,9 +1805,7 @@
         videoModalRetentionChart = null;
       }
       const points =
-        retention?.points?.length
-          ? retention.points
-          : retention?.series?.[0]?.points || [];
+        retention?.points?.length ? retention.points : retention?.series?.[0]?.points || [];
       if (!retention?.ok || !points.length || !canvas) {
         if (note) note.textContent = retention?.message || "시청 유지 곡선 없음";
         return;
@@ -1592,24 +1843,88 @@
         },
       });
     } catch (err) {
-      if (note) note.textContent = err.message || "시청 유지 조회 실패";
+      if (note) note.textContent = err.message || "분석 데이터 조회 실패";
+      ["modal-traffic", "modal-funnel", "modal-search", "modal-audience", "modal-devices", "modal-age", "modal-gender"].forEach(
+        (id) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = err.message || "조회 실패";
+        }
+      );
     }
   }
 
-  function renderVideos(videos) {
-    allReportVideos = videos || [];
-    if (!videos?.length) {
-      els.videoGrid.innerHTML = `<p class="video-note">영상 데이터가 없습니다. YOUTUBE_API_KEY를 확인하세요.</p>`;
+  function filteredReportVideos() {
+    return (allReportVideos || []).filter((video) => {
+      if (videoFormatFilter === "shorts") return isShortsVideo(video);
+      if (videoFormatFilter === "longform") return !isShortsVideo(video);
+      return true;
+    });
+  }
+
+  function renderContentPagination(total, page) {
+    if (!els.contentPagination) return;
+    const pages = Math.max(1, Math.ceil(total / VIDEO_PAGE_SIZE));
+    if (total <= VIDEO_PAGE_SIZE) {
+      els.contentPagination.innerHTML = "";
+      els.contentPagination.classList.add("hidden");
       return;
     }
-    els.videoGrid.innerHTML = (videos || [])
+    els.contentPagination.classList.remove("hidden");
+    const start = page * VIDEO_PAGE_SIZE + 1;
+    const end = Math.min(total, (page + 1) * VIDEO_PAGE_SIZE);
+    els.contentPagination.innerHTML = `
+      <button type="button" class="btn btn-ghost promo-page-btn" data-dir="prev" ${page <= 0 ? "disabled" : ""}>이전</button>
+      <span class="promo-page-info">${start}–${end} / ${total} · ${page + 1}/${pages}</span>
+      <button type="button" class="btn btn-ghost promo-page-btn" data-dir="next" ${page >= pages - 1 ? "disabled" : ""}>다음</button>`;
+    els.contentPagination.querySelectorAll(".promo-page-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const dir = btn.getAttribute("data-dir");
+        if (dir === "prev" && videoPage > 0) videoPage -= 1;
+        if (dir === "next" && videoPage < pages - 1) videoPage += 1;
+        renderVideos();
+      });
+    });
+  }
+
+  function bindContentFormatTabs() {
+    const tabs = document.getElementById("content-format-tabs");
+    if (!tabs || tabs.dataset.bound) return;
+    tabs.dataset.bound = "1";
+    tabs.querySelectorAll(".content-format-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        videoFormatFilter = btn.dataset.format || "all";
+        videoPage = 0;
+        tabs.querySelectorAll(".content-format-tab").forEach((tabBtn) => {
+          tabBtn.classList.toggle("active", tabBtn === btn);
+        });
+        renderVideos();
+      });
+    });
+  }
+
+  function renderVideos(videos) {
+    if (videos) allReportVideos = videos;
+    bindContentFormatTabs();
+    const filtered = filteredReportVideos();
+    if (!filtered.length) {
+      els.videoGrid.innerHTML = `<p class="video-note">표시할 영상이 없습니다.</p>`;
+      renderContentPagination(0, 0);
+      return;
+    }
+    const pages = Math.max(1, Math.ceil(filtered.length / VIDEO_PAGE_SIZE));
+    if (videoPage >= pages) videoPage = pages - 1;
+    if (videoPage < 0) videoPage = 0;
+    const visible = filtered.slice(videoPage * VIDEO_PAGE_SIZE, (videoPage + 1) * VIDEO_PAGE_SIZE);
+
+    els.videoGrid.innerHTML = visible
       .map((v) => {
         const date = v.publishedAt ? new Date(v.publishedAt).toLocaleDateString("ko-KR") : "—";
+        const shortBadge = isShortsVideo(v) ? '<span class="badge active">쇼츠</span>' : "";
         return `
         <article class="video-card" data-video-id="${esc(v.id)}">
           <img class="video-thumb" src="${esc(v.thumbnail)}" alt="" loading="lazy" role="button" tabindex="0" title="분석 보기" />
           <div class="video-body">
-            <div class="video-title">${esc(v.title)}</div>
+            <div class="video-title">${shortBadge}${esc(v.title)}</div>
             <div class="video-stats">
               <div><span>조회수</span><strong>${esc(v.viewsText || formatNum(v.views))}</strong></div>
               <div><span>길이</span><strong>${esc(v.durationText || "—")}</strong></div>
@@ -1617,14 +1932,19 @@
               <div><span>게시</span><strong>${esc(date)}</strong></div>
             </div>
             <div class="video-links">
-              <a href="${esc(v.url)}" target="_blank" rel="noopener">YouTube</a>
-              ${v.studioUrl ? `<a href="${esc(v.studioUrl)}" target="_blank" rel="noopener">Studio 분석</a>` : ""}
-              <button type="button" class="btn btn-ghost video-analyze-btn" style="padding:2px 8px;font-size:0.72rem;">분석</button>
+              <a class="icon-link-btn yt" href="${esc(v.url)}" target="_blank" rel="noopener" title="YouTube">YT</a>
+              ${
+                v.studioUrl
+                  ? `<a class="icon-link-btn studio" href="${esc(v.studioUrl)}" target="_blank" rel="noopener" title="Studio 분석">S</a>`
+                  : ""
+              }
             </div>
           </div>
         </article>`;
       })
       .join("");
+
+    renderContentPagination(filtered.length, videoPage);
 
     els.videoGrid.querySelectorAll(".video-card").forEach((card) => {
       const videoId = card.getAttribute("data-video-id");
@@ -1638,7 +1958,6 @@
           open();
         }
       });
-      card.querySelector(".video-analyze-btn")?.addEventListener("click", open);
     });
   }
 
@@ -1665,9 +1984,10 @@
     const quiet = Boolean(options.quiet);
     const seq = ++loadSeq;
     if (!quiet) {
-      els.loading.classList.remove("hidden");
+      els.loading?.classList.add("hidden");
       els.root.classList.add("hidden");
       els.error?.classList.add("hidden");
+      setPageLoading(true, refresh ? "데이터를 갱신하는 중…" : "보고 데이터를 불러오는 중…", "YouTube · Analytics · 프로모션");
       setStatus(refresh ? "API 요청 중…" : "불러오는 중…");
       stopSubscriberLivePoll();
       destroyCharts();
@@ -1694,11 +2014,11 @@
 
       renderKpis(overview.kpis || {}, overview.channel?.subscriberCount);
       renderAnalyticsOverview(overview.analytics);
-      renderAdsSyncStatus(overview.adsSync);
+      renderAdsSyncStatus();
       renderStudioSyncStatus(overview.studioPromoSync);
       renderInsights(overview.insights || []);
-      renderMemo(overview.memo || (overview.issues || []).join("\n") || "");
       promoPage = 0;
+      videoPage = 0;
       renderPromotions(overview.promotions || []);
       renderVideos(videosData.videos || []);
       els.limitations.innerHTML = (overview.limitations || [])
@@ -1709,8 +2029,9 @@
       if (seq !== loadSeq) return;
 
       // Chart.js needs visible parent to measure canvas size.
-      els.loading.classList.add("hidden");
+      els.loading?.classList.add("hidden");
       els.root.classList.remove("hidden");
+      setPageLoading(false);
       hideError();
 
       destroyCharts();
@@ -1749,7 +2070,8 @@
       showError(err.message || String(err));
     } finally {
       if (seq === loadSeq && !quiet) {
-        els.loading.classList.add("hidden");
+        els.loading?.classList.add("hidden");
+        setPageLoading(false);
         if (!els.error || els.error.classList.contains("hidden")) {
           els.root.classList.remove("hidden");
         }
@@ -1775,13 +2097,19 @@
     setStatus("API 요청 중…");
     loadReport(true);
   });
-  document.getElementById("btn-copy-link")?.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(location.href.split("?")[0]);
-      setStatus("링크 복사됨", "ok");
-    } catch {
-      setStatus("복사 실패", "error");
-    }
+
+  function openEfficiencyModal() {
+    const modal = document.getElementById("efficiency-criteria-modal");
+    if (modal) modal.hidden = false;
+  }
+  function closeEfficiencyModal() {
+    const modal = document.getElementById("efficiency-criteria-modal");
+    if (modal) modal.hidden = true;
+  }
+  document.getElementById("btn-efficiency-help")?.addEventListener("click", openEfficiencyModal);
+  document.getElementById("btn-efficiency-help-th")?.addEventListener("click", openEfficiencyModal);
+  document.querySelectorAll("[data-close-efficiency-modal]").forEach((el) => {
+    el.addEventListener("click", closeEfficiencyModal);
   });
   document.getElementById("btn-save-config")?.addEventListener("click", async () => {
     try {
@@ -1835,7 +2163,10 @@
     el.addEventListener("click", () => closeVideoAnalysisModal());
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeVideoAnalysisModal();
+    if (event.key === "Escape") {
+      closeVideoAnalysisModal();
+      closeEfficiencyModal();
+    }
   });
   document.addEventListener("dddit-theme", () => {
     redrawChartsFromSnapshot();

@@ -67,6 +67,26 @@
     .report-header p { color: var(--text-muted); font-size: 0.86rem; margin-top: 4px; }
 
     .header-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .header-toolbar {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .header-toolbar .status-pill {
+      border: none;
+      background: transparent;
+      padding: 4px 8px;
+    }
+    .header-toolbar .btn {
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.78rem;
+    }
 
     .btn {
       border: none;
@@ -102,23 +122,8 @@
     .grid-4 { grid-template-columns: repeat(4, 1fr); }
     .grid-2 { grid-template-columns: 1fr 1fr; }
     .grid-promo-insights {
-      grid-template-columns: minmax(200px, 24%) minmax(0, 1fr);
+      grid-template-columns: 1fr;
       align-items: start;
-    }
-    .memo-card .card-body {
-      max-height: 320px;
-      overflow-y: auto;
-    }
-    .memo-display {
-      margin: 0;
-      white-space: pre-wrap;
-      font-size: 0.86rem;
-      line-height: 1.55;
-      color: var(--text);
-    }
-    .memo-display:empty::before {
-      content: "메모 없음 — 아래 편집란에서 작성";
-      color: var(--muted);
     }
 
     .card {
@@ -227,7 +232,43 @@
       height: auto;
       writing-mode: horizontal-tb;
     }
-    .promo-pagination {
+    .promo-head-actions {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+    }
+    .promo-head-actions .status-pill {
+      font-size: 0.7rem;
+      padding: 4px 8px;
+    }
+    .promo-head-actions .btn {
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      border-radius: 8px;
+    }
+    .eff-help-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text-muted);
+      border-radius: 999px;
+      width: 22px;
+      height: 22px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+    }
+    .eff-help-btn:hover {
+      border-color: #93c5fd;
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
       display: flex;
       align-items: center;
       justify-content: flex-end;
@@ -312,12 +353,155 @@
       color: var(--text-muted);
     }
     .video-stats strong { color: var(--text); display: block; font-size: 0.88rem; }
-    .video-links { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .video-links a {
-      font-size: 0.74rem;
-      color: var(--accent);
+    .video-links { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .icon-link-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
       text-decoration: none;
-      font-weight: 600;
+      font-size: 0.68rem;
+      font-weight: 800;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .icon-link-btn:hover {
+      border-color: #93c5fd;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .icon-link-btn.yt { color: #dc2626; }
+    .icon-link-btn.studio { color: #2563eb; font-size: 0.62rem; }
+    .content-head-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .content-format-tabs {
+      display: inline-flex;
+      gap: 4px;
+      padding: 3px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+    }
+    .content-format-tab {
+      border: none;
+      background: transparent;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .content-format-tab.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .content-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .content-pagination.hidden { display: none; }
+    .retention-picker {
+      margin-top: 8px;
+      display: grid;
+      gap: 8px;
+    }
+    .retention-search {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font: inherit;
+      font-size: 0.78rem;
+      background: #fff;
+    }
+    .retention-dropdown {
+      position: relative;
+    }
+    .retention-dropdown-toggle {
+      width: 100%;
+      text-align: left;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      font: inherit;
+      font-size: 0.78rem;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .retention-dropdown-menu {
+      position: absolute;
+      z-index: 12;
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      padding: 6px;
+    }
+    .retention-dropdown-menu[hidden] { display: none !important; }
+    .retention-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      font-size: 0.74rem;
+      cursor: pointer;
+    }
+    .retention-option:hover { background: #f8fafc; }
+    .retention-option span {
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .retention-selected-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .retention-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      border: 1px solid #93c5fd;
+      color: var(--accent);
+      font-size: 0.68rem;
+      font-weight: 700;
+    }
+    .retention-tag button {
+      border: none;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font-size: 0.8rem;
+      line-height: 1;
+      padding: 0;
     }
     .video-note {
       margin-top: 8px;
@@ -441,8 +625,8 @@
     }
     .video-modal-dialog {
       position: relative;
-      width: min(720px, 100%);
-      max-height: min(88vh, 900px);
+      width: min(920px, 100%);
+      max-height: min(90vh, 960px);
       overflow: auto;
       background: #fff;
       border-radius: 14px;
@@ -478,7 +662,7 @@
     }
     .video-modal-kpis {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
     }
     .video-modal-kpis .item {
@@ -613,12 +797,109 @@
     }
     .edit-panel label { font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 6px; }
 
-    .hidden { display: none !important; }
-    .loading-block {
-      padding: 40px;
+    .video-modal-chart.short { height: 140px; }
+    .video-modal-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.76rem;
+    }
+    .video-modal-table th,
+    .video-modal-table td {
+      border-bottom: 1px solid var(--border);
+      padding: 6px 8px;
+      text-align: left;
+    }
+    .video-modal-table th {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+    .funnel-pyramid {
+      display: grid;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .funnel-step {
+      margin: 0 auto;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #f1f5f9;
       text-align: center;
+      font-size: 0.76rem;
+    }
+    .funnel-step strong { display: block; font-size: 0.92rem; margin-top: 2px; }
+    .funnel-step.impressions { width: 100%; background: #e0e7ff; }
+    .funnel-step.views { width: 78%; background: #dbeafe; }
+    .funnel-step.watch { width: 56%; background: #bfdbfe; }
+    .criteria-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .criteria-modal[hidden] { display: none !important; }
+    .criteria-dialog {
+      position: relative;
+      width: min(480px, 100%);
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 16px 18px;
+    }
+    .criteria-dialog h3 { margin: 0 0 10px; font-size: 0.95rem; }
+    .criteria-dialog ul {
+      margin: 0;
+      padding-left: 1.1rem;
+      font-size: 0.82rem;
+      display: grid;
+      gap: 6px;
+    }
+    .page-loading {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(244, 246, 248, 0.72);
+      backdrop-filter: blur(3px);
+    }
+    .page-loading[hidden] { display: none !important; }
+    .page-loading-card {
+      min-width: min(320px, 90vw);
+      padding: 20px 22px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .page-loading-spinner {
+      width: 34px;
+      height: 34px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      border: 3px solid #dbeafe;
+      border-top-color: var(--accent);
+      animation: reportSpin 0.8s linear infinite;
+    }
+    @keyframes reportSpin { to { transform: rotate(360deg); } }
+    .page-loading-text {
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .page-loading-sub {
+      margin-top: 4px;
+      font-size: 0.76rem;
       color: var(--text-muted);
     }
+
+    .hidden { display: none !important; }
 
     @media (max-width: 960px) {
       .kpi-grid, .grid-4 { grid-template-columns: repeat(2, 1fr); }
@@ -642,13 +923,15 @@
         <p id="report-subtitle">YouTube Data · Analytics · Google Ads · 링크 공유용 보고</p>
       </div>
       <div class="header-actions">
-        <button type="button" class="theme-toggle" data-theme-toggle>
-          <span data-theme-icon aria-hidden="true">☾</span>
-          <span data-theme-label>다크</span>
-        </button>
+      <div class="header-toolbar">
+        <label class="theme-switch" data-theme-toggle title="다크 모드">
+          <input type="checkbox" data-theme-input aria-label="다크 모드 전환" />
+          <span class="theme-switch-ui" aria-hidden="true"></span>
+          <span class="theme-switch-label" data-theme-label>다크</span>
+        </label>
         <span id="report-status" class="status-pill">불러오는 중…</span>
         <button id="btn-refresh" class="btn btn-ghost" type="button">데이터 갱신</button>
-        <button id="btn-copy-link" class="btn" type="button">링크 복사</button>
+      </div>
       </div>
     </header>
 
@@ -723,18 +1006,14 @@
       </section>
 
       <div class="grid grid-promo-insights" style="margin-bottom:14px;">
-        <section class="card memo-card">
-          <div class="card-head"><h2>메모</h2></div>
-          <div class="card-body"><p id="memo-display" class="memo-display"></p></div>
-        </section>
         <section class="card">
           <div class="card-head">
             <h2>프로모션 효율 요약</h2>
-            <div class="header-actions">
-              <span id="ads-sync-status" class="status-pill" style="font-size:0.72rem;">—</span>
-              <span id="studio-sync-status" class="status-pill" style="font-size:0.72rem;">—</span>
-              <button id="btn-copy-bookmarklet" class="btn" type="button" style="padding:4px 10px;font-size:0.76rem;" title="Studio Console에 붙여넣을 코드 복사">동기화 코드 복사</button>
-              <button id="btn-promo-cleanup" class="btn btn-ghost" type="button" style="padding:4px 10px;font-size:0.76rem;" title="Youtube Promotion-… 형태 중복 제거">깨진 동기화 정리</button>
+            <div class="promo-head-actions">
+              <span id="studio-sync-status" class="status-pill">—</span>
+              <button id="btn-efficiency-help" class="eff-help-btn" type="button" title="효율 기준 보기">?</button>
+              <button id="btn-copy-bookmarklet" class="btn" type="button" title="Studio Console에 붙여넣을 코드 복사">동기화 코드 복사</button>
+              <button id="btn-promo-cleanup" class="btn btn-ghost" type="button" title="Youtube Promotion-… 형태 중복 제거">깨진 동기화 정리</button>
             </div>
           </div>
           <div class="card-body promo-table-wrap">
@@ -752,7 +1031,7 @@
                   <th>구독</th>
                   <th>CPV</th>
                   <th>구독당</th>
-                  <th>효율</th>
+                  <th>효율 <button id="btn-efficiency-help-th" class="eff-help-btn" type="button" title="효율 기준">?</button></th>
                 </tr>
               </thead>
               <tbody id="promo-table-body"></tbody>
@@ -765,10 +1044,18 @@
       <section class="card" style="margin-bottom:14px;">
         <div class="card-head">
           <h2>콘텐츠별 현황</h2>
-          <a id="channel-link" class="btn btn-ghost" href="https://www.youtube.com/@DD-DIT" target="_blank" rel="noopener" style="text-decoration:none;">채널 열기</a>
+          <div class="content-head-tools">
+            <div class="content-format-tabs" id="content-format-tabs">
+              <button type="button" class="content-format-tab active" data-format="all">전체</button>
+              <button type="button" class="content-format-tab" data-format="longform">롱폼</button>
+              <button type="button" class="content-format-tab" data-format="shorts">쇼츠</button>
+            </div>
+            <a id="channel-link" class="btn btn-ghost" href="https://www.youtube.com/@DD-DIT" target="_blank" rel="noopener" style="text-decoration:none;">채널 열기</a>
+          </div>
         </div>
         <div class="card-body">
           <div id="video-grid" class="video-grid"></div>
+          <div id="content-pagination" class="content-pagination hidden" aria-label="콘텐츠 페이지"></div>
         </div>
       </section>
 
@@ -790,7 +1077,31 @@
       </div>
     </div>
 
-    <div id="loading" class="card loading-block">보고 데이터를 불러오는 중…</div>
+    <div id="page-loading" class="page-loading" hidden>
+      <div class="page-loading-card">
+        <div class="page-loading-spinner" aria-hidden="true"></div>
+        <div id="page-loading-text" class="page-loading-text">보고 데이터를 불러오는 중…</div>
+        <div id="page-loading-sub" class="page-loading-sub">YouTube · Analytics · 프로모션</div>
+      </div>
+    </div>
+
+    <div id="loading" class="card hidden loading-block" style="padding:40px;text-align:center;color:var(--text-muted);">보고 데이터를 불러오는 중…</div>
+
+    <div id="efficiency-criteria-modal" class="criteria-modal" hidden>
+      <div class="video-modal-backdrop" data-close-efficiency-modal tabindex="-1"></div>
+      <div class="criteria-dialog" role="dialog" aria-modal="true" aria-labelledby="efficiency-criteria-title">
+        <div class="video-modal-head" style="padding:0 0 10px;border:none;">
+          <h3 id="efficiency-criteria-title">프로모션 효율 기준</h3>
+          <button type="button" class="btn btn-ghost" data-close-efficiency-modal>닫기</button>
+        </div>
+        <ul>
+          <li><strong>구독 캠페인</strong> — 구독당 비용(CPS) 기준: 400원 이하 매우 좋음, 700원 이하 보통, 그 이상 낮음</li>
+          <li><strong>조회수 캠페인</strong> — 조회당 비용(CPV) 기준: 30원 이하 좋음, 60원 이하 보통, 그 이상 낮음</li>
+          <li>구독 캠페인은 부수 조회 CPV보다 CPS를 우선합니다.</li>
+          <li>Studio·Ads 동기화 직후 수치가 반영될 수 있습니다.</li>
+        </ul>
+      </div>
+    </div>
 
     <div id="video-analysis-modal" class="video-modal" hidden>
       <div class="video-modal-backdrop" data-close-video-modal tabindex="-1"></div>
@@ -806,6 +1117,6 @@
 
   <script src="../js/api-auth.js"></script>
   <script src="../js/theme.js"></script>
-  <script src="js/report.js?v=36"></script>
+  <script src="js/report.js?v=37"></script>
 </body>
 </html>
