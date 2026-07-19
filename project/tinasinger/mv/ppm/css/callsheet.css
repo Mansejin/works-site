@@ -58,6 +58,12 @@ a:hover {
   backdrop-filter: blur(10px);
 }
 
+.chrome-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .chrome-back {
   font-size: 0.8rem;
   font-weight: 600;
@@ -70,6 +76,7 @@ a:hover {
   text-decoration: none;
 }
 
+.chrome-btn,
 .chrome-print {
   font: inherit;
   font-size: 0.74rem;
@@ -80,12 +87,144 @@ a:hover {
   background: var(--page);
   color: var(--ink);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
+.chrome-btn:hover,
 .chrome-print:hover {
   background: var(--soft);
   border-color: #b8bfc8;
+}
+
+.chrome-btn.is-active {
+  background: var(--soft-2);
+  border-color: #9aa3ae;
+  color: var(--ink);
+}
+
+.chrome-btn--primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.chrome-btn--primary:hover {
+  background: #2a2e36;
+  border-color: #2a2e36;
+  color: #fff;
+}
+
+.save-status {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 3em;
+  text-align: right;
+}
+
+/* —— Edit fields —— */
+.cs-edit {
+  outline: none;
+}
+
+body:not(.is-edit-mode) .cs-edit {
+  cursor: default;
+  user-select: text;
+}
+
+body.is-edit-mode .cs-edit {
+  cursor: text;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow 0.12s ease, background 0.12s ease;
+}
+
+body.is-edit-mode .cs-edit:hover {
+  background: rgba(245, 241, 230, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(200, 185, 138, 0.45);
+}
+
+body.is-edit-mode .cs-edit:focus {
+  background: var(--focus);
+  box-shadow: inset 0 0 0 1px var(--focus-ring);
+}
+
+body.is-edit-mode {
+  overflow: auto;
+}
+
+body.is-edit-mode .page {
+  height: auto;
+  max-height: none;
+}
+
+/* —— Edit modal —— */
+.edit-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 22, 26, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.edit-modal[hidden] {
+  display: none;
+}
+
+.edit-modal-card {
+  width: min(360px, calc(100vw - 32px));
+  padding: 22px;
+  border-radius: 12px;
+  border: 1px solid var(--rule-strong);
+  background: var(--page);
+  box-shadow: 0 20px 48px rgba(24, 28, 36, 0.18);
+}
+
+.edit-modal-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.edit-modal-desc {
+  font-size: 0.76rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.edit-modal-input {
+  width: 100%;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--rule-strong);
+  background: var(--soft);
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.edit-modal-input:focus {
+  outline: none;
+  border-color: var(--focus-ring);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(200, 185, 138, 0.25);
+}
+
+.edit-modal-error {
+  font-size: 0.75rem;
+  color: #c23b3b;
+  margin-bottom: 8px;
+}
+
+.edit-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .page {
@@ -428,10 +567,8 @@ h2 {
 .crew .contact {
   min-height: 1.25em;
   outline: none;
-  cursor: text;
   font-variant-numeric: tabular-nums;
   border-radius: 4px;
-  transition: background 0.12s ease, box-shadow 0.12s ease;
 }
 
 .crew .contact:empty::before {
@@ -440,9 +577,8 @@ h2 {
   font-weight: 400;
 }
 
-.crew .contact:focus {
-  background: var(--focus);
-  box-shadow: inset 0 0 0 1px var(--focus-ring);
+body:not(.is-edit-mode) .crew .contact:empty::before {
+  content: attr(data-ph);
 }
 
 .crew tbody tr:last-child td {
@@ -614,6 +750,11 @@ h2 {
   .crew .contact {
     border-bottom: 1px dotted #999;
     min-height: 1.1em;
+  }
+
+  .cs-edit {
+    box-shadow: none !important;
+    background: transparent !important;
   }
 
   .schedule tbody tr:hover td {
