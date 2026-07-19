@@ -12,42 +12,47 @@
 <body>
   <div class="chrome no-print">
     <a class="chrome-back" href="../">← PPM</a>
-    <button type="button" class="chrome-print" id="btnPrint">인쇄</button>
+    <div class="chrome-actions">
+      <span class="save-status" id="saveStatus" hidden>저장됨</span>
+      <button type="button" class="chrome-btn" id="btnEdit">편집</button>
+      <button type="button" class="chrome-btn" id="btnReset" hidden title="저장된 편집 내용 초기">초기화</button>
+      <button type="button" class="chrome-btn" id="btnPrint">인쇄</button>
+    </div>
   </div>
 
   <main class="page">
     <header class="banner">
       <div class="banner-brand">
         <p class="banner-label">Call Sheet</p>
-        <h1>Right Here, Right Now</h1>
-        <p class="banner-sub">Tina Singer MV · 이겸비</p>
+        <h1 class="cs-edit" data-key="title" spellcheck="false">Right Here, Right Now</h1>
+        <p class="banner-sub cs-edit" data-key="subtitle" spellcheck="false">Tina Singer MV · 이겸비</p>
       </div>
       <div class="banner-day">
-        <span class="day-num">1회차</span>
-        <span class="day-date">2026.07.25 (토)</span>
+        <span class="day-num cs-edit" data-key="day" spellcheck="false">1회차</span>
+        <span class="day-date cs-edit" data-key="date" spellcheck="false">2026.07.25 (토)</span>
       </div>
     </header>
 
     <section class="meta-strip" aria-label="촬영 기본 정보">
       <div class="meta-item meta-wide">
         <span class="meta-k">장소</span>
-        <span class="meta-v">신촌 합주실</span>
+        <span class="meta-v cs-edit" data-key="loc" spellcheck="false">신촌 합주실</span>
       </div>
       <div class="meta-item">
         <span class="meta-k">콜</span>
-        <span class="meta-v meta-time">10:00</span>
+        <span class="meta-v meta-time cs-edit" data-key="call" spellcheck="false">10:00</span>
       </div>
       <div class="meta-item">
         <span class="meta-k">랩</span>
-        <span class="meta-v meta-time">18:00</span>
+        <span class="meta-v meta-time cs-edit" data-key="wrap" spellcheck="false">18:00</span>
       </div>
       <div class="meta-item meta-wide">
         <span class="meta-k">레퍼런스</span>
-        <span class="meta-v">수스 「라이트 스위치」</span>
+        <span class="meta-v cs-edit" data-key="ref" spellcheck="false">수스 「라이트 스위치」</span>
       </div>
       <div class="meta-item meta-span">
         <span class="meta-k">톤</span>
-        <span class="meta-v">코지 인디 · 연습실 OOTD · 연출 컷 + 원테이크</span>
+        <span class="meta-v cs-edit" data-key="tone" spellcheck="false">코지 인디 · 연습실 OOTD · 연출 컷 + 원테이크</span>
       </div>
     </section>
 
@@ -65,39 +70,39 @@
             </thead>
             <tbody>
               <tr>
-                <td class="t">10:00</td>
-                <td class="b">집결 · 세팅</td>
-                <td>장비·조명·배경 / 음원·슬레이트</td>
+                <td class="t cs-edit" data-key="s0t" spellcheck="false">10:00</td>
+                <td class="b cs-edit" data-key="s0b" spellcheck="false">집결 · 세팅</td>
+                <td class="cs-edit" data-key="s0d" spellcheck="false">장비·조명·배경 / 음원·슬레이트</td>
               </tr>
               <tr>
-                <td class="t">10:00–12:00</td>
-                <td class="b">오전 촬영</td>
-                <td>연출 컷 · 의상·배경 변경</td>
+                <td class="t cs-edit" data-key="s1t" spellcheck="false">10:00–12:00</td>
+                <td class="b cs-edit" data-key="s1b" spellcheck="false">오전 촬영</td>
+                <td class="cs-edit" data-key="s1d" spellcheck="false">연출 컷 · 의상·배경 변경</td>
               </tr>
               <tr class="break">
-                <td class="t">12:00–13:00</td>
-                <td class="b">점심</td>
-                <td>식사 · 오후 룩 준비</td>
+                <td class="t cs-edit" data-key="s2t" spellcheck="false">12:00–13:00</td>
+                <td class="b cs-edit" data-key="s2b" spellcheck="false">점심</td>
+                <td class="cs-edit" data-key="s2d" spellcheck="false">식사 · 오후 룩 준비</td>
               </tr>
               <tr>
-                <td class="t">13:00–15:00</td>
-                <td class="b">오후 촬영</td>
-                <td>원테이크(롱테이크) · 앵글 변경</td>
+                <td class="t cs-edit" data-key="s3t" spellcheck="false">13:00–15:00</td>
+                <td class="b cs-edit" data-key="s3b" spellcheck="false">오후 촬영</td>
+                <td class="cs-edit" data-key="s3d" spellcheck="false">원테이크(롱테이크) · 앵글 변경</td>
               </tr>
               <tr>
-                <td class="t">15:00–15:30</td>
-                <td class="b">프리뷰</td>
-                <td>모니터링 · 부족 컷</td>
+                <td class="t cs-edit" data-key="s4t" spellcheck="false">15:00–15:30</td>
+                <td class="b cs-edit" data-key="s4b" spellcheck="false">프리뷰</td>
+                <td class="cs-edit" data-key="s4d" spellcheck="false">모니터링 · 부족 컷</td>
               </tr>
               <tr>
-                <td class="t">15:30–17:00</td>
-                <td class="b">보충 · 인서트</td>
-                <td>추가 촬영 · 소품 디테일</td>
+                <td class="t cs-edit" data-key="s5t" spellcheck="false">15:30–17:00</td>
+                <td class="b cs-edit" data-key="s5b" spellcheck="false">보충 · 인서트</td>
+                <td class="cs-edit" data-key="s5d" spellcheck="false">추가 촬영 · 소품 디테일</td>
               </tr>
               <tr class="break">
-                <td class="t">17:00–18:00</td>
-                <td class="b">저녁 · 철수</td>
-                <td>식사 · 철수 · 백업 확인</td>
+                <td class="t cs-edit" data-key="s6t" spellcheck="false">17:00–18:00</td>
+                <td class="b cs-edit" data-key="s6b" spellcheck="false">저녁 · 철수</td>
+                <td class="cs-edit" data-key="s6d" spellcheck="false">식사 · 철수 · 백업 확인</td>
               </tr>
             </tbody>
           </table>
@@ -106,14 +111,14 @@
         <div class="block">
           <h2>촬영 체크</h2>
           <div class="checks">
-            <label><input type="checkbox" /> 음원·싱크</label>
-            <label><input type="checkbox" /> 프리뷰 모니터</label>
-            <label><input type="checkbox" /> 오전 룩 · 배경 A</label>
-            <label><input type="checkbox" /> 오후 룩 · 배경 B</label>
-            <label><input type="checkbox" /> 원테이크 W/M/C</label>
-            <label><input type="checkbox" /> 인서트·소품</label>
-            <label><input type="checkbox" /> 카드 이중 백업</label>
-            <label><input type="checkbox" /> 철수·장비 점검</label>
+            <label><input type="checkbox" data-check="c0" /> <span class="cs-edit" data-key="c0l" spellcheck="false">음원·싱크</span></label>
+            <label><input type="checkbox" data-check="c1" /> <span class="cs-edit" data-key="c1l" spellcheck="false">프리뷰 모니터</span></label>
+            <label><input type="checkbox" data-check="c2" /> <span class="cs-edit" data-key="c2l" spellcheck="false">오전 룩 · 배경 A</span></label>
+            <label><input type="checkbox" data-check="c3" /> <span class="cs-edit" data-key="c3l" spellcheck="false">오후 룩 · 배경 B</span></label>
+            <label><input type="checkbox" data-check="c4" /> <span class="cs-edit" data-key="c4l" spellcheck="false">원테이크 W/M/C</span></label>
+            <label><input type="checkbox" data-check="c5" /> <span class="cs-edit" data-key="c5l" spellcheck="false">인서트·소품</span></label>
+            <label><input type="checkbox" data-check="c6" /> <span class="cs-edit" data-key="c6l" spellcheck="false">카드 이중 백업</span></label>
+            <label><input type="checkbox" data-check="c7" /> <span class="cs-edit" data-key="c7l" spellcheck="false">철수·장비 점검</span></label>
           </div>
         </div>
 
@@ -129,34 +134,34 @@
             </thead>
             <tbody>
               <tr>
-                <td class="role">연출</td>
-                <td>오세진</td>
-                <td class="contact" contenteditable="true" data-ph="010-"></td>
+                <td class="role cs-edit" data-key="r0" spellcheck="false">연출</td>
+                <td class="cs-edit" data-key="n0" spellcheck="false">오세진</td>
+                <td class="contact cs-edit" data-key="p0" data-ph="010-" spellcheck="false"></td>
               </tr>
               <tr>
-                <td class="role">연출</td>
-                <td>이동혁</td>
-                <td class="contact" contenteditable="true" data-ph="010-"></td>
+                <td class="role cs-edit" data-key="r1" spellcheck="false">연출</td>
+                <td class="cs-edit" data-key="n1" spellcheck="false">이동혁</td>
+                <td class="contact cs-edit" data-key="p1" data-ph="010-" spellcheck="false"></td>
               </tr>
               <tr>
-                <td class="role">제작</td>
-                <td>최유정</td>
-                <td class="contact" contenteditable="true" data-ph="010-"></td>
+                <td class="role cs-edit" data-key="r2" spellcheck="false">제작</td>
+                <td class="cs-edit" data-key="n2" spellcheck="false">최유정</td>
+                <td class="contact cs-edit" data-key="p2" data-ph="010-" spellcheck="false"></td>
               </tr>
               <tr>
-                <td class="role">촬영</td>
-                <td>오세진</td>
-                <td class="contact" contenteditable="true" data-ph="010-"></td>
+                <td class="role cs-edit" data-key="r3" spellcheck="false">촬영</td>
+                <td class="cs-edit" data-key="n3" spellcheck="false">오세진</td>
+                <td class="contact cs-edit" data-key="p3" data-ph="010-" spellcheck="false"></td>
               </tr>
               <tr>
-                <td class="role">아티스트</td>
-                <td>이겸비</td>
-                <td class="contact" contenteditable="true" data-ph="010-"></td>
+                <td class="role cs-edit" data-key="r4" spellcheck="false">아티스트</td>
+                <td class="cs-edit" data-key="n4" spellcheck="false">이겸비</td>
+                <td class="contact cs-edit" data-key="p4" data-ph="010-" spellcheck="false"></td>
               </tr>
               <tr>
-                <td class="role">매니지먼트</td>
-                <td>윤백준</td>
-                <td class="contact" contenteditable="true" data-ph="010-"></td>
+                <td class="role cs-edit" data-key="r5" spellcheck="false">매니지먼트</td>
+                <td class="cs-edit" data-key="n5" spellcheck="false">윤백준</td>
+                <td class="contact cs-edit" data-key="p5" data-ph="010-" spellcheck="false"></td>
               </tr>
             </tbody>
           </table>
@@ -167,35 +172,35 @@
         <div class="block">
           <h2>의상 · 헤어/메이크업</h2>
           <table class="kv">
-            <tr><th>의상</th><td>연습실 OOTD · 오전/오후 룩 교체</td></tr>
-            <tr><th>헤어/메이크업</th><td>셀프 · 평소 + 약간 힘준</td></tr>
+            <tr><th>의상</th><td class="cs-edit" data-key="w0" spellcheck="false">연습실 OOTD · 오전/오후 룩 교체</td></tr>
+            <tr><th>헤어/메이크업</th><td class="cs-edit" data-key="w1" spellcheck="false">셀프 · 평소 + 약간 힘준</td></tr>
           </table>
         </div>
 
         <div class="block">
           <h2>장비</h2>
           <table class="kv">
-            <tr><th>카메라</th><td>A7M5 · 20–50 · 50–150 · 가변 ND</td></tr>
-            <tr><th>서포트</th><td>프리뷰 모니터 · 트라이포드 · RS4 Mini</td></tr>
-            <tr><th>조명</th><td>L300 · 반사판</td></tr>
-            <tr><th>제작</th><td>스피커 · 릴선·멀티 · 가퍼 · 슬레이트용 태블릿</td></tr>
+            <tr><th>카메라</th><td class="cs-edit" data-key="g0" spellcheck="false">A7M5 · 20–50 · 50–150 · 가변 ND</td></tr>
+            <tr><th>서포트</th><td class="cs-edit" data-key="g1" spellcheck="false">프리뷰 모니터 · 트라이포드 · RS4 Mini</td></tr>
+            <tr><th>조명</th><td class="cs-edit" data-key="g2" spellcheck="false">L300 · 반사판</td></tr>
+            <tr><th>제작</th><td class="cs-edit" data-key="g3" spellcheck="false">스피커 · 릴선·멀티 · 가퍼 · 슬레이트용 태블릿</td></tr>
           </table>
         </div>
 
         <div class="block">
           <h2>소품</h2>
           <table class="kv">
-            <tr><th>메인</th><td>유선 마이크</td></tr>
-            <tr><th>연출</th><td>헤드폰 · 단스탠드·알전구 · 천·빈티지 포스터 · 악기 주변기기 · 서적·음료·컵</td></tr>
+            <tr><th>메인</th><td class="cs-edit" data-key="pr0" spellcheck="false">유선 마이크</td></tr>
+            <tr><th>연출</th><td class="cs-edit" data-key="pr1" spellcheck="false">헤드폰 · 단스탠드·알전구 · 천·빈티지 포스터 · 악기 주변기기 · 서적·음료·컵</td></tr>
           </table>
         </div>
 
         <div class="block">
           <h2>노트</h2>
           <ul class="notes">
-            <li>1회차 · 합주실 연출 컷 + 원테이크(롱테이크)</li>
-            <li>음원 재생·싱크 테스트 후 본촬영</li>
-            <li>카드 이중 백업 필수</li>
+            <li class="cs-edit" data-key="note0" spellcheck="false">1회차 · 합주실 연출 컷 + 원테이크(롱테이크)</li>
+            <li class="cs-edit" data-key="note1" spellcheck="false">음원 재생·싱크 테스트 후 본촬영</li>
+            <li class="cs-edit" data-key="note2" spellcheck="false">카드 이중 백업 필수</li>
           </ul>
         </div>
       </aside>
@@ -203,12 +208,23 @@
 
     <footer class="foot">
       <span>Mansejin Works · Tina Singer MV</span>
-      <span>Call Sheet · 1회차 · 2026.07.25</span>
+      <span class="cs-edit" data-key="foot" spellcheck="false">Call Sheet · 1회차 · 2026.07.25</span>
     </footer>
   </main>
 
-  <script>
-    document.getElementById("btnPrint")?.addEventListener("click", () => window.print());
-  </script>
+  <div class="edit-modal" id="editModal" hidden>
+    <form class="edit-modal-card" id="editForm">
+      <h3 class="edit-modal-title">편집 모드</h3>
+      <p class="edit-modal-desc">PPM과 동일한 비밀번호를 입력하세요.</p>
+      <input type="password" class="edit-modal-input" id="editPassword" placeholder="비밀번호" autocomplete="current-password" required />
+      <p class="edit-modal-error" id="editError" hidden>비밀번호가 올바르지 않습니다.</p>
+      <div class="edit-modal-actions">
+        <button type="button" class="chrome-btn" id="editCancel">취소</button>
+        <button type="submit" class="chrome-btn chrome-btn--primary">입력</button>
+      </div>
+    </form>
+  </div>
+
+  <script src="../js/callsheet.js"></script>
 </body>
 </html>
