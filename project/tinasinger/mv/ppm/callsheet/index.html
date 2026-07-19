@@ -64,23 +64,62 @@
             <button type="button" class="row-btn row-btn--add edit-only no-print" id="btnAddSchedule" hidden>+ 행 추가</button>
           </div>
           <div class="schedule-wrap">
-          <table class="schedule" id="scheduleTable">
-            <thead>
-              <tr>
-                <th class="c-time">시간</th>
-                <th class="c-block">블록</th>
-                <th class="c-place">장소</th>
-                <th>내용</th>
-                <th class="c-actions edit-only no-print" hidden aria-hidden="true"></th>
-              </tr>
-            </thead>
-            <tbody id="scheduleBody">
-              <!-- filled by callsheet.js -->
-            </tbody>
-          </table>
+            <table class="schedule" id="scheduleTable">
+              <thead>
+                <tr>
+                  <th class="c-time">시간</th>
+                  <th class="c-block">블록</th>
+                  <th class="c-place">장소</th>
+                  <th class="c-detail">내용</th>
+                  <th class="c-actions edit-only no-print" hidden aria-hidden="true"></th>
+                </tr>
+              </thead>
+              <tbody id="scheduleBody">
+                <!-- filled by callsheet.js -->
+              </tbody>
+            </table>
           </div>
         </div>
+      </section>
 
+      <aside class="side-col">
+        <div class="block">
+          <h2>의상 · 헤어/메이크업</h2>
+          <table class="kv">
+            <tr><th>의상</th><td class="cs-edit" data-key="w0" spellcheck="false">연습실 OOTD · 오전/오후 룩 교체</td></tr>
+            <tr><th>헤어/메이크업</th><td class="cs-edit" data-key="w1" spellcheck="false">셀프 · 평소 + 약간 힘준</td></tr>
+          </table>
+        </div>
+
+        <div class="block">
+          <h2>장비</h2>
+          <table class="kv">
+            <tr><th>카메라</th><td class="cs-edit" data-key="g0" spellcheck="false">A7M5 · 20–50 · 50–150 · 가변 ND</td></tr>
+            <tr><th>서포트</th><td class="cs-edit" data-key="g1" spellcheck="false">프리뷰 모니터 · 트라이포드 · RS4 Mini</td></tr>
+            <tr><th>조명</th><td class="cs-edit" data-key="g2" spellcheck="false">L300 · 반사판</td></tr>
+            <tr><th>제작</th><td class="cs-edit" data-key="g3" spellcheck="false">스피커 · 릴선·멀티 · 가퍼 · 슬레이트용 태블릿</td></tr>
+          </table>
+        </div>
+
+        <div class="block">
+          <h2>소품</h2>
+          <table class="kv">
+            <tr><th>메인</th><td class="cs-edit" data-key="pr0" spellcheck="false">유선 마이크</td></tr>
+            <tr><th>연출</th><td class="cs-edit" data-key="pr1" spellcheck="false">헤드폰 · 단스탠드·알전구 · 천·빈티지 포스터 · 악기 주변기기 · 서적·음료·컵</td></tr>
+          </table>
+        </div>
+
+        <div class="block">
+          <h2>노트</h2>
+          <ul class="notes">
+            <li class="cs-edit" data-key="note0" spellcheck="false">1회차 · 합주실 연출 컷 + 원테이크(롱테이크)</li>
+            <li class="cs-edit" data-key="note1" spellcheck="false">음원 재생·싱크 테스트 후 본촬영</li>
+            <li class="cs-edit" data-key="note2" spellcheck="false">카드 이중 백업 필수</li>
+          </ul>
+        </div>
+      </aside>
+
+      <section class="bottom-row">
         <div class="block">
           <h2>촬영 체크</h2>
           <div class="checks">
@@ -140,43 +179,6 @@
           </table>
         </div>
       </section>
-
-      <aside class="side-col">
-        <div class="block">
-          <h2>의상 · 헤어/메이크업</h2>
-          <table class="kv">
-            <tr><th>의상</th><td class="cs-edit" data-key="w0" spellcheck="false">연습실 OOTD · 오전/오후 룩 교체</td></tr>
-            <tr><th>헤어/메이크업</th><td class="cs-edit" data-key="w1" spellcheck="false">셀프 · 평소 + 약간 힘준</td></tr>
-          </table>
-        </div>
-
-        <div class="block">
-          <h2>장비</h2>
-          <table class="kv">
-            <tr><th>카메라</th><td class="cs-edit" data-key="g0" spellcheck="false">A7M5 · 20–50 · 50–150 · 가변 ND</td></tr>
-            <tr><th>서포트</th><td class="cs-edit" data-key="g1" spellcheck="false">프리뷰 모니터 · 트라이포드 · RS4 Mini</td></tr>
-            <tr><th>조명</th><td class="cs-edit" data-key="g2" spellcheck="false">L300 · 반사판</td></tr>
-            <tr><th>제작</th><td class="cs-edit" data-key="g3" spellcheck="false">스피커 · 릴선·멀티 · 가퍼 · 슬레이트용 태블릿</td></tr>
-          </table>
-        </div>
-
-        <div class="block">
-          <h2>소품</h2>
-          <table class="kv">
-            <tr><th>메인</th><td class="cs-edit" data-key="pr0" spellcheck="false">유선 마이크</td></tr>
-            <tr><th>연출</th><td class="cs-edit" data-key="pr1" spellcheck="false">헤드폰 · 단스탠드·알전구 · 천·빈티지 포스터 · 악기 주변기기 · 서적·음료·컵</td></tr>
-          </table>
-        </div>
-
-        <div class="block">
-          <h2>노트</h2>
-          <ul class="notes">
-            <li class="cs-edit" data-key="note0" spellcheck="false">1회차 · 합주실 연출 컷 + 원테이크(롱테이크)</li>
-            <li class="cs-edit" data-key="note1" spellcheck="false">음원 재생·싱크 테스트 후 본촬영</li>
-            <li class="cs-edit" data-key="note2" spellcheck="false">카드 이중 백업 필수</li>
-          </ul>
-        </div>
-      </aside>
     </div>
 
     <footer class="foot">
