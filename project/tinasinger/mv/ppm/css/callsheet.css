@@ -364,6 +364,18 @@ body.is-edit-mode .cs-edit:focus {
   min-width: 0;
 }
 
+.block-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.block-head h2 {
+  flex: 1;
+}
+
 h2 {
   font-size: 0.68rem;
   font-weight: 800;
@@ -404,12 +416,12 @@ h2 {
 
 /* —— Schedule —— */
 .schedule {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
 }
 
 .schedule th,
 .schedule td {
-  padding: 6px 8px;
+  padding: 6px 7px;
   border-bottom: 1px solid var(--rule);
 }
 
@@ -420,11 +432,23 @@ h2 {
 }
 
 .schedule .c-time {
-  width: 7em;
+  width: 6.6em;
 }
 
 .schedule .c-block {
-  width: 6.4em;
+  width: 5.8em;
+}
+
+.schedule .c-place {
+  width: 6.5em;
+}
+
+.schedule .c-actions {
+  width: 2.2em;
+  padding-left: 4px;
+  padding-right: 4px;
+  text-align: center;
+  background: transparent;
 }
 
 .schedule .t {
@@ -438,7 +462,13 @@ h2 {
   white-space: nowrap;
 }
 
-.schedule td:last-child {
+.schedule .p {
+  font-weight: 550;
+  color: #3a414a;
+  white-space: nowrap;
+}
+
+.schedule td[data-field="detail"] {
   color: #3a414a;
 }
 
@@ -452,12 +482,53 @@ h2 {
 }
 
 .schedule tr.break .t,
-.schedule tr.break .b {
+.schedule tr.break .b,
+.schedule tr.break .p {
   font-weight: 550;
 }
 
 .schedule tbody tr:last-child td {
   border-bottom: none;
+}
+
+.row-btn {
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 5px;
+  background: var(--page);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.row-btn:hover {
+  background: var(--soft);
+}
+
+.row-btn--add {
+  flex-shrink: 0;
+  margin-bottom: 4px;
+  height: 26px;
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.row-btn--del {
+  color: #8a3b3b;
+  border-color: #d8b4b4;
+}
+
+.row-btn--del:hover {
+  background: #f8ecec;
+}
+
+body:not(.is-edit-mode) .edit-only {
+  display: none !important;
 }
 
 /* —— Checks —— */
@@ -685,7 +756,8 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
     overflow: visible;
   }
 
-  .no-print {
+  .no-print,
+  .edit-only {
     display: none !important;
   }
 
