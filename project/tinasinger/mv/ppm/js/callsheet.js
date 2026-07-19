@@ -4,7 +4,7 @@
   /** Shared with PPM deck — same password unlocks both */
   const EDIT_AUTH_KEY = "works/project/tinasinger/mv/ppm/edit/v1";
   const EDIT_PASS_SHA256 = "c74cead93d83c7317ad62515eec8333429048cc8e1ed5971eae50ae66f8d7fcb";
-  const STORAGE_KEY = "works/project/tinasinger/mv/ppm/callsheet/v1";
+  const STORAGE_KEY = "works/project/tinasinger/mv/ppm/callsheet/v2";
   const CHECKS_KEY = "works/project/tinasinger/mv/ppm/callsheet-checks/v1";
 
   const editModal = document.getElementById("editModal");
