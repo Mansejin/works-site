@@ -2,7 +2,7 @@
  * 이겸비 (Tina Singer) — Right Here, Right Now MV PPM
  * 배포 기본값 — 편집 후 「slides.js 저장」 버튼 또는 scripts/export-slides.mjs
  */
-window.PPM_SLIDES_UPDATED = "2026-07-20";
+window.PPM_SLIDES_UPDATED = "2026-07-25";
 window.PPM_SLIDES = [
   {
     "type": "cover",
@@ -16,7 +16,7 @@ window.PPM_SLIDES = [
   {
     "type": "toc",
     "title": "목차",
-    "subtitle": "16 Slides · Pre-Production Meeting",
+    "subtitle": "17 Slides · Pre-Production Meeting",
     "groups": [
       {
         "label": "기획",
@@ -85,6 +85,10 @@ window.PPM_SLIDES = [
           {
             "num": "12",
             "title": "일정 & 체크리스트"
+          },
+          {
+            "num": "12B",
+            "title": "7/25 1차 촬영 요약"
           }
         ]
       }
@@ -284,6 +288,10 @@ window.PPM_SLIDES = [
         "desc": "볼빨간사춘기 「Travel」 MV — 여행·일상 다큐, 자연광, 솔직한 카메라"
       },
       {
+        "label": "1차 촬영",
+        "desc": "수스 「라이트 스위치」 커버 영상 — 합주실·연습실 톤, 연출 컷·풀 촬영 레퍼런스"
+      },
+      {
         "label": "무드",
         "desc": "일상 Pop MV — 곡 첫 10초에 ‘시원함·희망’이 바로 오는 직관적 이미지 (muted 톤)"
       },
@@ -429,8 +437,8 @@ window.PPM_SLIDES = [
     "left": {
       "heading": "촬영 로케이션",
       "bullets": [
-        "해변·바다 — Chorus 메인 (일출/일몰 golden hour)",
-        "작업실·홈 스튜디오 — Verse, Pre-Chorus",
+        "1차 (7/25): 신촌 합주실 — 작업실·연출 컷·풀 촬영",
+        "해변·바다 — Chorus 메인 (일출/일몰 golden hour · 2차)",
         "일상 — 거리, 카페, 지하철/버스 (선택)",
         "야외 공원·둔치 — 달리기, B-roll"
       ]
@@ -450,11 +458,11 @@ window.PPM_SLIDES = [
     "title": "09 · 스타일링 & 룩",
     "sections": [
       {
-        "heading": "Look A — Verse / 일상·작업실",
+        "heading": "Look A — Verse / 합주실·연습실 (7/25)",
         "bullets": [
-          "캐주얼: 오버핏 셔츠, 니트, 편한 데님",
+          "코지한 인디 가수 느낌의 연습실 OOTD (오전/오후 교체)",
           "톤: 내추럴, 꾸밈 없는 ‘진짜 나’",
-          "소품: 헤드폰, 노트, 마이크"
+          "소품: 유선 마이크, 헤드폰, 악기 주변기기"
         ]
       },
       {
@@ -468,9 +476,9 @@ window.PPM_SLIDES = [
       {
         "heading": "Hair & Makeup",
         "bullets": [
-          "헤어: 자연스러운 웨이브, 바람 살리기 (해변)",
-          "메이크업: 글로우·선키스드, 과한 스모키 지양",
-          "아카이브 구간: 최소 메이크업 or 부드러운 필터"
+          "7/25: 겸비님 셀프 풀메이크업 — 평소 스타일에 약간 힘준 정도",
+          "헤어: 자연스러운 웨이브, 바람 살리기 (해변·2차)",
+          "메이크업: 글로우·선키스드, 과한 스모키 지양"
         ]
       },
       {
@@ -487,23 +495,23 @@ window.PPM_SLIDES = [
     "type": "two-col",
     "title": "10 · 촬영 & 조명",
     "left": {
-      "heading": "카메라",
+      "heading": "카메라 · 1차 (7/25)",
       "bullets": [
-        "메인: Sony A7M5/FX3 or equivalent",
-        "렌즈: 24–35mm (wide·여행), 50mm (인물), 85mm (close)",
-        "이동: DJI RS 4 Mini (해변·달리기), Handheld (일상·아카이브)",
-        "Drone: 가능할지 모르겠음 / 해변 (선택)",
-        "FPS: 24fps 기본, slow 60fps (모래·머리카락·파도)"
+        "메인: Sony A7M5",
+        "렌즈: 20–50, 50–150 · 가변 ND 필터",
+        "서포트: 트라이포드, RS4 Mini 짐벌, 프리뷰 모니터",
+        "이동: Gimbal / Tripod / Handheld 믹스",
+        "2차(해변): 24–35 / 85mm · Drone 검토 · 60fps slow"
       ]
     },
     "right": {
-      "heading": "조명",
+      "heading": "조명 · 제작",
       "bullets": [
-        "야외: 자연광 — 골든 아워",
-        "실내: 창가 자연광 + 보조광",
-        "아카이브 look: 소스 확인 필요, 후반 오버노출 활용",
-        "후보 시간: 일출 1hr / sunset 1hr (해변)",
-        "날씨 플랜 B: 일단 흐린대로 촬영 — hook 씬은 맑은 날 우선"
+        "1차: L300 조명, 반사판 · 배경용 단스탠드·알전구",
+        "야외(2차): 자연광 — 골든 아워",
+        "제작: 음원 재생 스피커, 릴선·멀티탭, 가퍼 테이프",
+        "슬레이트·콘티: 태블릿/스마트폰",
+        "날씨 플랜 B (해변): 흐린 날도 촬영 · hook은 맑은 날 우선"
       ]
     }
   },
@@ -556,7 +564,7 @@ window.PPM_SLIDES = [
       {
         "phase": "Shoot · 1차",
         "date": "2026.07.25",
-        "task": "서울 근교 — 작업실·일상·아카이브"
+        "task": "신촌 합주실 — 연출 컷·풀 촬영 · 10:00–18:00"
       },
       {
         "phase": "Shoot · 2차",
@@ -578,9 +586,45 @@ window.PPM_SLIDES = [
       "□ 스토리보드 v1",
       "□ 해변 로케·촬영 허가·날씨 플랜",
       "□ 아카이브 영상 리스트 & 사용 동의",
-      "□ 스타일링·HMU 보드",
+      "□ 스타일링·HMU 보드 (1차 OOTD 오전/오후)",
       "□ 최종 믹스 납품 일정",
-      "□ Call sheet"
+      "☑ 1차 일촬표 (callsheet/)"
+    ]
+  },
+  {
+    "type": "content",
+    "title": "12B · 7/25 1차 촬영 요약",
+    "sections": [
+      {
+        "heading": "기본 정보",
+        "bullets": [
+          "일시: 2026.07.25 (토) · 10:00–18:00",
+          "장소: 신촌 합주실",
+          "레퍼런스: 수스 「라이트 스위치」 커버 영상",
+          "상세 일촬표: callsheet/ (별도 페이지)"
+        ]
+      },
+      {
+        "heading": "타임테이블",
+        "bullets": [
+          "10:00 — 집결 및 세팅",
+          "10:00–12:00 — 오전 촬영 (연출 컷 · 의상·배경 변경)",
+          "12:00–13:00 — 점심",
+          "13:00–15:00 — 오후 촬영 (전체 곡 풀 촬영 · 다양한 앵글)",
+          "15:00–15:30 — 프리뷰 · 모니터링",
+          "15:30–17:00 — 보충 · 인서트",
+          "17:00–18:00 — 저녁 · 철수"
+        ]
+      },
+      {
+        "heading": "장비 · 룩 · 소품 (요약)",
+        "bullets": [
+          "카메라: A7M5 · 20–50 / 50–150 · 가변 ND · RS4 Mini · 프리뷰 모니터",
+          "조명: L300 · 반사판 · 배경용 단스탠드·알전구",
+          "의상: 코지 인디 가수 연습실 OOTD (오전/오후 교체) · HMU 셀프",
+          "소품: 유선 마이크 · 헤드폰 · 기타 스탠드·이펙터 · 빈티지 포스터·천 · 서적·음료"
+        ]
+      }
     ]
   },
   {
@@ -588,7 +632,7 @@ window.PPM_SLIDES = [
     "title": "Right Here, Right Now",
     "lines": [
       "이겸비 (Tina Singer)",
-      "MV Pre-Production · Draft v0.1",
+      "MV Pre-Production · Draft v0.2",
       "Mansejin Works"
     ]
   }
