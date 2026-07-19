@@ -10,190 +10,150 @@
   <title>일촬표 · 2026.07.25 · 신촌 합주실</title>
 </head>
 <body>
-  <div class="sheet-chrome no-print">
-    <a class="chrome-link" href="../">← PPM 덱</a>
-    <div class="chrome-actions">
-      <button type="button" class="chrome-btn" id="btnPrint">인쇄</button>
-    </div>
+  <div class="chrome no-print">
+    <a class="chrome-back" href="../">← PPM</a>
+    <button type="button" class="chrome-print" id="btnPrint">인쇄</button>
   </div>
 
-  <main class="sheet">
-    <header class="sheet-header">
-      <div class="sheet-eyebrow">Call Sheet · Shoot Day 1</div>
-      <h1 class="sheet-title">Right Here, Right Now</h1>
-      <p class="sheet-sub">이겸비 · Tina Singer · MV 1차 촬영</p>
-      <div class="sheet-meta-row">
-        <div class="meta-pill"><span class="meta-k">일시</span><span class="meta-v">2026.07.25 (토)</span></div>
-        <div class="meta-pill"><span class="meta-k">장소</span><span class="meta-v">신촌 합주실</span></div>
-        <div class="meta-pill"><span class="meta-k">콜타임</span><span class="meta-v">10:00</span></div>
-        <div class="meta-pill"><span class="meta-k">랩타임</span><span class="meta-v">18:00</span></div>
+  <main class="page">
+    <header class="head">
+      <div class="head-left">
+        <p class="kicker">Call Sheet · Shoot Day 1</p>
+        <h1>Right Here, Right Now</h1>
+        <p class="sub">이겸비 · Tina Singer MV · 1차 촬영</p>
       </div>
+      <dl class="meta">
+        <div><dt>일시</dt><dd>2026.07.25 (토)</dd></div>
+        <div><dt>장소</dt><dd>신촌 합주실</dd></div>
+        <div><dt>콜</dt><dd>10:00</dd></div>
+        <div><dt>랩</dt><dd>18:00</dd></div>
+      </dl>
     </header>
 
-    <section class="block">
-      <h2 class="block-title">기본 정보</h2>
-      <dl class="info-grid">
-        <div class="info-item">
-          <dt>프로젝트</dt>
-          <dd>Right Here, Right Now — Album Opening Track MV</dd>
-        </div>
-        <div class="info-item">
-          <dt>촬영차수</dt>
-          <dd>1차 · 합주실 / 연습실 연출·풀 촬영</dd>
-        </div>
-        <div class="info-item">
-          <dt>레퍼런스</dt>
-          <dd>수스 — 「라이트 스위치」 커버 영상</dd>
-        </div>
-        <div class="info-item">
-          <dt>톤</dt>
-          <dd>코지 인디 가수 · 연습실 OOTD · muted / intimate</dd>
-        </div>
-      </dl>
-    </section>
+    <div class="grid">
+      <section class="col timetable">
+        <h2>타임테이블</h2>
+        <table>
+          <thead>
+            <tr><th>시간</th><th>블록</th><th>내용</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="t">10:00</td>
+              <td class="b">집결 · 세팅</td>
+              <td>장비·조명·배경 / 음원·슬레이트</td>
+            </tr>
+            <tr>
+              <td class="t">10:00–12:00</td>
+              <td class="b">오전 촬영</td>
+              <td>연출 컷 · 의상·배경 변경</td>
+            </tr>
+            <tr class="break">
+              <td class="t">12:00–13:00</td>
+              <td class="b">점심</td>
+              <td>식사 · 오후 룩 준비</td>
+            </tr>
+            <tr>
+              <td class="t">13:00–15:00</td>
+              <td class="b">오후 촬영</td>
+              <td>풀 곡 · 다양한 앵글</td>
+            </tr>
+            <tr>
+              <td class="t">15:00–15:30</td>
+              <td class="b">프리뷰</td>
+              <td>모니터링 · 부족 컷</td>
+            </tr>
+            <tr>
+              <td class="t">15:30–17:00</td>
+              <td class="b">보충 · 인서트</td>
+              <td>추가 촬영 · 소품 디테일</td>
+            </tr>
+            <tr class="break">
+              <td class="t">17:00–18:00</td>
+              <td class="b">저녁 · 철수</td>
+              <td>식사 · 철수 · 백업 확인</td>
+            </tr>
+          </tbody>
+        </table>
 
-    <section class="block">
-      <h2 class="block-title">타임테이블</h2>
-      <table class="tt-table">
-        <thead>
-          <tr>
-            <th>시간</th>
-            <th>블록</th>
-            <th>내용</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="tt-time">10:00</td>
-            <td>집결 · 세팅</td>
-            <td>장비·조명·배경 세팅, 음원 재생 테스트, 슬레이트 준비</td>
-          </tr>
-          <tr>
-            <td class="tt-time">10:00 – 12:00</td>
-            <td>오전 촬영</td>
-            <td>연출 컷 위주 · 의상 및 배경 변경</td>
-          </tr>
-          <tr class="tt-break">
-            <td class="tt-time">12:00 – 13:00</td>
-            <td>점심</td>
-            <td>식사 · 오후 룩 준비</td>
-          </tr>
-          <tr>
-            <td class="tt-time">13:00 – 15:00</td>
-            <td>오후 촬영</td>
-            <td>전체 곡 풀 촬영 · 다양한 앵글 확보</td>
-          </tr>
-          <tr>
-            <td class="tt-time">15:00 – 15:30</td>
-            <td>프리뷰</td>
-            <td>모니터링 · 부족 컷 체크</td>
-          </tr>
-          <tr>
-            <td class="tt-time">15:30 – 17:00</td>
-            <td>보충 · 인서트</td>
-            <td>추가 촬영 · 소품·디테일 인서트</td>
-          </tr>
-          <tr class="tt-break">
-            <td class="tt-time">17:00 – 18:00</td>
-            <td>저녁 · 철수</td>
-            <td>식사 · 장비 철수 · 데이터 백업 확인</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+        <h2 class="mt">촬영 체크</h2>
+        <div class="checks">
+          <label><input type="checkbox" /> 음원·싱크</label>
+          <label><input type="checkbox" /> 프리뷰 모니터</label>
+          <label><input type="checkbox" /> 오전 룩 · 배경 A</label>
+          <label><input type="checkbox" /> 오후 룩 · 배경 B</label>
+          <label><input type="checkbox" /> 풀 곡 W/M/C</label>
+          <label><input type="checkbox" /> 인서트·소품</label>
+          <label><input type="checkbox" /> 카드 이중 백업</label>
+          <label><input type="checkbox" /> 철수·장비 점검</label>
+        </div>
+      </section>
 
-    <section class="block block--split">
-      <div>
-        <h2 class="block-title">장비 리스트</h2>
-        <div class="list-group">
-          <h3 class="list-label">카메라 / 렌즈</h3>
-          <ul>
-            <li>Sony A7M5</li>
-            <li>20–50 렌즈</li>
-            <li>50–150 렌즈</li>
-            <li>가변 ND 필터</li>
-          </ul>
-        </div>
-        <div class="list-group">
-          <h3 class="list-label">서포트</h3>
-          <ul>
-            <li>프리뷰 모니터</li>
-            <li>트라이포드</li>
-            <li>RS4 Mini 짐벌</li>
-          </ul>
-        </div>
-        <div class="list-group">
-          <h3 class="list-label">조명</h3>
-          <ul>
-            <li>L300 조명</li>
-            <li>반사판</li>
-          </ul>
-        </div>
-        <div class="list-group">
-          <h3 class="list-label">제작 / 연출</h3>
-          <ul>
-            <li>음원 재생용 스피커</li>
-            <li>릴선 및 멀티탭</li>
-            <li>가퍼 테이프</li>
-            <li>태블릿 / 스마트폰 (슬레이트 · 콘티)</li>
-          </ul>
-        </div>
-      </div>
+      <aside class="col side">
+        <section>
+          <h2>기본</h2>
+          <dl class="facts">
+            <div><dt>레퍼런스</dt><dd>수스 「라이트 스위치」</dd></div>
+            <div><dt>톤</dt><dd>코지 인디 · 연습실 OOTD</dd></div>
+            <div><dt>차수</dt><dd>합주실 연출·풀 촬영</dd></div>
+          </dl>
+        </section>
 
-      <div>
-        <h2 class="block-title">의상 · HMU</h2>
-        <div class="list-group">
-          <h3 class="list-label">의상</h3>
-          <ul>
-            <li>코지한 인디 가수 느낌의 연습실 OOTD</li>
-            <li>오전 / 오후 룩 교체</li>
-          </ul>
-        </div>
-        <div class="list-group">
-          <h3 class="list-label">헤어 / 메이크업</h3>
-          <ul>
-            <li>겸비님 셀프 풀메이크업</li>
-            <li>평소 스타일에 약간 힘준 정도</li>
-          </ul>
-        </div>
+        <section>
+          <h2>장비</h2>
+          <div class="packs">
+            <div>
+              <h3>카메라</h3>
+              <p>A7M5 · 20–50 · 50–150 · 가변 ND</p>
+            </div>
+            <div>
+              <h3>서포트</h3>
+              <p>프리뷰 모니터 · 트라이포드 · RS4 Mini</p>
+            </div>
+            <div>
+              <h3>조명</h3>
+              <p>L300 · 반사판</p>
+            </div>
+            <div>
+              <h3>제작</h3>
+              <p>스피커 · 릴선·멀티 · 가퍼 · 슬레이트용 태블릿</p>
+            </div>
+          </div>
+        </section>
 
-        <h2 class="block-title" style="margin-top: 28px">소품 리스트</h2>
-        <div class="list-group">
-          <h3 class="list-label">메인</h3>
-          <ul>
-            <li>유선 마이크</li>
-          </ul>
-        </div>
-        <div class="list-group">
-          <h3 class="list-label">연출</h3>
-          <ul>
-            <li>헤드폰</li>
-            <li>배경 레이어용 조명 (단스탠드, 알전구 등)</li>
-            <li>인테리어 천 및 빈티지 포스터</li>
-            <li>악기 주변기기 (기타 스탠드, 이펙터, 케이블)</li>
-            <li>감성 소품 (영문 서적, 음료 캔, 컵, 빨대)</li>
-          </ul>
-        </div>
-      </div>
-    </section>
+        <section>
+          <h2>의상 · HMU</h2>
+          <div class="packs">
+            <div>
+              <h3>의상</h3>
+              <p>연습실 OOTD · 오전/오후 룩 교체</p>
+            </div>
+            <div>
+              <h3>HMU</h3>
+              <p>셀프 풀메이크업 · 평소+약간 힘준</p>
+            </div>
+          </div>
+        </section>
 
-    <section class="block">
-      <h2 class="block-title">촬영 체크</h2>
-      <div class="check-grid">
-        <label class="check-item"><input type="checkbox" /> 음원 재생 · 싱크 테스트</label>
-        <label class="check-item"><input type="checkbox" /> 프리뷰 모니터 연결</label>
-        <label class="check-item"><input type="checkbox" /> 오전 룩 · 배경 A</label>
-        <label class="check-item"><input type="checkbox" /> 오후 룩 · 배경 B</label>
-        <label class="check-item"><input type="checkbox" /> 풀 곡 테이크 (와이드 / 미디엄 / 클로즈)</label>
-        <label class="check-item"><input type="checkbox" /> 인서트 · 소품 디테일</label>
-        <label class="check-item"><input type="checkbox" /> 카드 백업 (이중)</label>
-        <label class="check-item"><input type="checkbox" /> 철수 · 장비 점검</label>
-      </div>
-    </section>
+        <section>
+          <h2>소품</h2>
+          <div class="packs">
+            <div>
+              <h3>메인</h3>
+              <p>유선 마이크</p>
+            </div>
+            <div>
+              <h3>연출</h3>
+              <p>헤드폰 · 단스탠드·알전구 · 천·빈티지 포스터 · 악기 주변기기 · 서적·음료·컵</p>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
 
-    <footer class="sheet-footer">
+    <footer class="foot">
       <span>Mansejin Works · Tina Singer MV</span>
-      <span>PPM → <a href="../">index.html</a> · Call Sheet v1</span>
+      <span>v2 · one-page</span>
     </footer>
   </main>
 
