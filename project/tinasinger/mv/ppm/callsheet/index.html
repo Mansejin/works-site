@@ -16,71 +16,46 @@
   </div>
 
   <main class="page">
-    <header class="head">
-      <div class="head-left">
-        <p class="kicker">Call Sheet · Shoot Day 1</p>
+    <!-- Production header (field call sheet style) -->
+    <header class="banner">
+      <div class="banner-brand">
+        <span class="banner-label">CALL SHEET</span>
         <h1>Right Here, Right Now</h1>
-        <p class="sub">이겸비 · Tina Singer MV · 1회차</p>
+        <p class="banner-sub">Tina Singer MV · 이겸비</p>
       </div>
-      <dl class="meta">
-        <div><dt>일시</dt><dd>2026.07.25 (토)</dd></div>
-        <div><dt>장소</dt><dd>신촌 합주실</dd></div>
-        <div><dt>콜</dt><dd>10:00</dd></div>
-        <div><dt>랩</dt><dd>18:00</dd></div>
-      </dl>
+      <div class="banner-day">
+        <span class="day-num">1회차</span>
+        <span class="day-date">2026.07.25 (토)</span>
+      </div>
     </header>
 
-    <section class="crew">
-      <h2>스텝 명단</h2>
-      <table class="crew-table">
-        <thead>
-          <tr>
-            <th class="col-role">파트</th>
-            <th class="col-name">이름</th>
-            <th class="col-contact">연락처</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="role">연출</td>
-            <td class="name">오세진</td>
-            <td class="contact" contenteditable="true" data-ph="연락처"></td>
-          </tr>
-          <tr>
-            <td class="role">연출</td>
-            <td class="name">이동혁</td>
-            <td class="contact" contenteditable="true" data-ph="연락처"></td>
-          </tr>
-          <tr>
-            <td class="role">제작</td>
-            <td class="name">최유정</td>
-            <td class="contact" contenteditable="true" data-ph="연락처"></td>
-          </tr>
-          <tr>
-            <td class="role">촬영</td>
-            <td class="name">오세진</td>
-            <td class="contact" contenteditable="true" data-ph="연락처"></td>
-          </tr>
-          <tr>
-            <td class="role">아티스트</td>
-            <td class="name">이겸비</td>
-            <td class="contact" contenteditable="true" data-ph="연락처"></td>
-          </tr>
-          <tr>
-            <td class="role">매니지먼트</td>
-            <td class="name">윤백준</td>
-            <td class="contact" contenteditable="true" data-ph="연락처"></td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+    <table class="info-bar">
+      <tr>
+        <th>장소</th>
+        <td>신촌 합주실</td>
+        <th>General Call</th>
+        <td class="num">10:00</td>
+        <th>Est. Wrap</th>
+        <td class="num">18:00</td>
+      </tr>
+      <tr>
+        <th>레퍼런스</th>
+        <td>수스 「라이트 스위치」</td>
+        <th>톤</th>
+        <td colspan="3">코지 인디 · 연습실 OOTD · 연출 컷 + 원테이크</td>
+      </tr>
+    </table>
 
-    <div class="grid">
-      <section class="col timetable">
-        <h2>타임테이블</h2>
-        <table>
+    <div class="body">
+      <section class="main-col">
+        <h2>스케줄</h2>
+        <table class="schedule">
           <thead>
-            <tr><th>시간</th><th>블록</th><th>내용</th></tr>
+            <tr>
+              <th class="c-time">시간</th>
+              <th class="c-block">블록</th>
+              <th>내용</th>
+            </tr>
           </thead>
           <tbody>
             <tr>
@@ -121,7 +96,7 @@
           </tbody>
         </table>
 
-        <h2 class="mt">촬영 체크</h2>
+        <h2 class="sec">촬영 체크</h2>
         <div class="checks">
           <label><input type="checkbox" /> 음원·싱크</label>
           <label><input type="checkbox" /> 프리뷰 모니터</label>
@@ -132,73 +107,84 @@
           <label><input type="checkbox" /> 카드 이중 백업</label>
           <label><input type="checkbox" /> 철수·장비 점검</label>
         </div>
+
+        <h2 class="sec">스텝 명단</h2>
+        <table class="crew">
+          <thead>
+            <tr>
+              <th>파트</th>
+              <th>이름</th>
+              <th>연락처</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="role">연출</td>
+              <td>오세진</td>
+              <td class="contact" contenteditable="true" data-ph=""></td>
+            </tr>
+            <tr>
+              <td class="role">연출</td>
+              <td>이동혁</td>
+              <td class="contact" contenteditable="true" data-ph=""></td>
+            </tr>
+            <tr>
+              <td class="role">제작</td>
+              <td>최유정</td>
+              <td class="contact" contenteditable="true" data-ph=""></td>
+            </tr>
+            <tr>
+              <td class="role">촬영</td>
+              <td>오세진</td>
+              <td class="contact" contenteditable="true" data-ph=""></td>
+            </tr>
+            <tr>
+              <td class="role">아티스트</td>
+              <td>이겸비</td>
+              <td class="contact" contenteditable="true" data-ph=""></td>
+            </tr>
+            <tr>
+              <td class="role">매니지먼트</td>
+              <td>윤백준</td>
+              <td class="contact" contenteditable="true" data-ph=""></td>
+            </tr>
+          </tbody>
+        </table>
       </section>
 
-      <aside class="col side">
-        <section>
-          <h2>기본</h2>
-          <dl class="facts">
-            <div><dt>레퍼런스</dt><dd>수스 「라이트 스위치」</dd></div>
-            <div><dt>톤</dt><dd>코지 인디 · 연습실 OOTD</dd></div>
-            <div><dt>차수</dt><dd>합주실 연출·원테이크</dd></div>
-          </dl>
-        </section>
+      <aside class="side-col">
+        <h2>의상 · 헤어/메이크업</h2>
+        <table class="kv">
+          <tr><th>의상</th><td>연습실 OOTD · 오전/오후 룩 교체</td></tr>
+          <tr><th>헤어/메이크업</th><td>셀프 · 평소 + 약간 힘준</td></tr>
+        </table>
 
-        <section>
-          <h2>장비</h2>
-          <div class="packs">
-            <div>
-              <h3>카메라</h3>
-              <p>A7M5 · 20–50 · 50–150 · 가변 ND</p>
-            </div>
-            <div>
-              <h3>서포트</h3>
-              <p>프리뷰 모니터 · 트라이포드 · RS4 Mini</p>
-            </div>
-            <div>
-              <h3>조명</h3>
-              <p>L300 · 반사판</p>
-            </div>
-            <div>
-              <h3>제작</h3>
-              <p>스피커 · 릴선·멀티 · 가퍼 · 슬레이트용 태블릿</p>
-            </div>
-          </div>
-        </section>
+        <h2 class="sec">장비</h2>
+        <table class="kv">
+          <tr><th>카메라</th><td>A7M5 · 20–50 · 50–150 · 가변 ND</td></tr>
+          <tr><th>서포트</th><td>프리뷰 모니터 · 트라이포드 · RS4 Mini</td></tr>
+          <tr><th>조명</th><td>L300 · 반사판</td></tr>
+          <tr><th>제작</th><td>스피커 · 릴선·멀티 · 가퍼 · 슬레이트용 태블릿</td></tr>
+        </table>
 
-        <section>
-          <h2>의상 · 헤어/메이크업</h2>
-          <div class="packs">
-            <div>
-              <h3>의상</h3>
-              <p>연습실 OOTD · 오전/오후 룩 교체</p>
-            </div>
-            <div>
-              <h3>헤어/메이크업</h3>
-              <p>셀프 풀메이크업 · 평소+약간 힘준</p>
-            </div>
-          </div>
-        </section>
+        <h2 class="sec">소품</h2>
+        <table class="kv">
+          <tr><th>메인</th><td>유선 마이크</td></tr>
+          <tr><th>연출</th><td>헤드폰 · 단스탠드·알전구 · 천·빈티지 포스터 · 악기 주변기기 · 서적·음료·컵</td></tr>
+        </table>
 
-        <section>
-          <h2>소품</h2>
-          <div class="packs">
-            <div>
-              <h3>메인</h3>
-              <p>유선 마이크</p>
-            </div>
-            <div>
-              <h3>연출</h3>
-              <p>헤드폰 · 단스탠드·알전구 · 천·빈티지 포스터 · 악기 주변기기 · 서적·음료·컵</p>
-            </div>
-          </div>
-        </section>
+        <h2 class="sec">노트</h2>
+        <ul class="notes">
+          <li>1회차 · 합주실 연출 컷 + 원테이크(롱테이크)</li>
+          <li>음원 재생·싱크 테스트 후 본촬영</li>
+          <li>카드 이중 백업 필수</li>
+        </ul>
       </aside>
     </div>
 
     <footer class="foot">
       <span>Mansejin Works · Tina Singer MV</span>
-      <span>v3 · crew roster</span>
+      <span>Call Sheet · 1회차 · 2026.07.25</span>
     </footer>
   </main>
 
