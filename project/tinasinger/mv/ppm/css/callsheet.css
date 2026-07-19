@@ -169,7 +169,7 @@ a:hover {
 }
 
 .crew {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
@@ -186,29 +186,76 @@ a:hover {
   border-bottom: 1px solid var(--line);
 }
 
-.crew-list {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px 12px;
+.crew-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  table-layout: fixed;
 }
 
-.crew-list div {
-  min-width: 0;
+.crew-table th,
+.crew-table td {
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
 }
 
-.crew-list dt {
+.crew-table th {
   font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 1px;
+  background: var(--soft);
 }
 
-.crew-list dd {
-  font-size: 0.8rem;
+.crew-table .col-role {
+  width: 18%;
+}
+
+.crew-table .col-name {
+  width: 28%;
+}
+
+.crew-table .col-contact {
+  width: 54%;
+}
+
+.crew-table .role {
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.crew-table .name {
   font-weight: 650;
   color: var(--ink);
-  line-height: 1.3;
+}
+
+.crew-table .contact {
+  min-height: 1.4em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  cursor: text;
+  border-radius: 2px;
+}
+
+.crew-table .contact:empty::before {
+  content: attr(data-ph);
+  color: #b0b6be;
+  font-weight: 400;
+}
+
+.crew-table .contact:focus {
+  background: #fffdf5;
+  box-shadow: inset 0 0 0 1px #cfc7a8;
+}
+
+.crew-table tbody tr:last-child th,
+.crew-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .grid {
@@ -395,8 +442,16 @@ tr.break .b {
     text-align: left;
   }
 
-  .crew-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .crew-table .col-role {
+    width: 22%;
+  }
+
+  .crew-table .col-name {
+    width: 28%;
+  }
+
+  .crew-table .col-contact {
+    width: 50%;
   }
 
   .grid {
@@ -432,6 +487,15 @@ tr.break .b {
 
   .grid {
     gap: 10px 16px;
+  }
+
+  .crew-table .contact:empty::before {
+    content: "";
+  }
+
+  .crew-table .contact {
+    border-bottom: 1px solid #ccc;
+    min-height: 1.1em;
   }
 
   a {
