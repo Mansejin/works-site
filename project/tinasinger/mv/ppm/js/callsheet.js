@@ -19,6 +19,7 @@
   const defaults = collectFields();
   let editMode = sessionStorage.getItem(EDIT_AUTH_KEY) === "1";
   let saveTimer = null;
+  let flashTimer = null;
 
   async function sha256(text) {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
@@ -63,13 +64,20 @@
     flashSaved();
   }
 
+  function schedulePersist() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      persistFields();
+    }, 120);
+  }
+
   function flashSaved() {
     if (!saveStatusEl || !editMode) return;
     saveStatusEl.hidden = false;
     saveStatusEl.textContent = "저장됨";
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      saveStatusEl.textContent = "";
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      if (saveStatusEl) saveStatusEl.textContent = "";
     }, 1200);
   }
 
@@ -184,7 +192,15 @@
       persistChecks();
       return;
     }
-    if (editMode && t.matches(".cs-edit")) {
+    if (editMode && t.closest(".cs-edit")) {
+      schedulePersist();
+    }
+  });
+
+  document.addEventListener("focusout", (e) => {
+    if (!editMode) return;
+    const t = e.target;
+    if (t instanceof HTMLElement && t.closest(".cs-edit")) {
       persistFields();
     }
   });

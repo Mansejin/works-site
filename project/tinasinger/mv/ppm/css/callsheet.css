@@ -149,15 +149,6 @@ body.is-edit-mode .cs-edit:focus {
   box-shadow: inset 0 0 0 1px var(--focus-ring);
 }
 
-body.is-edit-mode {
-  overflow: auto;
-}
-
-body.is-edit-mode .page {
-  height: auto;
-  max-height: none;
-}
-
 /* —— Edit modal —— */
 .edit-modal {
   position: fixed;
@@ -228,9 +219,9 @@ body.is-edit-mode .page {
 }
 
 .page {
-  width: min(920px, calc(100% - 24px));
-  margin: 14px auto 18px;
-  padding: 20px 22px 14px;
+  width: min(1120px, calc(100% - 12px));
+  margin: 10px auto 14px;
+  padding: 16px 18px 12px;
   background: var(--page);
   border: 1px solid rgba(26, 29, 34, 0.1);
   border-radius: 10px;
@@ -251,23 +242,7 @@ body.is-edit-mode .page {
   }
 }
 
-@media (min-width: 860px) and (min-height: 760px) {
-  body {
-    overflow: hidden;
-  }
-
-  .page {
-    height: calc(100dvh - 40px - 28px);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .body {
-    flex: 1;
-    min-height: 0;
-  }
-}
+/* Do not lock page to viewport height — that clips the crew roster/footer */
 
 /* —— Banner —— */
 .banner {
@@ -647,23 +622,19 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 12px;
-  padding-top: 8px;
+  margin-top: 14px;
+  padding-top: 10px;
   border-top: 1px solid var(--rule);
   font-size: 0.62rem;
   color: var(--muted);
+  flex-shrink: 0;
 }
 
 @media (max-width: 860px) {
-  body {
-    overflow: auto;
-  }
-
   .page {
-    height: auto;
-    margin: 10px auto 24px;
-    padding: 16px 14px 12px;
-    animation: none;
+    margin: 8px auto 20px;
+    padding: 14px 12px 10px;
+    width: calc(100% - 8px);
   }
 
   .banner {
@@ -705,7 +676,7 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
 
 @media print {
   @page {
-    size: A4;
+    size: A4 landscape;
     margin: 8mm;
   }
 
@@ -720,6 +691,7 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
 
   .page {
     width: 100%;
+    max-width: none;
     height: auto;
     margin: 0;
     padding: 0;
@@ -727,6 +699,11 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
     border-radius: 0;
     box-shadow: none;
     animation: none;
+  }
+
+  .body {
+    grid-template-columns: 1.35fr 1fr;
+    gap: 10px 14px;
   }
 
   .banner-day,
@@ -759,6 +736,11 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
 
   .schedule tbody tr:hover td {
     background: transparent;
+  }
+
+  .foot {
+    margin-top: 10px;
+    padding-top: 8px;
   }
 
   a {
