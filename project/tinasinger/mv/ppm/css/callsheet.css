@@ -417,6 +417,7 @@ h2 {
 /* —— Schedule —— */
 .schedule {
   font-size: 0.76rem;
+  table-layout: fixed;
 }
 
 .schedule th,
@@ -432,15 +433,15 @@ h2 {
 }
 
 .schedule .c-time {
-  width: 6.6em;
+  width: 6.4em;
 }
 
 .schedule .c-block {
-  width: 5.8em;
+  width: 5.6em;
 }
 
 .schedule .c-place {
-  width: 6.5em;
+  width: 18%;
 }
 
 .schedule .c-actions {
@@ -459,17 +460,27 @@ h2 {
 
 .schedule .b {
   font-weight: 650;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .schedule .p {
   font-weight: 550;
   color: #3a414a;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  line-height: 1.3;
 }
 
 .schedule td[data-field="detail"] {
   color: #3a414a;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  line-height: 1.35;
+  min-width: 0;
 }
 
 .schedule tbody tr:hover td {
@@ -729,6 +740,28 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
 
   .body {
     grid-template-columns: 1fr;
+  }
+
+  .schedule-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .schedule {
+    min-width: 520px;
+  }
+
+  .schedule .c-time {
+    width: 5.8em;
+  }
+
+  .schedule .c-block {
+    width: 5em;
+  }
+
+  .schedule .c-place {
+    width: 22%;
   }
 }
 
