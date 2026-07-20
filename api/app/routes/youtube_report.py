@@ -441,6 +441,15 @@ def _short_video_label(title: str, video_id: str, promotions: list[dict[str, Any
     return compact[:14] + "…" if len(compact) > 14 else compact
 
 
+def _is_shorts_video(video: dict[str, Any]) -> bool:
+    duration = _parse_int(video.get("durationSec"))
+    return duration > 0 and duration <= 60
+
+
+def _longform_videos(videos: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [video for video in videos if not _is_shorts_video(video)]
+
+
 def _build_recent_videos_bar(
     videos: list[dict[str, Any]],
     promotions: list[dict[str, Any]],
@@ -449,7 +458,7 @@ def _build_recent_videos_bar(
     ad_views_map: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for video in videos[:limit]:
+    for video in _longform_videos(videos)[:limit]:
         title = str(video.get("title") or "")
         video_id = str(video.get("id") or "")
         views = _parse_int(video.get("views"))
@@ -637,7 +646,9 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             )
             api_connections.append({"name": "YouTube Studio API", "status": "미설정"})
 
-        recent_video_ids = [str(v.get("id") or "") for v in videos[:4] if v.get("id")]
+        recent_video_ids = [
+            str(v.get("id") or "") for v in _longform_videos(videos)[:4] if v.get("id")
+        ]
         ad_views_map = await fetch_videos_advertising_views(recent_video_ids, refresh=refresh)
 
         if analytics_overview.get("ok"):
