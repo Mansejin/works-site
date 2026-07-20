@@ -1802,8 +1802,13 @@
     }
   }
 
-  function modalChartHeight(labelCount, chartType) {
-    if (chartType === "doughnut" || chartType === "pie") return Math.min(128, Math.max(108, labelCount * 12 + 68));
+  function modalChartHeight(labelCount, chartType, circularSize = "panel") {
+    if (chartType === "doughnut" || chartType === "pie") {
+      if (circularSize === "compact") {
+        return Math.min(150, Math.max(132, labelCount * 10 + 96));
+      }
+      return Math.min(260, Math.max(200, labelCount * 14 + 150));
+    }
     return Math.min(160, Math.max(52, labelCount * 28 + 16));
   }
 
@@ -1812,9 +1817,10 @@
     destroyModalChart(key);
     const horizontal = options.horizontal || (chartType === "bar" && labels.length <= 6);
     const isCircular = chartType === "doughnut" || chartType === "pie";
-    const height = modalChartHeight(labels.length, chartType);
+    const circularSize = options.circularSize || "panel";
+    const height = modalChartHeight(labels.length, chartType, circularSize);
     const chartClass = isCircular
-      ? "video-modal-chart short pie-chart"
+      ? `video-modal-chart circular-${circularSize}`
       : height <= 72
         ? "video-modal-chart compact"
         : "video-modal-chart short";
@@ -1833,6 +1839,8 @@
       borderWidth: horizontal ? 1 : undefined,
       barThickness: horizontal ? Math.min(18, Math.max(10, Math.floor(height / Math.max(labels.length, 1)) - 6)) : undefined,
     };
+    const legendPosition =
+      isCircular && circularSize === "panel" && labels.length > 4 ? "right" : "bottom";
     modalCharts[key] = new Chart(canvas, {
       type: chartType,
       data: { labels, datasets: [dataset] },
@@ -1840,14 +1848,18 @@
         responsive: true,
         maintainAspectRatio: false,
         indexAxis: horizontal ? "y" : "x",
-        radius: isCircular ? "58%" : undefined,
-        layout: isCircular ? { padding: { top: 2, bottom: 0, left: 2, right: 2 } } : undefined,
+        radius: isCircular ? (circularSize === "compact" ? "62%" : "74%") : undefined,
+        layout: isCircular ? { padding: { top: 4, bottom: 2, left: 2, right: 2 } } : undefined,
         plugins: {
           legend: isCircular
             ? {
                 display: true,
-                position: "bottom",
-                labels: { boxWidth: 8, padding: 4, font: { size: 9 } },
+                position: legendPosition,
+                labels: {
+                  boxWidth: circularSize === "compact" ? 8 : 10,
+                  padding: circularSize === "compact" ? 4 : 6,
+                  font: { size: circularSize === "compact" ? 9 : 10 },
+                },
               }
             : { display: false },
         },
@@ -2007,7 +2019,8 @@
             "traffic",
             "doughnut",
             trafficRows.map((row) => trafficLabel(row.source, row.label)),
-            trafficRows.map((row) => Number(row.views) || 0)
+            trafficRows.map((row) => Number(row.views) || 0),
+            { circularSize: "panel" }
           );
           if (tableHost) {
             tableHost.innerHTML = renderModalTableRows(trafficRows, [
@@ -2053,7 +2066,8 @@
             "audience",
             "doughnut",
             audienceRows.map((row) => row.label || row.status || "—"),
-            audienceRows.map((row) => Number(row.views) || 0)
+            audienceRows.map((row) => Number(row.views) || 0),
+            { circularSize: "panel" }
           );
           if (tableHost) {
             tableHost.innerHTML = renderModalTableRows(audienceRows, [
@@ -2121,7 +2135,8 @@
             "gender",
             "pie",
             genderRows.map((row) => GENDER_LABELS[row.gender] || row.gender || "—"),
-            genderRows.map((row) => Number(row.viewerPercentage) || 0)
+            genderRows.map((row) => Number(row.viewerPercentage) || 0),
+            { circularSize: "compact" }
           );
           if (tableHost) {
             tableHost.innerHTML = renderModalTableRows(genderRows, [
