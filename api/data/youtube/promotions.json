@@ -3,6 +3,44 @@
   "issues": [],
   "promotions": [
     {
+      "id": "lumena-objet-subs",
+      "title": "루메나 오브제 제습기 (구독)",
+      "videoTitle": "10만 원 대 예쁜 제습기? 루메나 오브제 제습기 솔직 리뷰",
+      "videoId": "",
+      "status": "대기중",
+      "goal": "시청자층 성장",
+      "budget": 170000,
+      "cost": 0,
+      "impressions": 0,
+      "views": 0,
+      "subscribers": 0,
+      "followOnViews": 0,
+      "source": "manual",
+      "notes": [
+        "Studio 캡처 2026-07-20",
+        "대기 중"
+      ]
+    },
+    {
+      "id": "lumena-objet-views",
+      "title": "루메나 오브제 제습기 (조회수)",
+      "videoTitle": "10만 원 대 예쁜 제습기? 루메나 오브제 제습기 솔직 리뷰",
+      "videoId": "",
+      "status": "대기중",
+      "goal": "동영상 조회수",
+      "budget": 90000,
+      "cost": 0,
+      "impressions": 0,
+      "views": 0,
+      "subscribers": 0,
+      "followOnViews": 0,
+      "source": "manual",
+      "notes": [
+        "Studio 캡처 2026-07-20",
+        "대기 중"
+      ]
+    },
+    {
       "id": "dreame-mf10-subs",
       "title": "드리미 MF10 (구독)",
       "videoTitle": "다이슨이 긴장해야 할까? 드리미 MF10 직접 써봤습니다 #드리미 #MF10 #선풍기 #블레이드리스선풍기",
@@ -15,7 +53,11 @@
       "subscribers": 368,
       "followOnViews": 8,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "활성"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "활성"
+      ],
+      "budget": 170000
     },
     {
       "id": "redmi-pad2-subs",
@@ -26,11 +68,15 @@
       "goal": "시청자층 성장",
       "cost": 158760,
       "impressions": 87463,
-      "views": 1197,
+      "views": 1300,
       "subscribers": 597,
       "followOnViews": 2,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "활성"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "활성"
+      ],
+      "budget": 170000
     },
     {
       "id": "lenovo-ideatab11-subs",
@@ -39,13 +85,17 @@
       "videoId": "",
       "status": "진행중",
       "goal": "시청자층 성장",
-      "cost": 68307,
-      "impressions": 51542,
-      "views": 476,
-      "subscribers": 196,
+      "cost": 44435,
+      "impressions": 23905,
+      "views": 298,
+      "subscribers": 125,
       "followOnViews": 1,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "활성 · 구독 캠페인"]
+      "notes": [
+        "Studio 캡처 2026-07-14",
+        "활성 · 구독 캠페인"
+      ],
+      "budget": 170000
     },
     {
       "id": "lenovo-ideatab11-views",
@@ -60,7 +110,11 @@
       "subscribers": 0,
       "followOnViews": 0,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "활성"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "활성"
+      ],
+      "budget": 90000
     },
     {
       "id": "dreame-mf10-views",
@@ -75,7 +129,11 @@
       "subscribers": 0,
       "followOnViews": 0,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "활성"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "활성"
+      ],
+      "budget": 90000
     },
     {
       "id": "logitech-mobifold-subs",
@@ -90,7 +148,11 @@
       "subscribers": 602,
       "followOnViews": 22,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 170000
     },
     {
       "id": "lyfen-p3-t1-pro-subs",
@@ -105,7 +167,11 @@
       "subscribers": 568,
       "followOnViews": 11,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 170000
     },
     {
       "id": "ikko-mindone-pro-subs",
@@ -120,7 +186,11 @@
       "subscribers": 633,
       "followOnViews": 7,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 170000
     },
     {
       "id": "shokz-openfit-subs",
@@ -135,7 +205,11 @@
       "subscribers": 588,
       "followOnViews": 7,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 170000
     },
     {
       "id": "muji-best11-subs",
@@ -150,7 +224,11 @@
       "subscribers": 609,
       "followOnViews": 12,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 170000
     },
     {
       "id": "abko-af108pro-subs",
@@ -165,7 +243,11 @@
       "subscribers": 561,
       "followOnViews": 18,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 170000
     },
     {
       "id": "daiso-fan-subs",
@@ -180,7 +262,11 @@
       "subscribers": 579,
       "followOnViews": 19,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 170000
     },
     {
       "id": "garmin-165-subs",
@@ -195,7 +281,11 @@
       "subscribers": 493,
       "followOnViews": 19,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 170000
     },
     {
       "id": "air-purifier-subs",
@@ -210,7 +300,11 @@
       "subscribers": 470,
       "followOnViews": 24,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 170000
     },
     {
       "id": "daiso-deskterior-subs",
@@ -225,7 +319,11 @@
       "subscribers": 142,
       "followOnViews": 5,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 170000
     },
     {
       "id": "shokz-openfit-views",
@@ -240,7 +338,11 @@
       "subscribers": 0,
       "followOnViews": 0,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 90000
     },
     {
       "id": "abko-af108pro-views",
@@ -255,7 +357,11 @@
       "subscribers": 1,
       "followOnViews": 0,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 90000
     },
     {
       "id": "ipad-homescreen-views",
@@ -270,7 +376,11 @@
       "subscribers": 4,
       "followOnViews": 0,
       "source": "manual",
-      "notes": ["Studio 캡처 2026-07-16", "종료"]
+      "notes": [
+        "Studio 캡처 2026-07-16",
+        "종료"
+      ],
+      "budget": 90000
     }
   ]
 }

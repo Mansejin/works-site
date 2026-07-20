@@ -24,6 +24,7 @@ from app.youtube_analytics import (
     fetch_retention,
     fetch_traffic_sources,
     fetch_video_detail_analytics,
+    fetch_videos_advertising_views,
 )
 from app.youtube_report_store import (
     read_merged_promotions,
@@ -218,6 +219,15 @@ def _promotion_metrics(promo: dict[str, Any]) -> dict[str, Any]:
             efficiency_rating = "효율 낮음"
             efficiency += " · 효율 낮음"
 
+    manual_rating = str(promo.get("efficiencyRating") or "").strip()
+    if manual_rating:
+        efficiency_rating = manual_rating
+
+    budget_default = 170_000 if group == "subscribe" else 90_000 if group == "views" else None
+    budget = promo.get("budget")
+    if budget is None or budget == "":
+        budget = budget_default
+
     return {
         "cpv": cpv,
         "cps": cps,
@@ -227,6 +237,8 @@ def _promotion_metrics(promo: dict[str, Any]) -> dict[str, Any]:
         "goalGroup": group,
         "efficiencyText": efficiency,
         "efficiencyRating": efficiency_rating,
+        "budgetDefault": budget_default,
+        "budget": budget,
     }
 
 
@@ -429,18 +441,35 @@ def _short_video_label(title: str, video_id: str, promotions: list[dict[str, Any
     return compact[:14] + "…" if len(compact) > 14 else compact
 
 
+def _is_shorts_video(video: dict[str, Any]) -> bool:
+    duration = _parse_int(video.get("durationSec"))
+    return duration > 0 and duration <= 60
+
+
+def _longform_videos(videos: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [video for video in videos if not _is_shorts_video(video)]
+
+
 def _build_recent_videos_bar(
     videos: list[dict[str, Any]],
     promotions: list[dict[str, Any]],
     *,
     limit: int = 4,
+    ad_views_map: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for video in videos[:limit]:
+    for video in _longform_videos(videos)[:limit]:
         title = str(video.get("title") or "")
         video_id = str(video.get("id") or "")
         views = _parse_int(video.get("views"))
-        ad_views = min(views, _ad_views_for_video(title, video_id, promotions))
+        promo_ad = _ad_views_for_video(title, video_id, promotions)
+        analytics_ad = (ad_views_map or {}).get(video_id)
+        if analytics_ad is not None and analytics_ad > 0:
+            ad_views = min(views, analytics_ad)
+            ad_source = "analytics"
+        else:
+            ad_views = min(views, promo_ad)
+            ad_source = "promo" if promo_ad > 0 else "none"
         rows.append(
             {
                 "title": title,
@@ -448,6 +477,7 @@ def _build_recent_videos_bar(
                 "views": views,
                 "adViews": ad_views,
                 "organicViews": max(0, views - ad_views),
+                "adViewsSource": ad_source,
             }
         )
     return rows
@@ -489,9 +519,9 @@ def _build_subscriber_trend(
         )
 
     if analytics and analytics.get("ok"):
-        note = "회색=자연 증가(추정), 빨강=총 구독자. Analytics 연동됨 — 주간 스냅샷은 하단 JSON에서 편집."
+        note = ""
     else:
-        note = "회색=자연 증가(수동 입력·추정), 빨강=총 구독자. OAuth 연동 시 상단 Analytics와 함께 활용."
+        note = "주간 스냅샷 데이터 기준 추정치입니다."
 
     return {
         "points": points,
@@ -584,27 +614,42 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
         limitations = [
             "YouTube Data API: 조회수·구독자·영상 목록 (현재 지원)",
         ]
+        api_connections = [
+            {"name": "YouTube Data API", "status": "연동됨"},
+        ]
         if youtube_analytics_oauth_config():
             limitations.append("YouTube Analytics API (OAuth): 유입·시청 유지·인구통계 (연동됨)")
             limitations.append(_reporting_limitation_line(analytics_overview))
+            api_connections.append({"name": "YouTube Analytics API", "status": "연동됨"})
         else:
             limitations.append("YouTube Analytics API (OAuth): NAS .env에 OAuth 토큰 설정 필요")
+            api_connections.append({"name": "YouTube Analytics API", "status": "미설정"})
         if google_ads_sync_enabled() and google_ads_config():
             limitations.append("Google Ads API: 프로모션 비용·노출 동기화 (연동됨)")
+            api_connections.append({"name": "Google Ads API", "status": "연동됨"})
         else:
             limitations.append(
                 "Google Ads API: 동기화 꺼짐 — YouTube Studio 프로모션은 Studio 캡처/수동 입력"
             )
+            api_connections.append({"name": "Google Ads API", "status": "동기화 꺼짐"})
         studio_status = get_studio_promo_status()
         if studio_status.get("ready"):
             when = studio_status.get("lastSync") or "미동기화"
             limitations.append(f"YouTube Studio 내부 API: 프로모션 동기화 준비됨 (lastSync={when})")
+            api_connections.append({"name": "YouTube Studio API", "status": "준비됨"})
         elif studio_status.get("cookiesConfigured") or studio_status.get("captureConfigured"):
             limitations.append("YouTube Studio 내부 API: 캡처/쿠키 일부 설정됨 — Studio 동기화 버튼으로 실행")
+            api_connections.append({"name": "YouTube Studio API", "status": "부분 설정"})
         else:
             limitations.append(
                 "YouTube Studio 내부 API: 프로모션 탭 Copy as cURL 저장 후 자동 동기화 가능"
             )
+            api_connections.append({"name": "YouTube Studio API", "status": "미설정"})
+
+        recent_video_ids = [
+            str(v.get("id") or "") for v in _longform_videos(videos)[:4] if v.get("id")
+        ]
+        ad_views_map = await fetch_videos_advertising_views(recent_video_ids, refresh=refresh)
 
         if analytics_overview.get("ok"):
             for video in videos:
@@ -633,7 +678,7 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
                 "recentAvgViews": f"~{int(recent_avg):,}" if recent_avg else "—",
                 "recentAvgViewsRaw": int(recent_avg),
             },
-            "recentVideosBar": _build_recent_videos_bar(videos, promotions),
+            "recentVideosBar": _build_recent_videos_bar(videos, promotions, ad_views_map=ad_views_map),
             "viewsTrend7d": snapshots_data.get("viewsTrend7d") or [],
             "viewsTrendNote": views_trend_note,
             "subscriberTrend": _build_subscriber_trend(
@@ -648,6 +693,7 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             "adsSync": ads_status,
             "studioPromoSync": studio_status,
             "limitations": limitations,
+            "apiConnections": api_connections,
         }
         _cache_set(cache_key, payload)
         _cache_set("videos", {"ok": True, "videos": videos, "generatedAt": payload["generatedAt"]})

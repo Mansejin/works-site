@@ -60,6 +60,24 @@
   let retentionPickerOutsideHandler = null;
   let subscriberPollTimer = null;
   let videoModalRetentionChart = null;
+  let apiConnections = [];
+  const modalCharts = {};
+  const EFFICIENCY_OPTIONS = ["효율 매우 좋음", "효율 좋음", "효율 보통", "효율 낮음", "—"];
+  const MODAL_LOADING_HTML =
+    '<div class="modal-loading" aria-busy="true"><div class="modal-loading-bar"></div><div class="modal-loading-bar" style="width:78%"></div><div class="modal-loading-bar" style="width:52%"></div><p class="video-note modal-loading-label" style="margin:0;">Analytics API 호출 중…</p></div>';
+  const REACH_FUNNEL_TITLE = "노출수 및 이에 따른 시청 시간";
+  const BLOCK_HELP = {
+    traffic:
+      "채널 전체 조회가 어디서 유입됐는지 보여줍니다. 검색·추천·광고·Shorts 피드 비중을 보고 다음 콘텐츠 배포 전략을 정합니다.",
+    retention:
+      "영상 시청 유지 곡선입니다. 초반 이탈이 큰지, 중후반까지 몰입이 유지되는지 비교해 편집·챕터 구성을 점검합니다.",
+    age: "28일 기준 시청자 연령 분포입니다. 타깃 연령과 실제 시청층이 맞는지 확인합니다.",
+    gender: "28일 기준 시청자 성별 비율입니다. 썸네일·톤이 주 시청층과 맞는지 참고합니다.",
+    "recent-videos":
+      "최근 업로드 롱폼 4개의 조회 구성입니다(쇼츠 제외). 빨강은 YouTube Analytics 광고 유입(또는 프로모션 수치), 회색은 자연 조회입니다.",
+    subscribers:
+      "주간 스냅샷 기준 총 구독자(빨강)와 자연 증가 추정치(회색)입니다. 프로모션 구독 기여는 스냅샷·프로모션 데이터로 분리됩니다.",
+  };
 
   const TRAFFIC_LABELS = {
     ADVERTISING: "광고",
@@ -76,7 +94,8 @@
     PRODUCT_PAGE: "상품",
     PROMOTED: "프로모션",
     RELATED_VIDEO: "관련 영상",
-    SHORTS: "Shorts",
+    SHORTS: "Shorts 피드",
+    SHORTS_CONTENT_LINKS: "쇼츠 링크",
     SOUND_PAGE: "사운드",
     SUBSCRIBER: "구독자",
     YT_CHANNEL: "채널",
@@ -223,7 +242,7 @@
   function setStatus(text, kind) {
     if (!els.status) return;
     els.status.textContent = text;
-    els.status.className = "status-pill" + (kind ? ` ${kind}` : "");
+    els.status.className = "report-status-line" + (kind ? ` ${kind}` : "");
   }
 
   function showError(message) {
@@ -354,19 +373,20 @@
     });
   }
 
-  async function loadAnalyticsExtras(refresh) {
+  async function loadAnalyticsExtras(refresh, onStep) {
     const q = refresh ? "?refresh=1" : "";
-    const [traffic, retention, demographics] = await Promise.all([
-      apiGet(`/api/dddit/youtube/report/traffic-sources${q}`).catch(() => null),
-      apiGet(`/api/dddit/youtube/report/retention${q}`).catch(() => null),
-      apiGet(`/api/dddit/youtube/report/demographics${q}`).catch(() => null),
-    ]);
+    onStep?.("유입 경로 (Analytics API)");
+    const traffic = await apiGet(`/api/dddit/youtube/report/traffic-sources${q}`).catch(() => null);
+    onStep?.("시청 유지 (Analytics API)");
+    const retention = await apiGet(`/api/dddit/youtube/report/retention${q}`).catch(() => null);
+    onStep?.("연령·성별 (Analytics API)");
+    const demographics = await apiGet(`/api/dddit/youtube/report/demographics${q}`).catch(() => null);
     return { traffic, retention, demographics };
   }
 
   function renderKpis(kpis, subscriberRaw) {
     const items = [
-      { label: "구독자 수", value: kpis.subscribers, id: "kpi-subscribers", live: true },
+      { label: "구독자 수", value: kpis.subscribers, id: "kpi-subscribers" },
       { label: "총 영상 수", value: kpis.videoCount },
       { label: "최고 조회수 (최근)", value: kpis.topViews },
       { label: "최근 평균 조회수", value: kpis.recentAvgViews },
@@ -377,7 +397,6 @@
       <div class="kpi"${item.id ? ` id="${esc(item.id)}"` : ""}>
         <div class="kpi-label">${esc(item.label)}</div>
         <div class="kpi-value">${esc(item.value)}</div>
-        ${item.live ? '<div class="kpi-live-delta">실시간 갱신 중</div>' : ""}
       </div>`
       )
       .join("");
@@ -397,22 +416,10 @@
     const card = document.getElementById("kpi-subscribers");
     if (!card) return;
     const valueEl = card.querySelector(".kpi-value");
-    const deltaEl = card.querySelector(".kpi-live-delta");
     if (valueEl && countText && valueEl.textContent !== countText) {
       card.classList.add("pulse-update");
       window.setTimeout(() => card.classList.remove("pulse-update"), 700);
       valueEl.textContent = countText;
-    }
-    if (!deltaEl) return;
-    if (deltaSinceLoad > 0) {
-      deltaEl.textContent = `+${formatNum(deltaSinceLoad)} (페이지 로드 이후)`;
-      deltaEl.className = "kpi-live-delta";
-    } else if (deltaSinceLoad < 0) {
-      deltaEl.textContent = `${formatNum(deltaSinceLoad)} (페이지 로드 이후)`;
-      deltaEl.className = "kpi-live-delta down";
-    } else {
-      deltaEl.textContent = "실시간 갱신 중";
-      deltaEl.className = "kpi-live-delta";
     }
   }
 
@@ -580,11 +587,8 @@
         },
       },
     });
-    if (els.subscriberNote && trend.note) {
-      els.subscriberNote.textContent = `${trend.note} 구독자 수 KPI는 90초마다 YouTube API로 갱신됩니다 (완전 실시간 아님).`;
-    } else if (els.subscriberNote) {
-      els.subscriberNote.textContent =
-        "구독자 수 KPI는 90초마다 YouTube API로 갱신됩니다 (완전 실시간 아님).";
+    if (els.subscriberNote) {
+      els.subscriberNote.textContent = trend?.note || "";
     }
   }
 
@@ -872,21 +876,28 @@
     }
   }
 
+  function defaultRetentionIds(format) {
+    const catalog = retentionCatalog(format);
+    if (!catalog.length) return [];
+    const topId = [...catalog].sort((a, b) => (Number(b.views) || 0) - (Number(a.views) || 0))[0]?.id;
+    const recentIds = [...catalog]
+      .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0))
+      .slice(0, 2)
+      .map((video) => video.id);
+    return [...new Set([topId, ...recentIds].filter(Boolean))].slice(0, 3);
+  }
+
   function retentionSelectedFor(format, series) {
     let available = (series || []).map((item) => item.videoId).filter(Boolean);
     if (!available.length && allReportVideos.length) {
-      available = allReportVideos
-        .filter((video) => {
-          if (format === "shorts") return isShortsVideo(video);
-          if (format === "longform") return !isShortsVideo(video);
-          return true;
-        })
-        .slice(0, 6)
-        .map((video) => video.id);
+      available = retentionCatalog(format).map((video) => video.id);
     }
     let selected = retentionSelectedIds[format];
     if (!selected || !selected.length) {
-      selected = available.slice(0, Math.min(3, available.length));
+      selected = defaultRetentionIds(format);
+      if (!selected.length) {
+        selected = available.slice(0, Math.min(3, available.length));
+      }
       retentionSelectedIds[format] = selected;
     }
     const filtered = selected.filter((id) => available.includes(id) || allReportVideos.some((v) => v.id === id));
@@ -1426,28 +1437,34 @@
     });
   }
 
-  function renderPromoPagination(total, page) {
-    if (!els.promoPagination) return;
-    const pages = Math.max(1, Math.ceil(total / PROMO_PAGE_SIZE));
-    if (total <= PROMO_PAGE_SIZE) {
-      els.promoPagination.innerHTML = "";
-      els.promoPagination.classList.add("hidden");
+  function renderPageControls(container, page, pages, onChange) {
+    if (!container) return;
+    if (pages <= 1) {
+      container.innerHTML = "";
+      container.classList.add("hidden");
       return;
     }
-    els.promoPagination.classList.remove("hidden");
-    const start = page * PROMO_PAGE_SIZE + 1;
-    const end = Math.min(total, (page + 1) * PROMO_PAGE_SIZE);
-    els.promoPagination.innerHTML = `
+    container.classList.remove("hidden");
+    container.innerHTML = `
       <button type="button" class="btn btn-ghost promo-page-btn" data-dir="prev" ${page <= 0 ? "disabled" : ""}>이전</button>
-      <span class="promo-page-info">${start}–${end} / ${total} · ${page + 1}/${pages}</span>
+      <span class="promo-page-info">${page + 1}/${pages}</span>
       <button type="button" class="btn btn-ghost promo-page-btn" data-dir="next" ${page >= pages - 1 ? "disabled" : ""}>다음</button>`;
-    els.promoPagination.querySelectorAll(".promo-page-btn").forEach((btn) => {
+    container.querySelectorAll(".promo-page-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const dir = btn.getAttribute("data-dir");
-        if (dir === "prev" && promoPage > 0) promoPage -= 1;
-        if (dir === "next" && promoPage < pages - 1) promoPage += 1;
-        renderPromotions(allPromotions);
+        let next = page;
+        if (dir === "prev" && page > 0) next = page - 1;
+        if (dir === "next" && page < pages - 1) next = page + 1;
+        onChange(next);
       });
+    });
+  }
+
+  function renderPromoPagination(total, page) {
+    const pages = Math.max(1, Math.ceil(total / PROMO_PAGE_SIZE));
+    renderPageControls(els.promoPagination, page, pages, (next) => {
+      promoPage = next;
+      renderPromotions(allPromotions);
     });
   }
 
@@ -1489,14 +1506,12 @@
         : statusLabel === "진행중" || /ACTIVE/i.test(statusLabel)
           ? " active"
           : "";
-    const budget =
-      p.budget != null && p.budget !== ""
-        ? formatWon(p.budget)
-        : "—";
+    const budget = p.budget != null && p.budget !== "" ? formatWon(p.budget) : formatWon(m.budget);
+    const rating = p.efficiencyRating || m.efficiencyRating || "—";
     const cpvCell = group === "subscribe" ? "—" : m.cpv != null ? `${formatNum(m.cpv)}원` : "—";
     const cpsCell = m.cps != null ? `${formatNum(m.cps)}원` : "—";
     return `
-      <tr>
+      <tr data-promo-id="${esc(p.id)}">
         <td class="promo-name-cell">
           <strong>${esc(p.title)}</strong><span class="badge${statusClass}">${esc(statusLabel)}</span>${sourceBadge(p.source)}
         </td>
@@ -1507,8 +1522,44 @@
         <td>${formatNum(p.subscribers)}</td>
         <td>${cpvCell}</td>
         <td>${cpsCell}</td>
-        <td class="${effClass}">${esc(m.efficiencyRating || m.efficiencyText || "—")}</td>
+        <td class="${effClass}">
+          <select class="efficiency-select" data-promo-id="${esc(p.id)}" aria-label="효율 등급">
+            ${EFFICIENCY_OPTIONS.map(
+              (opt) =>
+                `<option value="${esc(opt)}"${opt === rating ? " selected" : ""}>${esc(opt)}</option>`
+            ).join("")}
+          </select>
+        </td>
       </tr>`;
+  }
+
+  async function savePromoEfficiency(promoId, rating) {
+    const current = await apiGet("/api/dddit/youtube/report/promotions", { timeoutMs: 15_000 });
+    const promotions = (current.promotions || []).map((promo) =>
+      promo.id === promoId ? { ...promo, efficiencyRating: rating } : promo
+    );
+    await apiPut("/api/dddit/youtube/report/promotions", {
+      promotions,
+      memo: current.memo || "",
+      issues: [],
+    });
+    allPromotions = promotions;
+  }
+
+  function bindPromoEfficiencyEditors() {
+    els.promoBody?.querySelectorAll(".efficiency-select").forEach((select) => {
+      select.addEventListener("change", async () => {
+        const promoId = select.getAttribute("data-promo-id");
+        if (!promoId) return;
+        try {
+          await savePromoEfficiency(promoId, select.value);
+          select.classList.add("ok-flash");
+          window.setTimeout(() => select.classList.remove("ok-flash"), 600);
+        } catch (err) {
+          alert(err.message || "효율 저장 실패");
+        }
+      });
+    });
   }
 
   function renderPromotions(promotions) {
@@ -1548,6 +1599,7 @@
     });
     els.promoBody.innerHTML = rows.join("");
     renderPromoPagination(flat.length, promoPage);
+    bindPromoEfficiencyEditors();
   }
 
   function isShortsVideo(video) {
@@ -1605,6 +1657,7 @@
     if (!modal) return;
     modal.hidden = true;
     document.body.classList.remove("video-modal-open");
+    Object.keys(modalCharts).forEach((key) => destroyModalChart(key));
     if (videoModalRetentionChart) {
       try {
         videoModalRetentionChart.destroy();
@@ -1648,11 +1701,63 @@
     const views = funnel.views;
     const watch = funnel.watchMinutes;
     if (!impressions && !views && !watch) return `<p class="video-note">노출·시청 데이터 없음</p>`;
+    const impressionsText =
+      impressions != null && impressions > 0 ? formatNum(impressions) : "집계 중";
     return `<div class="funnel-pyramid">
-      <div class="funnel-step impressions"><span>노출수</span><strong>${impressions != null ? formatNum(impressions) : "—"}</strong></div>
+      <div class="funnel-step impressions"><span>노출수</span><strong>${impressionsText}</strong></div>
       <div class="funnel-step views"><span>조회수</span><strong>${formatNum(views)}</strong></div>
       <div class="funnel-step watch"><span>시청 시간</span><strong>${formatMinutes(watch)}</strong></div>
     </div>`;
+  }
+
+  function destroyModalChart(key) {
+    if (modalCharts[key]) {
+      try {
+        modalCharts[key].destroy();
+      } catch {
+        /* ignore */
+      }
+      modalCharts[key] = null;
+    }
+  }
+
+  function renderModalChartSection(host, key, chartType, labels, values, labelKey = "label") {
+    if (!host) return;
+    destroyModalChart(key);
+    host.innerHTML = `<div class="video-modal-chart short"><canvas id="modal-chart-${key}"></canvas></div>
+      <button type="button" class="modal-data-toggle" data-modal-table="${key}">표 보기</button>
+      <div class="modal-table-host hidden" id="modal-table-${key}"></div>`;
+    const canvas = host.querySelector(`#modal-chart-${key}`);
+    if (!canvas || typeof Chart === "undefined") return;
+    const colors = ["#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed", "#0891b2", "#64748b"];
+    modalCharts[key] = new Chart(canvas, {
+      type: chartType,
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: chartType === "line" ? "rgba(37,99,235,0.15)" : colors,
+            borderColor: chartType === "line" ? "#2563eb" : undefined,
+            fill: chartType === "line",
+            tension: 0.3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: chartType !== "bar", position: "bottom" } },
+      },
+    });
+    const tableHost = host.querySelector(`#modal-table-${key}`);
+    const toggle = host.querySelector(`[data-modal-table="${key}"]`);
+    toggle?.addEventListener("click", () => {
+      const showTable = tableHost?.classList.toggle("hidden") === false;
+      host.querySelector(".video-modal-chart")?.classList.toggle("hidden", showTable);
+      toggle.textContent = showTable ? "차트 보기" : "표 보기";
+    });
+    return tableHost;
   }
 
   async function openVideoAnalysisModal(video) {
@@ -1692,36 +1797,40 @@
           : ""
       }
       <div class="video-modal-section">
-        <h4>시청 트래픽 소스</h4>
-        <div id="modal-traffic">불러오는 중…</div>
+        <div class="video-modal-section-head">
+          <h4>시청 트래픽 소스</h4>
+        </div>
+        <div id="modal-traffic">${MODAL_LOADING_HTML}</div>
       </div>
       <div class="video-modal-section">
-        <h4>노출수 → 시청 시간</h4>
-        <div id="modal-funnel">불러오는 중…</div>
+        <div class="video-modal-section-head">
+          <h4>${REACH_FUNNEL_TITLE}</h4>
+        </div>
+        <div id="modal-funnel">${MODAL_LOADING_HTML}</div>
       </div>
       <div class="video-modal-section">
-        <h4>검색어</h4>
-        <div id="modal-search">불러오는 중…</div>
+        <div class="video-modal-section-head"><h4>검색어</h4></div>
+        <div id="modal-search">${MODAL_LOADING_HTML}</div>
       </div>
       <div class="video-modal-section">
-        <h4>시청자 구분 (구독 여부)</h4>
-        <div id="modal-audience">불러오는 중…</div>
+        <div class="video-modal-section-head"><h4>시청자 구분 (구독 여부)</h4></div>
+        <div id="modal-audience">${MODAL_LOADING_HTML}</div>
       </div>
       <div class="video-modal-section">
-        <h4>기기 유형</h4>
-        <div id="modal-devices">불러오는 중…</div>
+        <div class="video-modal-section-head"><h4>기기 유형</h4></div>
+        <div id="modal-devices">${MODAL_LOADING_HTML}</div>
       </div>
       <div class="video-modal-section">
-        <h4>연령 및 성별</h4>
+        <div class="video-modal-section-head"><h4>연령 및 성별</h4></div>
         <div class="grid grid-2">
-          <div id="modal-age">불러오는 중…</div>
-          <div id="modal-gender">불러오는 중…</div>
+          <div id="modal-age">${MODAL_LOADING_HTML}</div>
+          <div id="modal-gender">${MODAL_LOADING_HTML}</div>
         </div>
       </div>
       <div class="video-modal-section">
-        <h4>시청 유지</h4>
+        <div class="video-modal-section-head"><h4>시청 유지</h4></div>
         <div class="video-modal-chart"><canvas id="chart-video-retention"></canvas></div>
-        <p class="video-note" id="video-retention-note" style="margin-top:8px;">불러오는 중…</p>
+        <p class="video-note" id="video-retention-note" style="margin-top:8px;">Analytics API에서 시청 유지 곡선 불러오는 중…</p>
       </div>
       <div class="video-modal-links">
         <a class="icon-link-btn yt" href="${esc(video.url)}" target="_blank" rel="noopener" title="YouTube">YT</a>
@@ -1737,16 +1846,23 @@
 
     const note = document.getElementById("video-retention-note");
     const canvas = document.getElementById("chart-video-retention");
+    const setModalStep = (label) => {
+      document.querySelectorAll(".modal-loading-label").forEach((el) => {
+        el.textContent = label;
+      });
+    };
 
     try {
-      const [retention, analytics] = await Promise.all([
-        apiGet(`/api/dddit/youtube/report/retention?video_id=${encodeURIComponent(video.id)}`, {
-          timeoutMs: 45_000,
-        }),
-        apiGet(`/api/dddit/youtube/report/video-analytics?video_id=${encodeURIComponent(video.id)}`, {
-          timeoutMs: 45_000,
-        }).catch(() => null),
-      ]);
+      setModalStep("시청 유지 API 호출 중…");
+      const retentionPromise = apiGet(`/api/dddit/youtube/report/retention?video_id=${encodeURIComponent(video.id)}`, {
+        timeoutMs: 45_000,
+      });
+      setModalStep("영상 Analytics API 호출 중…");
+      const analyticsPromise = apiGet(
+        `/api/dddit/youtube/report/video-analytics?video_id=${encodeURIComponent(video.id)}`,
+        { timeoutMs: 45_000 }
+      ).catch(() => null);
+      const [retention, analytics] = await Promise.all([retentionPromise, analyticsPromise]);
 
       const dash = analytics?.dashboard || {};
       const watchEl = document.getElementById("modal-watch-minutes");
@@ -1769,53 +1885,137 @@
       }
 
       const trafficHost = document.getElementById("modal-traffic");
+      const trafficRows = analytics?.trafficSources || [];
       if (trafficHost) {
-        trafficHost.innerHTML = renderModalTableRows(analytics?.trafficSources || [], [
-          { label: "소스", render: (row) => trafficLabel(row.source, row.label) },
-          { label: "조회", render: (row) => formatNum(row.views) },
-          { label: "비율", render: (row) => (row.share != null ? `${row.share}%` : "—") },
-        ]);
+        if (!trafficRows.length) {
+          trafficHost.innerHTML = `<p class="video-note">데이터 없음</p>`;
+        } else {
+          const tableHost = renderModalChartSection(
+            trafficHost,
+            "traffic",
+            "doughnut",
+            trafficRows.map((row) => trafficLabel(row.source, row.label)),
+            trafficRows.map((row) => Number(row.views) || 0)
+          );
+          if (tableHost) {
+            tableHost.innerHTML = renderModalTableRows(trafficRows, [
+              { label: "소스", render: (row) => trafficLabel(row.source, row.label) },
+              { label: "조회", render: (row) => formatNum(row.views) },
+              { label: "비율", render: (row) => (row.share != null ? `${row.share}%` : "—") },
+            ]);
+          }
+        }
       }
       const funnelHost = document.getElementById("modal-funnel");
       if (funnelHost) funnelHost.innerHTML = renderReachFunnel(analytics?.reachFunnel);
       const searchHost = document.getElementById("modal-search");
+      const searchRows = analytics?.searchTerms || [];
       if (searchHost) {
-        searchHost.innerHTML = renderModalTableRows(analytics?.searchTerms || [], [
-          { label: "검색어", render: (row) => row.term || "—" },
-          { label: "조회", render: (row) => formatNum(row.views) },
-        ]);
+        if (!searchRows.length) {
+          searchHost.innerHTML = `<p class="video-note">데이터 없음</p>`;
+        } else {
+          const tableHost = renderModalChartSection(
+            searchHost,
+            "search",
+            "bar",
+            searchRows.slice(0, 8).map((row) => row.term || "—"),
+            searchRows.slice(0, 8).map((row) => Number(row.views) || 0)
+          );
+          if (tableHost) {
+            tableHost.innerHTML = renderModalTableRows(searchRows, [
+              { label: "검색어", render: (row) => row.term || "—" },
+              { label: "조회", render: (row) => formatNum(row.views) },
+            ]);
+          }
+        }
       }
       const audienceHost = document.getElementById("modal-audience");
+      const audienceRows = analytics?.audienceBySubscription || [];
       if (audienceHost) {
-        audienceHost.innerHTML = renderModalTableRows(analytics?.audienceBySubscription || [], [
-          { label: "시청자", render: (row) => row.label || row.status || "—" },
-          { label: "조회", render: (row) => formatNum(row.views) },
-          { label: "시청 시간", render: (row) => formatMinutes(row.watchMinutes) },
-          { label: "비율", render: (row) => (row.share != null ? `${row.share}%` : "—") },
-        ]);
+        if (!audienceRows.length) {
+          audienceHost.innerHTML = `<p class="video-note">데이터 없음</p>`;
+        } else {
+          const tableHost = renderModalChartSection(
+            audienceHost,
+            "audience",
+            "doughnut",
+            audienceRows.map((row) => row.label || row.status || "—"),
+            audienceRows.map((row) => Number(row.views) || 0)
+          );
+          if (tableHost) {
+            tableHost.innerHTML = renderModalTableRows(audienceRows, [
+              { label: "시청자", render: (row) => row.label || row.status || "—" },
+              { label: "조회", render: (row) => formatNum(row.views) },
+              { label: "시청 시간", render: (row) => formatMinutes(row.watchMinutes) },
+              { label: "비율", render: (row) => (row.share != null ? `${row.share}%` : "—") },
+            ]);
+          }
+        }
       }
       const devicesHost = document.getElementById("modal-devices");
+      const deviceRows = analytics?.deviceTypes || [];
       if (devicesHost) {
-        devicesHost.innerHTML = renderModalTableRows(analytics?.deviceTypes || [], [
-          { label: "기기", render: (row) => DEVICE_LABELS[row.device] || row.device || "—" },
-          { label: "조회", render: (row) => formatNum(row.views) },
-          { label: "시청 시간", render: (row) => formatMinutes(row.watchMinutes) },
-          { label: "비율", render: (row) => (row.share != null ? `${row.share}%` : "—") },
-        ]);
+        if (!deviceRows.length) {
+          devicesHost.innerHTML = `<p class="video-note">데이터 없음</p>`;
+        } else {
+          const tableHost = renderModalChartSection(
+            devicesHost,
+            "devices",
+            "bar",
+            deviceRows.map((row) => DEVICE_LABELS[row.device] || row.device || "—"),
+            deviceRows.map((row) => Number(row.views) || 0)
+          );
+          if (tableHost) {
+            tableHost.innerHTML = renderModalTableRows(deviceRows, [
+              { label: "기기", render: (row) => DEVICE_LABELS[row.device] || row.device || "—" },
+              { label: "조회", render: (row) => formatNum(row.views) },
+              { label: "시청 시간", render: (row) => formatMinutes(row.watchMinutes) },
+              { label: "비율", render: (row) => (row.share != null ? `${row.share}%` : "—") },
+            ]);
+          }
+        }
       }
       const ageHost = document.getElementById("modal-age");
+      const ageRows = analytics?.ageGroups || [];
       if (ageHost) {
-        ageHost.innerHTML = renderModalTableRows(analytics?.ageGroups || [], [
-          { label: "연령", render: (row) => formatAgeLabel(row.ageGroup) },
-          { label: "비율", render: (row) => `${Number(row.viewerPercentage || 0).toFixed(1)}%` },
-        ]);
+        if (!ageRows.length) {
+          ageHost.innerHTML = `<p class="video-note">데이터 없음</p>`;
+        } else {
+          const tableHost = renderModalChartSection(
+            ageHost,
+            "age",
+            "bar",
+            ageRows.map((row) => formatAgeLabel(row.ageGroup)),
+            ageRows.map((row) => Number(row.viewerPercentage) || 0)
+          );
+          if (tableHost) {
+            tableHost.innerHTML = renderModalTableRows(ageRows, [
+              { label: "연령", render: (row) => formatAgeLabel(row.ageGroup) },
+              { label: "비율", render: (row) => `${Number(row.viewerPercentage || 0).toFixed(1)}%` },
+            ]);
+          }
+        }
       }
       const genderHost = document.getElementById("modal-gender");
+      const genderRows = analytics?.gender || [];
       if (genderHost) {
-        genderHost.innerHTML = renderModalTableRows(analytics?.gender || [], [
-          { label: "성별", render: (row) => GENDER_LABELS[row.gender] || row.gender || "—" },
-          { label: "비율", render: (row) => `${Number(row.viewerPercentage || 0).toFixed(1)}%` },
-        ]);
+        if (!genderRows.length) {
+          genderHost.innerHTML = `<p class="video-note">데이터 없음</p>`;
+        } else {
+          const tableHost = renderModalChartSection(
+            genderHost,
+            "gender",
+            "pie",
+            genderRows.map((row) => GENDER_LABELS[row.gender] || row.gender || "—"),
+            genderRows.map((row) => Number(row.viewerPercentage) || 0)
+          );
+          if (tableHost) {
+            tableHost.innerHTML = renderModalTableRows(genderRows, [
+              { label: "성별", render: (row) => GENDER_LABELS[row.gender] || row.gender || "—" },
+              { label: "비율", render: (row) => `${Number(row.viewerPercentage || 0).toFixed(1)}%` },
+            ]);
+          }
+        }
       }
 
       if (videoModalRetentionChart) {
@@ -1884,27 +2084,10 @@
   }
 
   function renderContentPagination(total, page) {
-    if (!els.contentPagination) return;
     const pages = Math.max(1, Math.ceil(total / VIDEO_PAGE_SIZE));
-    if (total <= VIDEO_PAGE_SIZE) {
-      els.contentPagination.innerHTML = "";
-      els.contentPagination.classList.add("hidden");
-      return;
-    }
-    els.contentPagination.classList.remove("hidden");
-    const start = page * VIDEO_PAGE_SIZE + 1;
-    const end = Math.min(total, (page + 1) * VIDEO_PAGE_SIZE);
-    els.contentPagination.innerHTML = `
-      <button type="button" class="btn btn-ghost promo-page-btn" data-dir="prev" ${page <= 0 ? "disabled" : ""}>이전</button>
-      <span class="promo-page-info">${start}–${end} / ${total} · ${page + 1}/${pages}</span>
-      <button type="button" class="btn btn-ghost promo-page-btn" data-dir="next" ${page >= pages - 1 ? "disabled" : ""}>다음</button>`;
-    els.contentPagination.querySelectorAll(".promo-page-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const dir = btn.getAttribute("data-dir");
-        if (dir === "prev" && videoPage > 0) videoPage -= 1;
-        if (dir === "next" && videoPage < pages - 1) videoPage += 1;
-        renderVideos();
-      });
+    renderPageControls(els.contentPagination, page, pages, (next) => {
+      videoPage = next;
+      renderVideos();
     });
   }
 
@@ -2018,13 +2201,17 @@
     }
 
     try {
+      const onStep = (step) => {
+        setPageLoading(true, refresh ? "데이터를 갱신하는 중…" : "보고 데이터를 불러오는 중…", step);
+        setStatus(step);
+      };
+      onStep("채널 개요 (YouTube Data API)");
       const overview = await apiGet(`/api/dddit/youtube/report/overview${refresh ? "?refresh=1" : ""}`);
       if (seq !== loadSeq) return;
-      // Overview already warms the videos cache — do not request videos?refresh=1
-      // (that previously forced a second full rebuild and hung the first paint).
+      onStep("영상 목록 (YouTube Data API)");
       const videosData = await apiGet("/api/dddit/youtube/report/videos");
       if (seq !== loadSeq) return;
-      const { traffic, retention, demographics } = await loadAnalyticsExtras(refresh);
+      const { traffic, retention, demographics } = await loadAnalyticsExtras(refresh, onStep);
       if (seq !== loadSeq) return;
 
       const ch = overview.channel || {};
@@ -2034,6 +2221,7 @@
         els.channelLink.href = ch.channelUrl;
       }
 
+      apiConnections = overview.apiConnections || [];
       renderKpis(overview.kpis || {}, overview.channel?.subscriberCount);
       renderAnalyticsOverview(overview.analytics);
       renderInsights(overview.insights || []);
@@ -2041,9 +2229,6 @@
       videoPage = 0;
       renderPromotions(overview.promotions || []);
       renderVideos(videosData.videos || []);
-      els.limitations.innerHTML = (overview.limitations || [])
-        .map((line) => `<li>${esc(line)}</li>`)
-        .join("");
 
       await loadEditors();
       if (seq !== loadSeq) return;
@@ -2126,10 +2311,49 @@
     const modal = document.getElementById("efficiency-criteria-modal");
     if (modal) modal.hidden = true;
   }
-  document.getElementById("btn-efficiency-help")?.addEventListener("click", openEfficiencyModal);
+  function openBlockHelpModal(key) {
+    const modal = document.getElementById("block-help-modal");
+    const title = document.getElementById("block-help-title");
+    const body = document.getElementById("block-help-body");
+    if (!modal || !body) return;
+    title.textContent = "지표 설명";
+    body.textContent = BLOCK_HELP[key] || "설명이 준비되지 않았습니다.";
+    modal.hidden = false;
+  }
+
+  function closeBlockHelpModal() {
+    const modal = document.getElementById("block-help-modal");
+    if (modal) modal.hidden = true;
+  }
+
+  function openApiInfoModal() {
+    const modal = document.getElementById("api-info-modal");
+    const list = document.getElementById("api-info-list");
+    if (!modal || !list) return;
+    list.innerHTML = (apiConnections || [])
+      .map((item) => `<li><strong>${esc(item.name)}</strong> — ${esc(item.status)}</li>`)
+      .join("") || "<li>연동 정보 없음</li>";
+    modal.hidden = false;
+  }
+
+  function closeApiInfoModal() {
+    const modal = document.getElementById("api-info-modal");
+    if (modal) modal.hidden = true;
+  }
+
   document.getElementById("btn-efficiency-help-th")?.addEventListener("click", openEfficiencyModal);
   document.querySelectorAll("[data-close-efficiency-modal]").forEach((el) => {
     el.addEventListener("click", closeEfficiencyModal);
+  });
+  document.querySelectorAll("[data-block-help]").forEach((btn) => {
+    btn.addEventListener("click", () => openBlockHelpModal(btn.getAttribute("data-block-help")));
+  });
+  document.querySelectorAll("[data-close-block-help]").forEach((el) => {
+    el.addEventListener("click", closeBlockHelpModal);
+  });
+  document.getElementById("btn-api-info")?.addEventListener("click", openApiInfoModal);
+  document.querySelectorAll("[data-close-api-info]").forEach((el) => {
+    el.addEventListener("click", closeApiInfoModal);
   });
   document.getElementById("btn-save-config")?.addEventListener("click", async () => {
     try {
@@ -2148,6 +2372,8 @@
     if (event.key === "Escape") {
       closeVideoAnalysisModal();
       closeEfficiencyModal();
+      closeBlockHelpModal();
+      closeApiInfoModal();
     }
   });
   document.addEventListener("dddit-theme", () => {

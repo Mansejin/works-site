@@ -91,10 +91,7 @@ html[data-theme="dark"] .theme-switch input:checked + .theme-switch-ui {
   transform: translateX(18px);
 }
 .theme-switch-label {
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  min-width: 2.2em;
+  display: none;
 }
 
 html[data-theme="dark"] .page-loading {
