@@ -445,7 +445,8 @@ window.PPM_SLIDES = [
         "bullets": [
           "원모어트립 — 그래피티·키치·하이틴 컨셉스튜디오 (강서구) · https://hourplace.co.kr/place/40245",
           "리버뷰 서재/라운지 — 모던클래식 콘셉트 (영등포구) · https://hourplace.co.kr/place/39418",
-          "가족오락관 성수 쇼룸 — 레트로 게임 판매점 (성동구) · https://hourplace.co.kr/place/31931"
+          "가족오락관 성수 쇼룸 — 레트로 게임 판매점 (성동구) · https://hourplace.co.kr/place/31931",
+          "우드톤 아티스트 작업실 대관 — 우드톤 컨셉스튜디오 (마포구) · https://hourplace.co.kr/place/58794"
         ]
       },
       {
