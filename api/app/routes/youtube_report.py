@@ -23,8 +23,10 @@ from app.youtube_analytics import (
     fetch_demographics,
     fetch_retention,
     fetch_traffic_sources,
+    fetch_video_content_types,
     fetch_video_detail_analytics,
     fetch_videos_advertising_views,
+    is_shorts_video_record,
 )
 from app.youtube_report_store import (
     read_merged_promotions,
@@ -441,13 +443,11 @@ def _short_video_label(title: str, video_id: str, promotions: list[dict[str, Any
     return compact[:14] + "…" if len(compact) > 14 else compact
 
 
-def _is_shorts_video(video: dict[str, Any]) -> bool:
-    duration = _parse_int(video.get("durationSec"))
-    return duration > 0 and duration <= 60
-
-
-def _longform_videos(videos: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [video for video in videos if not _is_shorts_video(video)]
+def _longform_videos(
+    videos: list[dict[str, Any]],
+    content_types: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    return [video for video in videos if not is_shorts_video_record(video, content_types)]
 
 
 def _build_recent_videos_bar(
@@ -456,9 +456,10 @@ def _build_recent_videos_bar(
     *,
     limit: int = 4,
     ad_views_map: dict[str, int] | None = None,
+    content_types: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for video in _longform_videos(videos)[:limit]:
+    for video in _longform_videos(videos, content_types)[:limit]:
         title = str(video.get("title") or "")
         video_id = str(video.get("id") or "")
         views = _parse_int(video.get("views"))
@@ -472,12 +473,14 @@ def _build_recent_videos_bar(
             ad_source = "promo" if promo_ad > 0 else "none"
         rows.append(
             {
+                "videoId": video_id,
                 "title": title,
                 "shortLabel": _short_video_label(title, video_id, promotions),
                 "views": views,
                 "adViews": ad_views,
                 "organicViews": max(0, views - ad_views),
                 "adViewsSource": ad_source,
+                "isShorts": False,
             }
         )
     return rows
@@ -646,8 +649,14 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             )
             api_connections.append({"name": "YouTube Studio API", "status": "미설정"})
 
+        content_type_ids = [str(v.get("id") or "") for v in videos[:40] if v.get("id")]
+        content_types = await fetch_video_content_types(content_type_ids, refresh=refresh)
+        for video in videos:
+            video["isShorts"] = is_shorts_video_record(video, content_types)
         recent_video_ids = [
-            str(v.get("id") or "") for v in _longform_videos(videos)[:4] if v.get("id")
+            str(v.get("id") or "")
+            for v in _longform_videos(videos, content_types)[:4]
+            if v.get("id")
         ]
         ad_views_map = await fetch_videos_advertising_views(recent_video_ids, refresh=refresh)
 
@@ -678,7 +687,9 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
                 "recentAvgViews": f"~{int(recent_avg):,}" if recent_avg else "—",
                 "recentAvgViewsRaw": int(recent_avg),
             },
-            "recentVideosBar": _build_recent_videos_bar(videos, promotions, ad_views_map=ad_views_map),
+            "recentVideosBar": _build_recent_videos_bar(
+                videos, promotions, ad_views_map=ad_views_map, content_types=content_types
+            ),
             "viewsTrend7d": snapshots_data.get("viewsTrend7d") or [],
             "viewsTrendNote": views_trend_note,
             "subscriberTrend": _build_subscriber_trend(

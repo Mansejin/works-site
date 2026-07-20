@@ -444,22 +444,23 @@
     if (!ctx) return;
     destroyCanvasChart(ctx);
     charts.recent = null;
-    if (!rows?.length) return;
+    const longformRows = (rows || []).filter((row) => row.isShorts !== true);
+    if (!longformRows.length) return;
     charts.recent = new Chart(ctx, {
       type: "bar",
       data: {
-        labels: rows.map((row) => row.shortLabel || row.title),
+        labels: longformRows.map((row) => row.shortLabel || row.title),
         datasets: [
           {
             label: "자연 조회",
-            data: rows.map((row) => row.organicViews ?? row.views ?? 0),
+            data: longformRows.map((row) => row.organicViews ?? row.views ?? 0),
             backgroundColor: "rgba(148, 163, 184, 0.88)",
             borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 },
             stack: "views",
           },
           {
             label: "광고 조회",
-            data: rows.map((row) => row.adViews ?? 0),
+            data: longformRows.map((row) => row.adViews ?? 0),
             backgroundColor: "rgba(220, 38, 38, 0.88)",
             borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
             stack: "views",
@@ -474,11 +475,11 @@
           tooltip: {
             callbacks: {
               title(items) {
-                const row = rows[items[0]?.dataIndex];
+                const row = longformRows[items[0]?.dataIndex];
                 return row?.title || items[0]?.label || "";
               },
               footer(items) {
-                const row = rows[items[0]?.dataIndex];
+                const row = longformRows[items[0]?.dataIndex];
                 return row ? `합계 ${formatNum(row.views)}` : "";
               },
             },
@@ -1605,6 +1606,8 @@
   }
 
   function isShortsVideo(video) {
+    if (video?.isShorts === true) return true;
+    if (video?.isShorts === false) return false;
     const sec = Number(video?.durationSec);
     return Number.isFinite(sec) && sec > 0 && sec <= 60;
   }

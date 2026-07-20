@@ -375,6 +375,77 @@ def _group_traffic_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
+async def fetch_video_content_types(
+    video_ids: list[str], refresh: bool = False
+) -> dict[str, str]:
+    """Map videoId -> creatorContentType (SHORTS, VIDEO_ON_DEMAND, …) via Analytics API."""
+    ids = [str(v).strip() for v in video_ids if str(v).strip()]
+    if not ids or not _configured():
+        return {}
+
+    cache_key = f"video-content-types:{','.join(sorted(ids[:50]))}"
+    if not refresh:
+        cached = _cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+    start_date, end_date = _date_range(28)
+    result: dict[str, str] = {}
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            token, channel_id = await _get_token_and_channel(client)
+            for index in range(0, min(len(ids), 50), 25):
+                chunk = ids[index : index + 25]
+                id_filter = ",".join(chunk)
+                body = await _analytics_get_safe(
+                    client,
+                    token,
+                    channel_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    metrics="views",
+                    dimensions="video,creatorContentType",
+                    filters=f"video=={id_filter}",
+                    max_results=50,
+                )
+                for row in _parse_rows(body):
+                    vid = str(row.get("video") or "").strip()
+                    ctype = str(row.get("creatorContentType") or "").strip()
+                    if not vid or not ctype:
+                        continue
+                    if ctype == _CONTENT_SHORTS:
+                        result[vid] = _CONTENT_SHORTS
+                    elif result.get(vid) != _CONTENT_SHORTS:
+                        result[vid] = ctype
+        _cache_set(cache_key, result)
+    except Exception:
+        return result
+    return result
+
+
+def is_shorts_video_record(
+    video: dict[str, Any],
+    content_types: dict[str, str] | None = None,
+) -> bool:
+    """Classify Shorts using Analytics content type, then title/duration heuristics."""
+    vid = str(video.get("id") or "").strip()
+    ctype = (content_types or {}).get(vid)
+    if ctype == _CONTENT_SHORTS:
+        return True
+    if ctype in (_CONTENT_LONGFORM, "VIDEO_ON_DEMAND"):
+        return False
+
+    title = str(video.get("title") or "").lower()
+    description = str(video.get("description") or "").lower()
+    if "#shorts" in title or "#shorts" in description or "#쇼츠" in title:
+        return True
+
+    duration = _safe_int(video.get("durationSec"))
+    if duration > 0 and duration <= _SHORTS_MAX_DURATION_SEC:
+        return True
+    return False
+
+
 async def fetch_videos_advertising_views(
     video_ids: list[str], refresh: bool = False
 ) -> dict[str, int]:
