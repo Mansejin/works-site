@@ -1,5 +1,7 @@
 # works-api NAS 자동 배포
 
+개념·흐름 설명(다른 사람에게 이해시킬 때): **[docs/nas-auto-deploy-explained.md](../../docs/nas-auto-deploy-explained.md)**
+
 `git push`만 하면 NAS가 알아서 `api/`를 pull하고, **API 코드가 바뀐 경우에만** `docker compose up -d --build` 합니다.  
 (프론트 `dddit/`만 바뀐 push는 GitHub Pages만 갱신되고 NAS는 스킵)
 
