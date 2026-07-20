@@ -9,3 +9,5 @@ data/youtube/studio-promo-sync.json
 __pycache__/
 *.pyc
 conti-collab/node_modules/
+.venv/
+.env
