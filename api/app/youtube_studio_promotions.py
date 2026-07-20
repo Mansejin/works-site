@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
 
@@ -876,6 +876,8 @@ def merge_studio_into_promotions(studio_promos: list[dict[str, Any]]) -> dict[st
                     if studio_video and not _is_generic_studio_title(studio_video)
                     else manual.get("videoTitle") or studio_video or "",
                     "startDate": match.get("startDate") or manual.get("startDate"),
+                    "capturedAt": manual.get("capturedAt") or match.get("capturedAt") or date.today().isoformat(),
+                    "endDate": manual.get("endDate") or match.get("endDate"),
                     "source": "merged-studio",
                     "studioCampaignId": match.get("studioCampaignId") or manual.get("studioCampaignId"),
                     "syncedAt": match.get("syncedAt"),

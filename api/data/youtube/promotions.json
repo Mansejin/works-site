@@ -19,7 +19,8 @@
       "notes": [
         "Studio 캡처 2026-07-20",
         "대기 중"
-      ]
+      ],
+      "capturedAt": "2026-07-20"
     },
     {
       "id": "lumena-objet-views",
@@ -38,7 +39,8 @@
       "notes": [
         "Studio 캡처 2026-07-20",
         "대기 중"
-      ]
+      ],
+      "capturedAt": "2026-07-20"
     },
     {
       "id": "dreame-mf10-subs",
@@ -57,7 +59,8 @@
         "Studio 캡처 2026-07-16",
         "활성"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16"
     },
     {
       "id": "redmi-pad2-subs",
@@ -76,7 +79,8 @@
         "Studio 캡처 2026-07-16",
         "활성"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16"
     },
     {
       "id": "lenovo-ideatab11-subs",
@@ -95,7 +99,8 @@
         "Studio 캡처 2026-07-14",
         "활성 · 구독 캠페인"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-14"
     },
     {
       "id": "lenovo-ideatab11-views",
@@ -114,7 +119,8 @@
         "Studio 캡처 2026-07-16",
         "활성"
       ],
-      "budget": 90000
+      "budget": 90000,
+      "capturedAt": "2026-07-16"
     },
     {
       "id": "dreame-mf10-views",
@@ -133,7 +139,8 @@
         "Studio 캡처 2026-07-16",
         "활성"
       ],
-      "budget": 90000
+      "budget": 90000,
+      "capturedAt": "2026-07-16"
     },
     {
       "id": "logitech-mobifold-subs",
@@ -152,7 +159,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "lyfen-p3-t1-pro-subs",
@@ -171,7 +180,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "ikko-mindone-pro-subs",
@@ -190,7 +201,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "shokz-openfit-subs",
@@ -209,7 +222,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "muji-best11-subs",
@@ -228,7 +243,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "abko-af108pro-subs",
@@ -247,7 +264,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "daiso-fan-subs",
@@ -266,7 +285,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "garmin-165-subs",
@@ -285,7 +306,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "air-purifier-subs",
@@ -304,7 +327,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "daiso-deskterior-subs",
@@ -323,7 +348,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 170000
+      "budget": 170000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "shokz-openfit-views",
@@ -342,7 +369,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 90000
+      "budget": 90000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "abko-af108pro-views",
@@ -361,7 +390,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 90000
+      "budget": 90000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     },
     {
       "id": "ipad-homescreen-views",
@@ -380,7 +411,9 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 90000
+      "budget": 90000,
+      "capturedAt": "2026-07-16",
+      "endDate": "2026-07-16"
     }
   ]
 }

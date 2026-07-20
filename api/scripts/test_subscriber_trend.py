@@ -21,16 +21,18 @@ def test_promo_timeline_is_date_ordered() -> None:
         {
             "goal": "시청자층 성장",
             "subscribers": 100,
-            "notes": ["Studio 캡처 2026-07-01"],
+            "capturedAt": "2026-07-01",
+            "endDate": "2026-07-10",
         },
         {
             "goal": "시청자층 성장",
             "subscribers": 200,
-            "notes": ["Studio 캡처 2026-07-16"],
+            "capturedAt": "2026-07-16",
+            "endDate": "2026-07-16",
         },
     ]
     timeline = _promo_ad_subscribers_by_date(promos)
-    assert timeline == [(date(2026, 7, 1), 100), (date(2026, 7, 16), 200)]
+    assert timeline == [(date(2026, 7, 10), 100), (date(2026, 7, 16), 200)]
     assert _cumulative_promo_subscribers(timeline, date(2026, 7, 10)) == 100
     assert _cumulative_promo_subscribers(timeline, date(2026, 7, 20)) == 300
 
@@ -47,12 +49,14 @@ def test_build_subscriber_trend_uses_promo_dates() -> None:
         {
             "goal": "시청자층 성장",
             "subscribers": 400,
-            "notes": ["Studio 캡처 2026-07-01"],
+            "capturedAt": "2026-07-01",
+            "endDate": "2026-07-01",
         },
         {
             "goal": "시청자층 성장",
             "subscribers": 300,
-            "notes": ["Studio 캡처 2026-07-16"],
+            "capturedAt": "2026-07-16",
+            "endDate": "2026-07-16",
         },
         {
             "goal": "동영상 조회수",

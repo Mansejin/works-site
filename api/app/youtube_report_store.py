@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -29,13 +30,77 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+_PROMO_DATE_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
+_DONE_STATUS_RE = re.compile(r"완료|종료|ENDED|COMPLETED|FINISHED", re.I)
+
+
+def _parse_promo_iso_date(value: Any) -> str | None:
+    if value is None or value == "":
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10]).isoformat()
+    except ValueError:
+        return None
+
+
+def _promo_date_from_notes(notes: Any) -> str | None:
+    if not isinstance(notes, list):
+        return None
+    for note in notes:
+        match = _PROMO_DATE_RE.search(str(note))
+        if not match:
+            continue
+        try:
+            return date(
+                int(match.group(1)),
+                int(match.group(2)),
+                int(match.group(3)),
+            ).isoformat()
+        except ValueError:
+            continue
+    return None
+
+
+def _promo_is_completed(promo: dict[str, Any]) -> bool:
+    status = str(promo.get("status") or "")
+    return bool(_DONE_STATUS_RE.search(status))
+
+
+def normalize_promotion(promo: dict[str, Any]) -> dict[str, Any]:
+    """Ensure capturedAt/endDate exist for subscriber trend attribution."""
+    row = dict(promo)
+    notes_date = _promo_date_from_notes(row.get("notes"))
+    captured = _parse_promo_iso_date(row.get("capturedAt")) or notes_date
+    ended = _parse_promo_iso_date(row.get("endDate"))
+    start = _parse_promo_iso_date(row.get("startDate"))
+
+    if captured:
+        row["capturedAt"] = captured
+    if start:
+        row["startDate"] = start
+
+    if ended:
+        row["endDate"] = ended
+    elif _promo_is_completed(row):
+        row["endDate"] = captured or notes_date or start
+    elif "endDate" in row and row["endDate"] in (None, ""):
+        row.pop("endDate", None)
+
+    return row
+
+
+def normalize_promotions(data: dict[str, Any]) -> dict[str, Any]:
+    promos = [normalize_promotion(p) for p in data.get("promotions") or [] if isinstance(p, dict)]
+    return {**data, "promotions": promos}
+
+
 def read_promotions() -> dict[str, Any]:
     data = _read_json(PROMOTIONS_FILE, {"promotions": [], "memo": "", "issues": []})
     if not str(data.get("memo") or "").strip():
         issues = data.get("issues") or []
         if isinstance(issues, list) and issues:
             data["memo"] = "\n".join(str(item).strip() for item in issues if str(item).strip())
-    return data
+    return normalize_promotions(data)
 
 
 def write_promotions(data: dict[str, Any]) -> None:
@@ -44,11 +109,13 @@ def write_promotions(data: dict[str, Any]) -> None:
         issues = data.get("issues") or []
         if isinstance(issues, list):
             memo = "\n".join(str(item).strip() for item in issues if str(item).strip())
-    payload = {
-        "memo": memo,
-        "issues": [],
-        "promotions": data.get("promotions") or [],
-    }
+    payload = normalize_promotions(
+        {
+            "memo": memo,
+            "issues": [],
+            "promotions": data.get("promotions") or [],
+        }
+    )
     _write_json(PROMOTIONS_FILE, payload)
 
 

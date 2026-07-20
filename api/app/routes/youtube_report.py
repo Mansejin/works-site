@@ -490,29 +490,43 @@ def _build_recent_videos_bar(
 _PROMO_DATE_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 
 
-def _promo_capture_date(promo: dict[str, Any]) -> date | None:
-    for key in ("capturedAt", "endDate", "completedAt", "updatedAt"):
-        raw = promo.get(key)
-        if not raw:
-            continue
-        try:
-            return date.fromisoformat(str(raw)[:10])
-        except ValueError:
-            continue
-    for note in promo.get("notes") or []:
+def _promo_subscriber_credit_date(promo: dict[str, Any]) -> date | None:
+    """Date when promo subscriber count applies to the weekly trend."""
+    for key in ("endDate", "capturedAt", "startDate", "completedAt", "updatedAt"):
+        parsed = _parse_promo_iso_date(promo.get(key))
+        if parsed:
+            return date.fromisoformat(parsed)
+    notes_date = _promo_date_from_notes(promo.get("notes"))
+    if notes_date:
+        return date.fromisoformat(notes_date)
+    return None
+
+
+def _parse_promo_iso_date(value: Any) -> str | None:
+    if value is None or value == "":
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10]).isoformat()
+    except ValueError:
+        return None
+
+
+def _promo_date_from_notes(notes: Any) -> str | None:
+    if not isinstance(notes, list):
+        return None
+    for note in notes:
         match = _PROMO_DATE_RE.search(str(note))
         if not match:
             continue
         try:
-            return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+            return date(
+                int(match.group(1)),
+                int(match.group(2)),
+                int(match.group(3)),
+            ).isoformat()
         except ValueError:
             continue
     return None
-
-
-def _snapshot_week_end_dates(snapshot_count: int) -> list[date]:
-    today = date.today()
-    return [today - timedelta(weeks=(snapshot_count - 1 - index)) for index in range(snapshot_count)]
 
 
 def _promo_ad_subscribers_by_date(promotions: list[dict[str, Any]]) -> list[tuple[date, int]]:
@@ -523,11 +537,16 @@ def _promo_ad_subscribers_by_date(promotions: list[dict[str, Any]]) -> list[tupl
         subs = _parse_int(promo.get("subscribers"))
         if subs <= 0:
             continue
-        captured = _promo_capture_date(promo)
-        if captured:
-            rows.append((captured, subs))
+        credit_date = _promo_subscriber_credit_date(promo)
+        if credit_date:
+            rows.append((credit_date, subs))
     rows.sort(key=lambda item: item[0])
     return rows
+
+
+def _snapshot_week_end_dates(snapshot_count: int) -> list[date]:
+    today = date.today()
+    return [today - timedelta(weeks=(snapshot_count - 1 - index)) for index in range(snapshot_count)]
 
 
 def _cumulative_promo_subscribers(promo_timeline: list[tuple[date, int]], as_of: date) -> int:
