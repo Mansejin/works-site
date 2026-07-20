@@ -109,6 +109,7 @@
       .join("");
     setEditableState(editMode);
     syncEditOnlyUI();
+    updatePageScale();
   }
 
   function loadSaved() {
@@ -278,24 +279,33 @@
     flashSaved();
   }
 
-  // Viewport scaling — design canvas 1180px, scale with available width
+  // Viewport scaling — fit 1180px canvas to available width and height
   const pageViewport = document.querySelector(".page-viewport");
   const pageFrame = document.querySelector(".page-frame");
   const pageEl = document.querySelector(".page");
   const PAGE_DESIGN_W = 1180;
-  const PAGE_PAD = 16;
+  const PAGE_PAD_X = 16;
+  const PAGE_PAD_Y = 20;
 
   function updatePageScale() {
     if (!pageViewport || !pageFrame || !pageEl) return;
-    const available = pageViewport.clientWidth - PAGE_PAD;
-    if (!available) return;
-    const scale = available / PAGE_DESIGN_W;
+    const availableW = pageViewport.clientWidth - PAGE_PAD_X;
+    const availableH = pageViewport.clientHeight - PAGE_PAD_Y;
+    const naturalH = pageEl.offsetHeight;
+    if (!availableW || !availableH || !naturalH) return;
+
+    const scaleW = availableW / PAGE_DESIGN_W;
+    const scaleH = availableH / naturalH;
+    const scale = Math.min(scaleW, scaleH);
+
     pageFrame.style.setProperty("--page-scale", String(scale));
-    pageViewport.style.minHeight = `${pageEl.offsetHeight * scale + 16}px`;
+    pageFrame.style.height = `${naturalH}px`;
+    pageFrame.style.marginBottom = `${naturalH * (scale - 1)}px`;
   }
 
   const scaleObserver = new ResizeObserver(() => updatePageScale());
   if (pageViewport) scaleObserver.observe(pageViewport);
+  if (pageEl) scaleObserver.observe(pageEl);
   window.addEventListener("resize", updatePageScale);
   window.addEventListener("load", updatePageScale);
   if (document.fonts?.ready) {

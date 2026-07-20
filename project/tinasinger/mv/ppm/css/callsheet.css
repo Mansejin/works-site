@@ -25,9 +25,12 @@
 html,
 body {
   height: 100%;
+  overflow: hidden;
 }
 
 body {
+  display: flex;
+  flex-direction: column;
   font-family: var(--font);
   background:
     radial-gradient(120% 80% at 50% -10%, #ffffff 0%, transparent 55%),
@@ -221,16 +224,20 @@ body.is-edit-mode .cs-edit:focus {
 }
 
 .page-viewport {
+  flex: 1;
+  min-height: 0;
   display: flex;
   justify-content: center;
+  align-items: center;
   padding: 8px 6px 12px;
-  min-height: calc(100vh - 40px);
+  overflow: hidden;
 }
 
 .page-frame {
   width: calc(var(--page-design-w) * 1px);
   transform-origin: top center;
   transform: scale(var(--page-scale));
+  flex-shrink: 0;
 }
 
 .page {
@@ -818,8 +825,20 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
 }
 
 @media (max-width: 860px) {
+  html,
+  body {
+    overflow: auto;
+  }
+
+  body {
+    display: block;
+  }
+
   .page-viewport {
-    padding: 8px 4px 20px;
+    flex: none;
+    min-height: calc(100vh - 40px);
+    overflow: visible;
+    align-items: flex-start;
   }
 
   .page {
@@ -896,9 +915,15 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
     margin: 8mm;
   }
 
+  html,
   body {
-    background: #fff;
+    height: auto;
     overflow: visible;
+  }
+
+  body {
+    display: block;
+    background: #fff;
   }
 
   .no-print,
