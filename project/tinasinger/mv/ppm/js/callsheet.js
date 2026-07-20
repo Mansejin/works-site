@@ -195,6 +195,7 @@
         el.setAttribute("aria-hidden", editMode ? "false" : "true");
       }
     });
+    updatePageScale();
   }
 
   function updateEditUI() {
@@ -277,6 +278,30 @@
     flashSaved();
   }
 
+  // Viewport scaling — design canvas 1180px, scale with available width
+  const pageViewport = document.querySelector(".page-viewport");
+  const pageFrame = document.querySelector(".page-frame");
+  const pageEl = document.querySelector(".page");
+  const PAGE_DESIGN_W = 1180;
+  const PAGE_PAD = 16;
+
+  function updatePageScale() {
+    if (!pageViewport || !pageFrame || !pageEl) return;
+    const available = pageViewport.clientWidth - PAGE_PAD;
+    if (!available) return;
+    const scale = available / PAGE_DESIGN_W;
+    pageFrame.style.setProperty("--page-scale", String(scale));
+    pageViewport.style.minHeight = `${pageEl.offsetHeight * scale + 16}px`;
+  }
+
+  const scaleObserver = new ResizeObserver(() => updatePageScale());
+  if (pageViewport) scaleObserver.observe(pageViewport);
+  window.addEventListener("resize", updatePageScale);
+  window.addEventListener("load", updatePageScale);
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(updatePageScale);
+  }
+
   // Init
   loadSaved();
   renderSchedule();
@@ -337,4 +362,6 @@
       e.preventDefault();
     }
   });
+
+  updatePageScale();
 })();

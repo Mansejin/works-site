@@ -12,6 +12,8 @@
   --focus: #f5f1e6;
   --focus-ring: #c8b98a;
   --font: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --page-design-w: 1180;
+  --page-scale: 1;
 }
 
 * {
@@ -218,9 +220,22 @@ body.is-edit-mode .cs-edit:focus {
   margin-top: 12px;
 }
 
+.page-viewport {
+  display: flex;
+  justify-content: center;
+  padding: 8px 6px 12px;
+  min-height: calc(100vh - 40px);
+}
+
+.page-frame {
+  width: calc(var(--page-design-w) * 1px);
+  transform-origin: top center;
+  transform: scale(var(--page-scale));
+}
+
 .page {
-  width: min(1180px, calc(100% - 12px));
-  margin: 8px auto 12px;
+  width: calc(var(--page-design-w) * 1px);
+  margin: 0;
   padding: 14px 16px 10px;
   background: var(--page);
   border: 1px solid rgba(26, 29, 34, 0.1);
@@ -373,6 +388,19 @@ body.is-edit-mode .cs-edit:focus {
   min-width: 0;
 }
 
+.block--schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.schedule-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 2px 0 4px;
+}
+
 .block-head {
   display: flex;
   align-items: flex-end;
@@ -424,10 +452,18 @@ h2 {
 }
 
 /* —— Schedule —— */
+.schedule-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .schedule {
   font-size: 0.74rem;
   table-layout: fixed;
   width: 100%;
+  min-width: 0;
 }
 
 .schedule th,
@@ -469,11 +505,39 @@ h2 {
 }
 
 .schedule .c-actions {
-  width: 2em;
-  padding-left: 2px;
-  padding-right: 2px;
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  padding: 2px;
   text-align: center;
   background: transparent;
+  vertical-align: middle;
+}
+
+body.is-edit-mode .schedule .c-time,
+body.is-edit-mode .schedule td.t {
+  width: 86px;
+  min-width: 86px;
+  max-width: 86px;
+}
+
+body.is-edit-mode .schedule .c-block,
+body.is-edit-mode .schedule td.b {
+  width: 78px;
+  min-width: 78px;
+  max-width: 78px;
+}
+
+body.is-edit-mode .schedule .c-place,
+body.is-edit-mode .schedule td.p {
+  width: 82px;
+  min-width: 82px;
+  max-width: 82px;
+}
+
+body.is-edit-mode .schedule .c-detail {
+  width: auto;
+  min-width: 0;
 }
 
 .schedule .t,
@@ -558,13 +622,19 @@ body.is-edit-mode .schedule td[data-field="detail"] {
 
 .row-btn--add {
   flex-shrink: 0;
-  margin-bottom: 4px;
   height: 26px;
   font-size: 0.68rem;
   font-weight: 650;
 }
 
 .row-btn--del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
   color: #8a3b3b;
   border-color: #d8b4b4;
 }
@@ -748,10 +818,12 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
 }
 
 @media (max-width: 860px) {
+  .page-viewport {
+    padding: 8px 4px 20px;
+  }
+
   .page {
-    margin: 8px auto 20px;
     padding: 14px 12px 10px;
-    width: calc(100% - 8px);
   }
 
   .banner {
@@ -789,7 +861,7 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
   }
 
   .schedule {
-    min-width: 560px;
+    min-width: 520px;
   }
 
   .schedule .c-time {
@@ -832,6 +904,14 @@ body:not(.is-edit-mode) .crew .contact:empty::before {
   .no-print,
   .edit-only {
     display: none !important;
+  }
+
+  .page-viewport,
+  .page-frame {
+    padding: 0;
+    transform: none !important;
+    width: 100%;
+    min-height: auto;
   }
 
   .page {
