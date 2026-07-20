@@ -127,9 +127,11 @@ html[data-theme="dark"] .budget-input {
   color: var(--text);
   border-color: var(--border);
 }
-html[data-theme="dark"] .funnel-step.impressions { background: linear-gradient(180deg, #1e2a44, #1a2740); }
-html[data-theme="dark"] .funnel-step.views { background: linear-gradient(180deg, #1a2740, #15233a); }
-html[data-theme="dark"] .funnel-step.watch { background: linear-gradient(180deg, #15233a, #101b2c); color: #dbeafe; }
+html[data-theme="dark"] .yta-funnel-segment.impressions { background: #3f3f3f; color: #f1f1f1; }
+html[data-theme="dark"] .yta-funnel-segment.views { background: #353535; color: #f1f1f1; }
+html[data-theme="dark"] .yta-funnel-segment.watch-time { background: #2a2a2a; color: #f1f1f1; }
+html[data-theme="dark"] .yta-funnel-title { color: #aaa; }
+html[data-theme="dark"] .yta-funnel-bridge { background: #0f0f0f; color: #aaa; }
 html[data-theme="dark"] .btn-ghost,
 html[data-theme="dark"] button.btn-ghost {
   background: transparent;

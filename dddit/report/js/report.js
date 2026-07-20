@@ -65,7 +65,7 @@
   const modalCharts = {};
   const MODAL_LOADING_HTML =
     '<div class="modal-loading" aria-busy="true"><div class="modal-loading-bar"></div><div class="modal-loading-bar" style="width:78%"></div><div class="modal-loading-bar" style="width:52%"></div><p class="video-note modal-loading-label" style="margin:0;">Analytics API 호출 중…</p></div>';
-  const REACH_FUNNEL_TITLE = "노출수 및 이에 따른 시청 시간";
+  const REACH_FUNNEL_TITLE = "노출수 및 노출수가 시청 시간에 미치는 영향";
   const BLOCK_HELP = {
     traffic:
       "채널 전체 조회가 어디서 유입됐는지 보여줍니다. 검색·추천·광고·Shorts 피드 비중을 보고 다음 콘텐츠 배포 전략을 정합니다.",
@@ -1714,6 +1714,28 @@
     return `${Math.round(n)}분`;
   }
 
+  function formatCompactNum(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    if (n >= 10000) {
+      const v = n / 10000;
+      const text = v >= 10 ? String(Math.round(v)) : v.toFixed(1).replace(/\.0$/, "");
+      return `${text}만`;
+    }
+    if (n >= 1000) {
+      const v = n / 1000;
+      const text = v >= 10 ? v.toFixed(1).replace(/\.0$/, "") : v.toFixed(1).replace(/\.0$/, "");
+      return `${text}천`;
+    }
+    return formatNum(n);
+  }
+
+  function formatWatchHours(minutes) {
+    const n = Number(minutes);
+    if (!Number.isFinite(n) || n <= 0) return "—";
+    return (n / 60).toFixed(2);
+  }
+
   function formatDurationSec(sec) {
     const n = Number(sec);
     if (!Number.isFinite(n) || n <= 0) return "—";
@@ -1741,11 +1763,31 @@
     const watch = funnel.watchMinutes;
     if (!impressions && !views && !watch) return `<p class="video-note">노출·시청 데이터 없음</p>`;
     const impressionsText =
-      impressions != null && impressions > 0 ? formatNum(impressions) : "집계 중";
-    return `<div class="funnel-pyramid">
-      <div class="funnel-step impressions"><span>노출수</span><strong>${impressionsText}</strong></div>
-      <div class="funnel-step views"><span>조회수</span><strong>${formatNum(views)}</strong></div>
-      <div class="funnel-step watch"><span>시청 시간</span><strong>${formatMinutes(watch)}</strong></div>
+      impressions != null && impressions > 0 ? formatCompactNum(impressions) : "집계 중";
+    const ctr =
+      impressions != null && impressions > 0 && views != null && views >= 0
+        ? ((views / impressions) * 100).toFixed(1)
+        : null;
+    const avdSec = funnel.averageViewDurationSec;
+    const avdText =
+      avdSec != null && Number(avdSec) > 0
+        ? `${formatDurationSec(avdSec)} 평균 시청 지속 시간`
+        : null;
+    return `<div class="yta-funnel">
+      <div class="yta-funnel-segment impressions">
+        <div class="yta-funnel-title">노출수</div>
+        <div class="yta-funnel-value">${esc(impressionsText)}</div>
+      </div>
+      ${ctr != null ? `<div class="yta-funnel-bridge ctr">클릭률: ${ctr}%</div>` : ""}
+      <div class="yta-funnel-segment views">
+        <div class="yta-funnel-title">노출에서 발생한 조회수</div>
+        <div class="yta-funnel-value">${formatNum(views)}</div>
+      </div>
+      ${avdText ? `<div class="yta-funnel-bridge avd">${esc(avdText)}</div>` : ""}
+      <div class="yta-funnel-segment watch-time">
+        <div class="yta-funnel-title">노출에서 발생한 시청 시간(시간)</div>
+        <div class="yta-funnel-value">${formatWatchHours(watch)}</div>
+      </div>
     </div>`;
   }
 

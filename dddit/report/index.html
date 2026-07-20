@@ -892,26 +892,67 @@
       font-size: 0.7rem;
       font-weight: 700;
     }
-    .funnel-pyramid {
+    .yta-funnel {
+      --funnel-slope: 8%;
+      --funnel-w1: 100%;
+      --funnel-w2: 84%;
+      --funnel-w3: 70.56%;
+      width: 100%;
+      max-width: 280px;
+      margin: 4px auto 0;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 2px;
-      padding: 4px 0;
-      max-width: 100%;
-      margin: 0 auto;
     }
-    .funnel-step {
+    .yta-funnel-segment {
+      width: var(--seg-w);
       text-align: center;
-      padding: 12px 10px 10px;
-      color: #1e3a5f;
-      clip-path: polygon(0 0, 100% 0, 88% 100%, 12% 100%);
+      padding: 14px 12px 13px;
+      color: #0f0f0f;
+      clip-path: polygon(0 0, 100% 0, calc(100% - var(--funnel-slope)) 100%, var(--funnel-slope) 100%);
+      box-sizing: border-box;
     }
-    .funnel-step span { display: block; font-size: 0.72rem; font-weight: 700; opacity: 0.85; }
-    .funnel-step strong { display: block; font-size: 0.95rem; margin-top: 2px; }
-    .funnel-step.impressions { width: 100%; background: linear-gradient(180deg, #dbeafe, #bfdbfe); }
-    .funnel-step.views { width: 88%; background: linear-gradient(180deg, #dbeafe, #93c5fd); }
-    .funnel-step.watch { width: 76%; background: linear-gradient(180deg, #93c5fd, #60a5fa); color: #fff; }
+    .yta-funnel-segment.impressions {
+      --seg-w: var(--funnel-w1);
+      background: #e8eaed;
+      min-height: 68px;
+    }
+    .yta-funnel-segment.views {
+      --seg-w: var(--funnel-w2);
+      background: #dadce0;
+      min-height: 58px;
+    }
+    .yta-funnel-segment.watch-time {
+      --seg-w: var(--funnel-w3);
+      background: #bdc1c6;
+      min-height: 54px;
+    }
+    .yta-funnel-title {
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: #606060;
+      margin-bottom: 4px;
+      line-height: 1.25;
+    }
+    .yta-funnel-value {
+      font-size: 1.2rem;
+      font-weight: 400;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+    }
+    .yta-funnel-bridge {
+      width: var(--bridge-w);
+      background: #282828;
+      color: #e8eaed;
+      text-align: center;
+      padding: 5px 8px;
+      font-size: 0.68rem;
+      font-weight: 500;
+      line-height: 1.3;
+      box-sizing: border-box;
+    }
+    .yta-funnel-bridge.ctr { --bridge-w: var(--funnel-w2); }
+    .yta-funnel-bridge.avd { --bridge-w: var(--funnel-w3); }
     .chart-wrap.traffic-tall { height: 300px; }
     .section-head-row {
       display: flex;
