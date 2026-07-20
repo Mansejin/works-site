@@ -67,26 +67,30 @@
     .report-header p { color: var(--text-muted); font-size: 0.86rem; margin-top: 4px; }
 
     .header-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .header-toolbar {
-      display: inline-flex;
+    .report-header-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+    }
+    .report-header-controls {
+      display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: var(--surface);
-      box-shadow: var(--shadow);
+      gap: 8px;
+      flex-shrink: 0;
     }
-    .header-toolbar .status-pill {
-      border: none;
-      background: transparent;
-      padding: 4px 8px;
+    .report-status-line {
+      width: 100%;
+      margin-top: 8px;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      min-height: 1.2em;
     }
-    .header-toolbar .btn {
-      border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 0.78rem;
-    }
+    .report-status-line.ok { color: var(--success); }
+    .report-status-line.error { color: var(--danger); }
+    .report-status-line.warn { color: #92400e; }
 
     .btn {
       border: none;
@@ -269,16 +273,18 @@
       color: var(--accent);
       background: var(--accent-soft);
     }
+    .promo-pagination,
+    .content-pagination {
       display: flex;
       align-items: center;
-      justify-content: flex-end;
+      justify-content: center;
       gap: 10px;
-      margin-top: 10px;
+      margin-top: 18px;
       font-size: 0.8rem;
       color: var(--text-muted);
     }
     .promo-pagination.hidden { display: none; }
-    .promo-page-info { min-width: 120px; text-align: center; }
+    .promo-page-info { min-width: 3em; text-align: center; font-weight: 600; }
     .promo-page-btn { padding: 4px 12px; font-size: 0.76rem; }
     .promo-page-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     table {
@@ -641,8 +647,8 @@
     }
     .video-modal-dialog {
       position: relative;
-      width: min(920px, 100%);
-      max-height: min(90vh, 960px);
+      width: min(1180px, 96vw);
+      max-height: min(92vh, 1080px);
       overflow: auto;
       background: #fff;
       border-radius: 14px;
@@ -831,22 +837,109 @@
       font-weight: 700;
     }
     .funnel-pyramid {
-      display: grid;
-      gap: 6px;
-      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 8px 0 4px;
+      max-width: 520px;
+      margin: 0 auto;
     }
     .funnel-step {
-      margin: 0 auto;
-      padding: 8px 12px;
-      border-radius: 8px;
-      background: #f1f5f9;
       text-align: center;
-      font-size: 0.76rem;
+      padding: 14px 12px 12px;
+      color: #1e3a5f;
+      clip-path: polygon(6% 0, 94% 0, 100% 100%, 0 100%);
     }
-    .funnel-step strong { display: block; font-size: 0.92rem; margin-top: 2px; }
-    .funnel-step.impressions { width: 100%; background: #e0e7ff; }
-    .funnel-step.views { width: 78%; background: #dbeafe; }
-    .funnel-step.watch { width: 56%; background: #bfdbfe; }
+    .funnel-step span { display: block; font-size: 0.72rem; font-weight: 700; opacity: 0.85; }
+    .funnel-step strong { display: block; font-size: 1rem; margin-top: 2px; }
+    .funnel-step.impressions { width: 100%; background: linear-gradient(180deg, #dbeafe, #bfdbfe); }
+    .funnel-step.views { width: 82%; background: linear-gradient(180deg, #dbeafe, #93c5fd); }
+    .funnel-step.watch { width: 64%; background: linear-gradient(180deg, #93c5fd, #60a5fa); color: #fff; }
+    .chart-wrap.traffic-tall { height: 300px; }
+    .section-head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .section-head-row .video-note { margin: 0; }
+    .block-help-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text-muted);
+      border-radius: 999px;
+      width: 20px;
+      height: 20px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .block-help-btn:hover { border-color: #93c5fd; color: var(--accent); background: var(--accent-soft); }
+    .api-info-link {
+      display: block;
+      width: fit-content;
+      margin: 20px auto 0;
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      font-family: inherit;
+    }
+    .api-info-link:hover { color: var(--accent); }
+    .modal-loading { display: grid; gap: 8px; padding: 10px 0; }
+    .modal-loading-bar {
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #e2e8f0 0%, #cbd5e1 50%, #e2e8f0 100%);
+      background-size: 200% 100%;
+      animation: modalShimmer 1.2s ease-in-out infinite;
+    }
+    @keyframes modalShimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
+    }
+    .modal-data-toggle {
+      font-size: 0.72rem;
+      color: var(--accent);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 600;
+      margin-left: auto;
+    }
+    .video-modal-section-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .video-modal-section-head h4 { margin: 0; flex: 1; }
+    .efficiency-select {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 4px;
+      font: inherit;
+      font-size: 0.76rem;
+      max-width: 120px;
+      background: #fff;
+    }
+    .retention-combo-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      width: 100%;
+    }
+    .retention-combo { width: 100%; min-width: 0; }
+    .retention-picker { width: 100%; }
     .criteria-modal {
       position: fixed;
       inset: 0;
@@ -934,21 +1027,20 @@
     <nav class="hub-nav"><a href="../">← 디디딧 워크스페이스</a></nav>
 
     <header class="report-header">
-      <div>
-        <h1 id="report-title">채널 현황 분석</h1>
-        <p id="report-subtitle">YouTube Data · Analytics · Google Ads · 링크 공유용 보고</p>
+      <div class="report-header-top">
+        <div>
+          <h1 id="report-title">채널 현황 분석</h1>
+          <p id="report-subtitle">YouTube Data · Analytics · Google Ads · 링크 공유용 보고</p>
+        </div>
+        <div class="report-header-controls">
+          <label class="theme-switch" data-theme-toggle title="다크 모드">
+            <input type="checkbox" data-theme-input aria-label="다크 모드 전환" />
+            <span class="theme-switch-ui" aria-hidden="true"></span>
+          </label>
+          <button id="btn-refresh" class="btn btn-ghost" type="button">데이터 갱신</button>
+        </div>
       </div>
-      <div class="header-actions">
-      <div class="header-toolbar">
-        <label class="theme-switch" data-theme-toggle title="다크 모드">
-          <input type="checkbox" data-theme-input aria-label="다크 모드 전환" />
-          <span class="theme-switch-ui" aria-hidden="true"></span>
-          <span class="theme-switch-label" data-theme-label>다크</span>
-        </label>
-        <span id="report-status" class="status-pill">불러오는 중…</span>
-        <button id="btn-refresh" class="btn btn-ghost" type="button">데이터 갱신</button>
-      </div>
-      </div>
+      <p id="report-status" class="report-status-line">불러오는 중…</p>
     </header>
 
     <div id="error-banner" class="card hidden" style="margin-bottom:14px;border-color:#fecaca;">
@@ -968,12 +1060,18 @@
           <div class="analytics-kpi-grid" id="analytics-kpi-grid"></div>
           <div class="grid grid-2">
             <div>
-              <p class="video-note" style="margin-bottom:8px;">유입 경로</p>
-              <div class="chart-wrap short"><canvas id="chart-traffic-sources"></canvas></div>
+              <div class="section-head-row">
+                <p class="video-note">유입 경로</p>
+                <button type="button" class="block-help-btn" data-block-help="traffic" title="유입 경로 설명">?</button>
+              </div>
+              <div class="chart-wrap short traffic-tall"><canvas id="chart-traffic-sources"></canvas></div>
             </div>
             <div>
               <div class="retention-head">
-                <p id="retention-chart-label" class="video-note" style="margin:0;">시청 유지</p>
+                <div class="section-head-row" style="margin:0;flex:1;">
+                  <p id="retention-chart-label" class="video-note" style="margin:0;">시청 유지</p>
+                  <button type="button" class="block-help-btn" data-block-help="retention" title="시청 유지 설명">?</button>
+                </div>
                 <div class="retention-tabs" id="retention-tabs">
                   <button type="button" class="retention-tab active" data-format="longform">롱폼</button>
                   <button type="button" class="retention-tab" data-format="shorts">쇼츠</button>
@@ -985,11 +1083,17 @@
           </div>
           <div class="grid grid-2" style="margin-top:12px;">
             <div>
-              <p class="video-note" style="margin-bottom:8px;">연령대</p>
+              <div class="section-head-row">
+                <p class="video-note">연령대</p>
+                <button type="button" class="block-help-btn" data-block-help="age" title="연령대 설명">?</button>
+              </div>
               <div class="chart-wrap short"><canvas id="chart-age"></canvas></div>
             </div>
             <div>
-              <p class="video-note" style="margin-bottom:8px;">성별</p>
+              <div class="section-head-row">
+                <p class="video-note">성별</p>
+                <button type="button" class="block-help-btn" data-block-help="gender" title="성별 설명">?</button>
+              </div>
               <div class="chart-wrap short"><canvas id="chart-gender"></canvas></div>
             </div>
           </div>
@@ -998,7 +1102,10 @@
 
       <div class="grid grid-2" style="margin-bottom:14px;">
         <section class="card">
-          <div class="card-head"><h2>최근 영상 조회수</h2><span class="status-pill" style="font-size:0.72rem;">빨강=광고 · 회색=자연</span></div>
+          <div class="card-head">
+            <h2>최근 영상 조회수</h2>
+            <button type="button" class="block-help-btn" data-block-help="recent-videos" title="최근 영상 조회수 설명">?</button>
+          </div>
           <div class="card-body"><div class="chart-wrap"><canvas id="chart-recent-videos"></canvas></div></div>
         </section>
         <section class="card">
@@ -1013,11 +1120,10 @@
       <section class="card" style="margin-bottom:14px;">
         <div class="card-head">
           <h2>구독자 추이</h2>
-          <span class="status-pill" style="font-size:0.72rem;">총 구독자 vs 자연 증가 · 90초 갱신</span>
+          <button type="button" class="block-help-btn" data-block-help="subscribers" title="구독자 추이 설명">?</button>
         </div>
         <div class="card-body">
           <div class="chart-wrap"><canvas id="chart-subscribers"></canvas></div>
-          <p id="subscriber-trend-note" class="video-note" style="margin-top:10px;"></p>
         </div>
       </section>
 
@@ -1025,9 +1131,6 @@
         <section class="card">
           <div class="card-head">
             <h2>프로모션 효율 요약</h2>
-            <div class="promo-head-actions">
-              <button id="btn-efficiency-help" class="eff-help-btn" type="button" title="효율 기준 보기">?</button>
-            </div>
           </div>
           <div class="card-body promo-table-wrap">
             <p class="video-note" style="margin:0 0 10px;">프로모션 수치는 수동으로 반영합니다. Studio 캡처를 보내주시면 표에 맞춰 정리합니다.</p>
@@ -1082,10 +1185,7 @@
         </div>
       </section>
 
-      <div class="limitations" id="limitations-box">
-        <strong>자동화 범위</strong>
-        <ul id="limitations-list"></ul>
-      </div>
+      <button type="button" id="btn-api-info" class="api-info-link">API 정보</button>
     </div>
 
     <div id="page-loading" class="page-loading" hidden>
@@ -1097,6 +1197,28 @@
     </div>
 
     <div id="loading" class="card hidden loading-block" style="padding:40px;text-align:center;color:var(--text-muted);">보고 데이터를 불러오는 중…</div>
+
+    <div id="block-help-modal" class="criteria-modal" hidden>
+      <div class="video-modal-backdrop" data-close-block-help tabindex="-1"></div>
+      <div class="criteria-dialog" role="dialog" aria-modal="true" aria-labelledby="block-help-title">
+        <div class="video-modal-head" style="padding:0 0 10px;border:none;">
+          <h3 id="block-help-title">지표 설명</h3>
+          <button type="button" class="btn btn-ghost" data-close-block-help>닫기</button>
+        </div>
+        <p id="block-help-body" style="font-size:0.84rem;line-height:1.55;color:var(--text);"></p>
+      </div>
+    </div>
+
+    <div id="api-info-modal" class="criteria-modal" hidden>
+      <div class="video-modal-backdrop" data-close-api-info tabindex="-1"></div>
+      <div class="criteria-dialog" role="dialog" aria-modal="true" aria-labelledby="api-info-title">
+        <div class="video-modal-head" style="padding:0 0 10px;border:none;">
+          <h3 id="api-info-title">API 연동 상태</h3>
+          <button type="button" class="btn btn-ghost" data-close-api-info>닫기</button>
+        </div>
+        <ul id="api-info-list" class="insights" style="margin:0;"></ul>
+      </div>
+    </div>
 
     <div id="efficiency-criteria-modal" class="criteria-modal" hidden>
       <div class="video-modal-backdrop" data-close-efficiency-modal tabindex="-1"></div>
@@ -1127,6 +1249,6 @@
 
   <script src="../js/api-auth.js"></script>
   <script src="../js/theme.js"></script>
-  <script src="js/report.js?v=39"></script>
+  <script src="js/report.js?v=40"></script>
 </body>
 </html>

@@ -19,7 +19,7 @@
       const input = root.querySelector("[data-theme-input]");
       if (input) input.checked = dark;
       const label = root.querySelector("[data-theme-label]");
-      if (label) label.textContent = dark ? "라이트" : "다크";
+      if (label) label.textContent = "";
       const icon = root.querySelector("[data-theme-icon]");
       if (icon) icon.textContent = dark ? "☀" : "☾";
     });

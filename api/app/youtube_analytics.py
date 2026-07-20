@@ -293,6 +293,7 @@ _TRAFFIC_SOURCE_LABELS: dict[str, str] = {
     "PROMOTED": "프로모션",
     "RELATED_VIDEO": "관련 영상",
     "SHORTS": "Shorts 피드",
+    "SHORTS_CONTENT_LINKS": "쇼츠 링크",
     "SOUND_PAGE": "사운드",
     "SUBSCRIBER": "구독 피드",
     "YT_CHANNEL": "채널 페이지",
@@ -317,6 +318,7 @@ _TRAFFIC_GROUP_MAP: dict[str, str] = {
     "SOUND_PAGE": "YouTube 맞춤 동영상",
     "PROMOTED": "YouTube 맞춤 동영상",
     "SHORTS": "Shorts 피드",
+    "SHORTS_CONTENT_LINKS": "쇼츠 링크",
     "ADVERTISING": "YouTube 광고",
     "YT_SEARCH": "YouTube 검색",
     "YT_CHANNEL": "채널 페이지",
@@ -370,6 +372,48 @@ def _group_traffic_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "details": sorted(item["details"], key=lambda d: -d["views"]),
             }
         )
+    return result
+
+
+async def fetch_videos_advertising_views(
+    video_ids: list[str], refresh: bool = False
+) -> dict[str, int]:
+    """Per-video ad traffic (ADVERTISING source) for recent-videos bar chart."""
+    ids = [str(v).strip() for v in video_ids if str(v).strip()]
+    if not ids or not _configured():
+        return {}
+
+    cache_key = f"video-ad-views:{','.join(sorted(ids[:25]))}"
+    if not refresh:
+        cached = _cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+    start_date, end_date = _date_range(28)
+    result: dict[str, int] = {}
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            token, channel_id = await _get_token_and_channel(client)
+            id_filter = ",".join(ids[:25])
+            body = await _analytics_get(
+                client,
+                token,
+                channel_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics="views",
+                dimensions="video",
+                filters=f"insightTrafficSourceType==ADVERTISING;video=={id_filter}",
+                sort="-views",
+                max_results=25,
+            )
+            for row in _parse_rows(body):
+                vid = str(row.get("video") or "").strip()
+                if vid:
+                    result[vid] = _safe_int(row.get("views"))
+        _cache_set(cache_key, result)
+    except Exception:
+        return result
     return result
 
 
