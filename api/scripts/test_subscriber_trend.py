@@ -105,8 +105,33 @@ def test_build_subscriber_trend_rebuilds_totals_from_analytics() -> None:
     assert trend["method"] == "analytics+promo"
 
 
+def test_organic_does_not_drop_when_promo_batch_exceeds_total() -> None:
+    snapshots = {
+        "snapshots": [
+            {"label": "2주전", "total": 1000},
+            {"label": "1주전", "total": 1300},
+            {"label": "최신", "total": 1500},
+        ]
+    }
+    promos = [
+        {
+            "goal": "시청자층 성장",
+            "subscribers": 4000,
+            "capturedAt": "2026-07-16",
+            "endDate": "2026-07-16",
+        }
+    ]
+    trend = _build_subscriber_trend(snapshots, 5610, promotions=promos)
+    points = trend["points"]
+    assert points[-2]["organic"] == 1300
+    assert points[-1]["organic"] > 0
+    assert points[-1]["organic"] >= points[-2]["organic"]
+    assert points[-1]["total"] == 5610
+
+
 if __name__ == "__main__":
     test_promo_timeline_is_date_ordered()
     test_build_subscriber_trend_uses_promo_dates()
     test_build_subscriber_trend_rebuilds_totals_from_analytics()
+    test_organic_does_not_drop_when_promo_batch_exceeds_total()
     print("ok")

@@ -594,6 +594,30 @@ def _align_analytics_weeks(
     return aligned
 
 
+def _promo_ad_delta(
+    promo_timeline: list[tuple[date, int]],
+    week_end: date,
+    prev_week_end: date,
+) -> int:
+    return max(
+        0,
+        _cumulative_promo_subscribers(promo_timeline, week_end)
+        - _cumulative_promo_subscribers(promo_timeline, prev_week_end),
+    )
+
+
+def _bounded_weekly_ad_delta(
+    *,
+    ad_delta: int | None,
+    promo_delta: int | None,
+    total_delta: int | None,
+) -> int:
+    candidate = ad_delta if ad_delta is not None else promo_delta or 0
+    if total_delta is not None and total_delta >= 0:
+        return min(max(0, candidate), total_delta)
+    return max(0, candidate)
+
+
 def _build_subscriber_trend(
     snapshots_data: dict[str, Any],
     live_subscribers: int | None,
@@ -645,27 +669,43 @@ def _build_subscriber_trend(
             totals[-1] = live_subscribers
 
     points: list[dict[str, Any]] = []
-    prev_total: int | None = None
+    organic_stock = 0
     for index, snap in enumerate(snapshots):
         total = totals[index]
         week_end = week_ends[index]
-        ad_cumulative = _cumulative_promo_subscribers(promo_timeline, week_end)
-        organic = max(0, total - ad_cumulative)
+        total_delta = None if index == 0 else total - totals[index - 1]
 
         aw = aligned_analytics[index]
-        ad_delta = _parse_int(aw.get("adGained")) if aw else None
-        organic_delta = _parse_int(aw.get("organicGained")) if aw else None
+        analytics_ad_delta = _parse_int(aw.get("adGained")) if aw else None
+        analytics_organic_delta = _parse_int(aw.get("organicGained")) if aw else None
 
-        if ad_delta is None and index > 0:
-            prev_week_end = week_ends[index - 1]
-            ad_delta = max(
-                0,
-                _cumulative_promo_subscribers(promo_timeline, week_end)
-                - _cumulative_promo_subscribers(promo_timeline, prev_week_end),
-            )
+        promo_delta = (
+            _promo_ad_delta(promo_timeline, week_end, week_ends[index - 1]) if index > 0 else None
+        )
+        ad_delta = _bounded_weekly_ad_delta(
+            ad_delta=analytics_ad_delta,
+            promo_delta=promo_delta,
+            total_delta=total_delta,
+        )
 
-        total_delta = None if prev_total is None else total - prev_total
-        if organic_delta is None and total_delta is not None and ad_delta is not None:
+        if index == 0:
+            opening_ad = min(_cumulative_promo_subscribers(promo_timeline, week_end), total)
+            organic_stock = max(0, total - opening_ad)
+        elif analytics_organic_delta is not None:
+            organic_stock += analytics_organic_delta
+        elif total_delta is not None:
+            organic_stock += max(0, total_delta - ad_delta)
+
+        organic_stock = max(0, min(organic_stock, total))
+        organic = organic_stock
+        ad_driven = max(0, total - organic)
+
+        organic_delta = None
+        if index > 0:
+            organic_delta = organic - points[index - 1]["organic"]
+        if analytics_organic_delta is not None:
+            organic_delta = analytics_organic_delta
+        elif total_delta is not None:
             organic_delta = max(0, total_delta - ad_delta)
 
         points.append(
@@ -674,25 +714,24 @@ def _build_subscriber_trend(
                 "date": week_end.isoformat(),
                 "total": total,
                 "organic": organic,
-                "adDriven": max(0, total - organic),
+                "adDriven": ad_driven,
                 "totalDelta": total_delta,
                 "organicDelta": organic_delta,
                 "adDelta": ad_delta,
             }
         )
-        prev_total = total
 
     has_analytics = bool(analytics_weeks and analytics_weeks.get("ok"))
     if has_analytics:
         note = (
-            "총 구독자는 Analytics 주간 순증으로 역산하고, "
-            "광고·자연 증가는 구독 캠페인 종료일과 Analytics 광고 유입을 합산한 추정입니다."
+            "총 구독자는 Analytics 주간 순증으로 역산합니다. "
+            "자연·광고 누적은 주간 Analytics(우선)와 캠페인 반영분을 합산한 추정입니다."
         )
         method = "analytics+promo"
     else:
         note = (
-            "광고 구독은 구독 캠페인 종료일 기준 누적이며, "
-            "자연 증가는 총 구독자에서 광고 누적을 뺀 값입니다."
+            "자연·광고 누적은 주간 순증 기준으로 쌓은 추정치입니다. "
+            "캠페인 구독 합계가 한 주에 몰리면 광고 쪽으로 우선 배분됩니다."
         )
         method = "promo-dated"
 
