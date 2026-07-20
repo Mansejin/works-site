@@ -249,6 +249,22 @@ html[data-theme="dark"] .promo-group-row.views td {
   background: #15233a !important;
   color: #93c5fd !important;
 }
+html[data-theme="dark"] .promo-summary-row td {
+  background: #141c2b !important;
+  color: var(--text);
+}
+html[data-theme="dark"] .promo-summary-row.subscribe td {
+  background: #10291d !important;
+  color: #86efac !important;
+}
+html[data-theme="dark"] .promo-summary-row.views td {
+  background: #15233a !important;
+  color: #93c5fd !important;
+}
+html[data-theme="dark"] .promo-summary-row.total td {
+  background: #2a2310 !important;
+  color: #fcd34d !important;
+}
 
 html[data-theme="dark"] .retention-tab,
 html[data-theme="dark"] .retention-chip {

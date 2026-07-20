@@ -621,6 +621,20 @@
     }
     .promo-group-row.subscribe td { background: #ecfdf5; color: #065f46; }
     .promo-group-row.views td { background: #eff6ff; color: #1e40af; }
+    .promo-summary-row td {
+      background: #f8fafc;
+      font-size: 0.8rem;
+      font-weight: 700;
+      border-top: 2px solid var(--border);
+      padding: 10px;
+    }
+    .promo-summary-row.subscribe td { background: #ecfdf5; color: #065f46; }
+    .promo-summary-row.views td { background: #eff6ff; color: #1e40af; }
+    .promo-summary-row.total td {
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 0.84rem;
+    }
 
     .video-thumb {
       cursor: pointer;
@@ -1205,6 +1219,7 @@
                 </tr>
               </thead>
               <tbody id="promo-table-body"></tbody>
+              <tfoot id="promo-table-foot"></tfoot>
             </table>
             <div id="promo-pagination" class="promo-pagination hidden" aria-label="프로모션 페이지"></div>
           </div>
@@ -1305,6 +1320,6 @@
 
   <script src="../js/api-auth.js"></script>
   <script src="../js/theme.js"></script>
-  <script src="js/report.js?v=42"></script>
+  <script src="js/report.js?v=43"></script>
 </body>
 </html>

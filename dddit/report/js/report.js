@@ -35,6 +35,7 @@
     analyticsKpiGrid: document.getElementById("analytics-kpi-grid"),
     analyticsStatus: document.getElementById("analytics-status"),
     promoPagination: document.getElementById("promo-pagination"),
+    promoFoot: document.getElementById("promo-table-foot"),
     saveStatus: document.getElementById("save-status"),
   };
 
@@ -1565,11 +1566,43 @@
     });
   }
 
+  function promoCostTotals(promotions) {
+    const totals = { subscribe: 0, views: 0, other: 0 };
+    (promotions || []).forEach((promo) => {
+      const group = promoGoalGroup(promo);
+      totals[group] = (totals[group] || 0) + (Number(promo.cost) || 0);
+    });
+    return totals;
+  }
+
+  function renderPromoCostSummary(promotions) {
+    if (!els.promoFoot) return;
+    const totals = promoCostTotals(promotions);
+    const grandTotal = totals.subscribe + totals.views + totals.other;
+    els.promoFoot.innerHTML = `
+      <tr class="promo-summary-row subscribe">
+        <td colspan="2">구독 캠페인 합계</td>
+        <td>${formatWon(totals.subscribe)}</td>
+        <td colspan="6"></td>
+      </tr>
+      <tr class="promo-summary-row views">
+        <td colspan="2">조회수 캠페인 합계</td>
+        <td>${formatWon(totals.views)}</td>
+        <td colspan="6"></td>
+      </tr>
+      <tr class="promo-summary-row total">
+        <td colspan="2">총 합계</td>
+        <td>${formatWon(grandTotal)}</td>
+        <td colspan="6"></td>
+      </tr>`;
+  }
+
   function renderPromotions(promotions) {
     if (promotions) allPromotions = promotions;
     const sorted = sortPromotionsForDisplay(allPromotions);
     if (!sorted.length) {
       els.promoBody.innerHTML = `<tr><td colspan="9">등록된 프로모션이 없습니다. 아래 JSON 편집으로 추가하세요.</td></tr>`;
+      if (els.promoFoot) els.promoFoot.innerHTML = "";
       renderPromoPagination(0, 0);
       return;
     }
@@ -1601,6 +1634,7 @@
       rows.push(renderPromoRow(p));
     });
     els.promoBody.innerHTML = rows.join("");
+    renderPromoCostSummary(allPromotions);
     renderPromoPagination(flat.length, promoPage);
     bindPromoBudgetEditors();
   }
