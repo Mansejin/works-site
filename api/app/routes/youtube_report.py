@@ -814,7 +814,6 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
                 channel["source"] = "scrape"
 
         recent_six = videos[:6]
-        top_views = max((v.get("views") or 0 for v in videos), default=0)
         recent_avg = (
             sum(v.get("views", 0) for v in recent_six) / len(recent_six) if recent_six else 0
         )
@@ -860,10 +859,12 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             )
             api_connections.append({"name": "YouTube Studio API", "status": "미설정"})
 
-        content_type_ids = [str(v.get("id") or "") for v in videos[:40] if v.get("id")]
+        content_type_ids = [str(v.get("id") or "") for v in videos if v.get("id")]
         content_types = await fetch_video_content_types(content_type_ids, refresh=refresh)
         for video in videos:
             video["isShorts"] = is_shorts_video_record(video, content_types)
+        longform_videos = _longform_videos(videos, content_types)
+        top_views = max((v.get("views") or 0 for v in longform_videos), default=0)
         recent_video_ids = [
             str(v.get("id") or "")
             for v in _longform_videos(videos, content_types)[:4]

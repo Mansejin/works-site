@@ -395,7 +395,7 @@
     const items = [
       { label: "구독자 수", value: kpis.subscribers, id: "kpi-subscribers" },
       { label: "총 영상 수", value: kpis.videoCount },
-      { label: "최고 조회수 (최근)", value: kpis.topViews },
+      { label: "최고 조회수 (롱폼)", value: kpis.topViews },
       { label: "최근 평균 조회수", value: kpis.recentAvgViews },
     ];
     els.kpiGrid.innerHTML = items
