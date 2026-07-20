@@ -1780,12 +1780,12 @@
       </div>
       ${ctr != null ? `<div class="yta-funnel-bridge ctr">클릭률: ${ctr}%</div>` : ""}
       <div class="yta-funnel-segment views">
-        <div class="yta-funnel-title">노출에서 발생한 조회수</div>
+        <div class="yta-funnel-title">노출 조회수</div>
         <div class="yta-funnel-value">${formatNum(views)}</div>
       </div>
       ${avdText ? `<div class="yta-funnel-bridge avd">${esc(avdText)}</div>` : ""}
       <div class="yta-funnel-segment watch-time">
-        <div class="yta-funnel-title">노출에서 발생한 시청 시간(시간)</div>
+        <div class="yta-funnel-title">시청 시간(시간)</div>
         <div class="yta-funnel-value">${formatWatchHours(watch)}</div>
       </div>
     </div>`;
@@ -1803,7 +1803,7 @@
   }
 
   function modalChartHeight(labelCount, chartType) {
-    if (chartType === "doughnut" || chartType === "pie") return Math.min(160, Math.max(120, labelCount * 18 + 80));
+    if (chartType === "doughnut" || chartType === "pie") return Math.min(128, Math.max(108, labelCount * 12 + 68));
     return Math.min(160, Math.max(52, labelCount * 28 + 16));
   }
 
@@ -1811,8 +1811,13 @@
     if (!host) return;
     destroyModalChart(key);
     const horizontal = options.horizontal || (chartType === "bar" && labels.length <= 6);
+    const isCircular = chartType === "doughnut" || chartType === "pie";
     const height = modalChartHeight(labels.length, chartType);
-    const chartClass = height <= 72 ? "video-modal-chart compact" : "video-modal-chart short";
+    const chartClass = isCircular
+      ? "video-modal-chart short pie-chart"
+      : height <= 72
+        ? "video-modal-chart compact"
+        : "video-modal-chart short";
     host.innerHTML = `<div class="${chartClass}" style="height:${height}px"><canvas id="modal-chart-${key}"></canvas></div>
       <button type="button" class="modal-data-toggle" data-modal-table="${key}">표 보기</button>
       <div class="modal-table-host hidden" id="modal-table-${key}"></div>`;
@@ -1835,8 +1840,16 @@
         responsive: true,
         maintainAspectRatio: false,
         indexAxis: horizontal ? "y" : "x",
+        radius: isCircular ? "58%" : undefined,
+        layout: isCircular ? { padding: { top: 2, bottom: 0, left: 2, right: 2 } } : undefined,
         plugins: {
-          legend: { display: chartType === "doughnut" || chartType === "pie", position: "bottom" },
+          legend: isCircular
+            ? {
+                display: true,
+                position: "bottom",
+                labels: { boxWidth: 8, padding: 4, font: { size: 9 } },
+              }
+            : { display: false },
         },
         scales:
           chartType === "bar" && horizontal
@@ -1920,7 +1933,7 @@
         </div>
         <div class="video-modal-panel">
           <h4>연령 · 성별</h4>
-          <div class="grid grid-2" style="gap:8px;">
+          <div class="modal-demographics-grid">
             <div id="modal-age">${MODAL_LOADING_HTML}</div>
             <div id="modal-gender">${MODAL_LOADING_HTML}</div>
           </div>
