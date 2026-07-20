@@ -647,8 +647,8 @@
     }
     .video-modal-dialog {
       position: relative;
-      width: min(1180px, 96vw);
-      max-height: min(92vh, 1080px);
+      width: min(1520px, 98vw);
+      max-height: min(94vh, 1200px);
       overflow: auto;
       background: #fff;
       border-radius: 14px;
@@ -669,6 +669,40 @@
       margin: 0;
     }
     .video-modal-body { padding: 14px 16px 18px; }
+    .video-modal-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .video-modal-panel {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px 12px;
+      background: #fafbfc;
+      min-width: 0;
+    }
+    .video-modal-panel.span-2 { grid-column: span 2; }
+    .video-modal-panel.span-3 { grid-column: 1 / -1; }
+    .video-modal-panel h4 {
+      margin: 0 0 8px;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+    .video-modal-top {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .video-modal-top .video-modal-panel ul {
+      margin: 0;
+      padding-left: 1.1rem;
+      font-size: 0.8rem;
+      display: grid;
+      gap: 4px;
+    }
     .video-modal-hero {
       display: grid;
       grid-template-columns: 220px 1fr;
@@ -727,8 +761,15 @@
     }
     body.video-modal-open { overflow: hidden; }
 
+    @media (max-width: 960px) {
+      .video-modal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .video-modal-top { grid-template-columns: 1fr; }
+    }
     @media (max-width: 640px) {
       .video-modal-hero { grid-template-columns: 1fr; }
+      .video-modal-grid { grid-template-columns: 1fr; }
+      .video-modal-panel.span-2,
+      .video-modal-panel.span-3 { grid-column: auto; }
       .retention-chip span { max-width: 110px; }
     }
 
@@ -820,6 +861,7 @@
     .edit-panel label { font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 6px; }
 
     .video-modal-chart.short { height: 140px; }
+    .video-modal-chart.compact { height: auto; min-height: 48px; max-height: 120px; }
     .video-modal-table {
       width: 100%;
       border-collapse: collapse;
@@ -840,22 +882,22 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
-      padding: 8px 0 4px;
-      max-width: 520px;
+      gap: 2px;
+      padding: 4px 0;
+      max-width: 100%;
       margin: 0 auto;
     }
     .funnel-step {
       text-align: center;
-      padding: 14px 12px 12px;
+      padding: 12px 10px 10px;
       color: #1e3a5f;
-      clip-path: polygon(6% 0, 94% 0, 100% 100%, 0 100%);
+      clip-path: polygon(0 0, 100% 0, 88% 100%, 12% 100%);
     }
     .funnel-step span { display: block; font-size: 0.72rem; font-weight: 700; opacity: 0.85; }
-    .funnel-step strong { display: block; font-size: 1rem; margin-top: 2px; }
+    .funnel-step strong { display: block; font-size: 0.95rem; margin-top: 2px; }
     .funnel-step.impressions { width: 100%; background: linear-gradient(180deg, #dbeafe, #bfdbfe); }
-    .funnel-step.views { width: 82%; background: linear-gradient(180deg, #dbeafe, #93c5fd); }
-    .funnel-step.watch { width: 64%; background: linear-gradient(180deg, #93c5fd, #60a5fa); color: #fff; }
+    .funnel-step.views { width: 88%; background: linear-gradient(180deg, #dbeafe, #93c5fd); }
+    .funnel-step.watch { width: 76%; background: linear-gradient(180deg, #93c5fd, #60a5fa); color: #fff; }
     .chart-wrap.traffic-tall { height: 300px; }
     .section-head-row {
       display: flex;
@@ -931,6 +973,21 @@
       font-size: 0.76rem;
       max-width: 120px;
       background: #fff;
+    }
+    .budget-input {
+      width: 5.5rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 6px;
+      font: inherit;
+      font-size: 0.76rem;
+      text-align: right;
+      background: #fff;
+    }
+    .budget-input:focus {
+      outline: none;
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
     }
     .retention-combo-row {
       display: grid;
@@ -1133,7 +1190,6 @@
             <h2>프로모션 효율 요약</h2>
           </div>
           <div class="card-body promo-table-wrap">
-            <p class="video-note" style="margin:0 0 10px;">프로모션 수치는 수동으로 반영합니다. Studio 캡처를 보내주시면 표에 맞춰 정리합니다.</p>
             <table>
               <thead>
                 <tr>
@@ -1249,6 +1305,6 @@
 
   <script src="../js/api-auth.js"></script>
   <script src="../js/theme.js"></script>
-  <script src="js/report.js?v=40"></script>
+  <script src="js/report.js?v=41"></script>
 </body>
 </html>

@@ -113,9 +113,23 @@ html[data-theme="dark"] .eff-help-btn {
   background: var(--surface);
   color: var(--text);
 }
-html[data-theme="dark"] .funnel-step.impressions { background: #1e2a44; }
-html[data-theme="dark"] .funnel-step.views { background: #1a2740; }
-html[data-theme="dark"] .funnel-step.watch { background: #15233a; }
+html[data-theme="dark"] .video-modal-dialog {
+  background: var(--surface);
+  color: var(--text);
+}
+html[data-theme="dark"] .video-modal-panel,
+html[data-theme="dark"] .video-modal-kpis .item {
+  background: #141c2b;
+  border-color: var(--border);
+}
+html[data-theme="dark"] .budget-input {
+  background: #141c2b;
+  color: var(--text);
+  border-color: var(--border);
+}
+html[data-theme="dark"] .funnel-step.impressions { background: linear-gradient(180deg, #1e2a44, #1a2740); }
+html[data-theme="dark"] .funnel-step.views { background: linear-gradient(180deg, #1a2740, #15233a); }
+html[data-theme="dark"] .funnel-step.watch { background: linear-gradient(180deg, #15233a, #101b2c); color: #dbeafe; }
 html[data-theme="dark"] .btn-ghost,
 html[data-theme="dark"] button.btn-ghost {
   background: transparent;

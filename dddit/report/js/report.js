@@ -62,7 +62,6 @@
   let videoModalRetentionChart = null;
   let apiConnections = [];
   const modalCharts = {};
-  const EFFICIENCY_OPTIONS = ["효율 매우 좋음", "효율 좋음", "효율 보통", "효율 낮음", "—"];
   const MODAL_LOADING_HTML =
     '<div class="modal-loading" aria-busy="true"><div class="modal-loading-bar"></div><div class="modal-loading-bar" style="width:78%"></div><div class="modal-loading-bar" style="width:52%"></div><p class="video-note modal-loading-label" style="margin:0;">Analytics API 호출 중…</p></div>';
   const REACH_FUNNEL_TITLE = "노출수 및 이에 따른 시청 시간";
@@ -1506,8 +1505,7 @@
         : statusLabel === "진행중" || /ACTIVE/i.test(statusLabel)
           ? " active"
           : "";
-    const budget = p.budget != null && p.budget !== "" ? formatWon(p.budget) : formatWon(m.budget);
-    const rating = p.efficiencyRating || m.efficiencyRating || "—";
+    const budgetRaw = p.budget != null && p.budget !== "" ? Number(p.budget) : Number(m.budget) || "";
     const cpvCell = group === "subscribe" ? "—" : m.cpv != null ? `${formatNum(m.cpv)}원` : "—";
     const cpsCell = m.cps != null ? `${formatNum(m.cps)}원` : "—";
     return `
@@ -1515,28 +1513,32 @@
         <td class="promo-name-cell">
           <strong>${esc(p.title)}</strong><span class="badge${statusClass}">${esc(statusLabel)}</span>${sourceBadge(p.source)}
         </td>
-        <td>${budget}</td>
+        <td>
+          <input
+            type="number"
+            class="budget-input"
+            data-promo-id="${esc(p.id)}"
+            value="${Number.isFinite(budgetRaw) && budgetRaw !== "" ? budgetRaw : ""}"
+            min="0"
+            step="1000"
+            aria-label="예산"
+          />
+        </td>
         <td>${formatWon(p.cost)}</td>
         <td>${formatNum(p.impressions)}</td>
         <td>${formatNum(p.views)}</td>
         <td>${formatNum(p.subscribers)}</td>
         <td>${cpvCell}</td>
         <td>${cpsCell}</td>
-        <td class="${effClass}">
-          <select class="efficiency-select" data-promo-id="${esc(p.id)}" aria-label="효율 등급">
-            ${EFFICIENCY_OPTIONS.map(
-              (opt) =>
-                `<option value="${esc(opt)}"${opt === rating ? " selected" : ""}>${esc(opt)}</option>`
-            ).join("")}
-          </select>
-        </td>
+        <td class="${effClass}">${esc(m.efficiencyRating || m.efficiencyText || "—")}</td>
       </tr>`;
   }
 
-  async function savePromoEfficiency(promoId, rating) {
+  async function savePromoBudget(promoId, budgetValue) {
+    const budget = Math.max(0, Math.round(Number(budgetValue) || 0));
     const current = await apiGet("/api/dddit/youtube/report/promotions", { timeoutMs: 15_000 });
     const promotions = (current.promotions || []).map((promo) =>
-      promo.id === promoId ? { ...promo, efficiencyRating: rating } : promo
+      promo.id === promoId ? { ...promo, budget } : promo
     );
     await apiPut("/api/dddit/youtube/report/promotions", {
       promotions,
@@ -1546,19 +1548,19 @@
     allPromotions = promotions;
   }
 
-  function bindPromoEfficiencyEditors() {
-    els.promoBody?.querySelectorAll(".efficiency-select").forEach((select) => {
-      select.addEventListener("change", async () => {
-        const promoId = select.getAttribute("data-promo-id");
+  function bindPromoBudgetEditors() {
+    els.promoBody?.querySelectorAll(".budget-input").forEach((input) => {
+      const commit = async () => {
+        const promoId = input.getAttribute("data-promo-id");
         if (!promoId) return;
         try {
-          await savePromoEfficiency(promoId, select.value);
-          select.classList.add("ok-flash");
-          window.setTimeout(() => select.classList.remove("ok-flash"), 600);
+          await savePromoBudget(promoId, input.value);
         } catch (err) {
-          alert(err.message || "효율 저장 실패");
+          alert(err.message || "예산 저장 실패");
         }
-      });
+      };
+      input.addEventListener("change", commit);
+      input.addEventListener("blur", commit);
     });
   }
 
@@ -1599,7 +1601,7 @@
     });
     els.promoBody.innerHTML = rows.join("");
     renderPromoPagination(flat.length, promoPage);
-    bindPromoEfficiencyEditors();
+    bindPromoBudgetEditors();
   }
 
   function isShortsVideo(video) {
@@ -1721,33 +1723,51 @@
     }
   }
 
-  function renderModalChartSection(host, key, chartType, labels, values, labelKey = "label") {
+  function modalChartHeight(labelCount, chartType) {
+    if (chartType === "doughnut" || chartType === "pie") return Math.min(160, Math.max(120, labelCount * 18 + 80));
+    return Math.min(160, Math.max(52, labelCount * 28 + 16));
+  }
+
+  function renderModalChartSection(host, key, chartType, labels, values, options = {}) {
     if (!host) return;
     destroyModalChart(key);
-    host.innerHTML = `<div class="video-modal-chart short"><canvas id="modal-chart-${key}"></canvas></div>
+    const horizontal = options.horizontal || (chartType === "bar" && labels.length <= 6);
+    const height = modalChartHeight(labels.length, chartType);
+    const chartClass = height <= 72 ? "video-modal-chart compact" : "video-modal-chart short";
+    host.innerHTML = `<div class="${chartClass}" style="height:${height}px"><canvas id="modal-chart-${key}"></canvas></div>
       <button type="button" class="modal-data-toggle" data-modal-table="${key}">표 보기</button>
       <div class="modal-table-host hidden" id="modal-table-${key}"></div>`;
     const canvas = host.querySelector(`#modal-chart-${key}`);
     if (!canvas || typeof Chart === "undefined") return;
     const colors = ["#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed", "#0891b2", "#64748b"];
+    const dataset = {
+      data: values,
+      backgroundColor: chartType === "line" ? "rgba(37,99,235,0.15)" : colors,
+      borderColor: chartType === "line" ? "#2563eb" : horizontal ? "#2563eb" : undefined,
+      fill: chartType === "line",
+      tension: 0.3,
+      borderWidth: horizontal ? 1 : undefined,
+      barThickness: horizontal ? Math.min(18, Math.max(10, Math.floor(height / Math.max(labels.length, 1)) - 6)) : undefined,
+    };
     modalCharts[key] = new Chart(canvas, {
       type: chartType,
-      data: {
-        labels,
-        datasets: [
-          {
-            data: values,
-            backgroundColor: chartType === "line" ? "rgba(37,99,235,0.15)" : colors,
-            borderColor: chartType === "line" ? "#2563eb" : undefined,
-            fill: chartType === "line",
-            tension: 0.3,
-          },
-        ],
-      },
+      data: { labels, datasets: [dataset] },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: chartType !== "bar", position: "bottom" } },
+        indexAxis: horizontal ? "y" : "x",
+        plugins: {
+          legend: { display: chartType === "doughnut" || chartType === "pie", position: "bottom" },
+        },
+        scales:
+          chartType === "bar" && horizontal
+            ? {
+                x: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                y: { ticks: { font: { size: 10 }, autoSkip: false } },
+              }
+            : chartType === "bar"
+              ? { y: { beginAtZero: true } }
+              : {},
       },
     });
     const tableHost = host.querySelector(`#modal-table-${key}`);
@@ -1784,53 +1804,53 @@
           <div class="item"><span>평균 시청</span><strong id="modal-avg-watch">불러오는 중…</strong></div>
         </div>
       </div>
-      <div class="video-modal-section">
-        <h4>빠른 진단</h4>
-        <ul>${assessment.map((line) => `<li>${esc(line)}</li>`).join("")}</ul>
+      <div class="video-modal-top">
+        <div class="video-modal-panel">
+          <h4>빠른 진단</h4>
+          <ul>${assessment.map((line) => `<li>${esc(line)}</li>`).join("")}</ul>
+        </div>
+        ${
+          (video.chapters || []).length
+            ? `<div class="video-modal-panel"><h4>챕터</h4><ul>${video.chapters
+                .slice(0, 8)
+                .map((ch) => `<li><strong>${esc(ch.timestamp)}</strong> ${esc(ch.title)}</li>`)
+                .join("")}</ul></div>`
+            : `<div class="video-modal-panel"><h4>챕터</h4><p class="video-note" style="margin:0;">챕터 없음</p></div>`
+        }
       </div>
-      ${
-        (video.chapters || []).length
-          ? `<div class="video-modal-section"><h4>챕터</h4><ul>${video.chapters
-              .slice(0, 12)
-              .map((ch) => `<li><strong>${esc(ch.timestamp)}</strong> ${esc(ch.title)}</li>`)
-              .join("")}</ul></div>`
-          : ""
-      }
-      <div class="video-modal-section">
-        <div class="video-modal-section-head">
+      <div class="video-modal-grid">
+        <div class="video-modal-panel">
           <h4>시청 트래픽 소스</h4>
+          <div id="modal-traffic">${MODAL_LOADING_HTML}</div>
         </div>
-        <div id="modal-traffic">${MODAL_LOADING_HTML}</div>
-      </div>
-      <div class="video-modal-section">
-        <div class="video-modal-section-head">
+        <div class="video-modal-panel">
           <h4>${REACH_FUNNEL_TITLE}</h4>
+          <div id="modal-funnel">${MODAL_LOADING_HTML}</div>
         </div>
-        <div id="modal-funnel">${MODAL_LOADING_HTML}</div>
-      </div>
-      <div class="video-modal-section">
-        <div class="video-modal-section-head"><h4>검색어</h4></div>
-        <div id="modal-search">${MODAL_LOADING_HTML}</div>
-      </div>
-      <div class="video-modal-section">
-        <div class="video-modal-section-head"><h4>시청자 구분 (구독 여부)</h4></div>
-        <div id="modal-audience">${MODAL_LOADING_HTML}</div>
-      </div>
-      <div class="video-modal-section">
-        <div class="video-modal-section-head"><h4>기기 유형</h4></div>
-        <div id="modal-devices">${MODAL_LOADING_HTML}</div>
-      </div>
-      <div class="video-modal-section">
-        <div class="video-modal-section-head"><h4>연령 및 성별</h4></div>
-        <div class="grid grid-2">
-          <div id="modal-age">${MODAL_LOADING_HTML}</div>
-          <div id="modal-gender">${MODAL_LOADING_HTML}</div>
+        <div class="video-modal-panel">
+          <h4>검색어</h4>
+          <div id="modal-search">${MODAL_LOADING_HTML}</div>
         </div>
-      </div>
-      <div class="video-modal-section">
-        <div class="video-modal-section-head"><h4>시청 유지</h4></div>
-        <div class="video-modal-chart"><canvas id="chart-video-retention"></canvas></div>
-        <p class="video-note" id="video-retention-note" style="margin-top:8px;">Analytics API에서 시청 유지 곡선 불러오는 중…</p>
+        <div class="video-modal-panel">
+          <h4>시청자 구분 (구독 여부)</h4>
+          <div id="modal-audience">${MODAL_LOADING_HTML}</div>
+        </div>
+        <div class="video-modal-panel">
+          <h4>기기 유형</h4>
+          <div id="modal-devices">${MODAL_LOADING_HTML}</div>
+        </div>
+        <div class="video-modal-panel">
+          <h4>연령 · 성별</h4>
+          <div class="grid grid-2" style="gap:8px;">
+            <div id="modal-age">${MODAL_LOADING_HTML}</div>
+            <div id="modal-gender">${MODAL_LOADING_HTML}</div>
+          </div>
+        </div>
+        <div class="video-modal-panel span-3">
+          <h4>시청 유지</h4>
+          <div class="video-modal-chart"><canvas id="chart-video-retention"></canvas></div>
+          <p class="video-note" id="video-retention-note" style="margin-top:8px;">Analytics API에서 시청 유지 곡선 불러오는 중…</p>
+        </div>
       </div>
       <div class="video-modal-links">
         <a class="icon-link-btn yt" href="${esc(video.url)}" target="_blank" rel="noopener" title="YouTube">YT</a>
@@ -1919,7 +1939,8 @@
             "search",
             "bar",
             searchRows.slice(0, 8).map((row) => row.term || "—"),
-            searchRows.slice(0, 8).map((row) => Number(row.views) || 0)
+            searchRows.slice(0, 8).map((row) => Number(row.views) || 0),
+            { horizontal: true }
           );
           if (tableHost) {
             tableHost.innerHTML = renderModalTableRows(searchRows, [
@@ -1963,7 +1984,8 @@
             "devices",
             "bar",
             deviceRows.map((row) => DEVICE_LABELS[row.device] || row.device || "—"),
-            deviceRows.map((row) => Number(row.views) || 0)
+            deviceRows.map((row) => Number(row.views) || 0),
+            { horizontal: true }
           );
           if (tableHost) {
             tableHost.innerHTML = renderModalTableRows(deviceRows, [
