@@ -211,6 +211,101 @@ async def _get_token_and_channel(client: httpx.AsyncClient) -> tuple[str, str]:
 
 
 
+async def fetch_subscriber_weekly_trend(refresh: bool = False) -> dict[str, Any]:
+    """Weekly subscribers gained/lost and advertising-sourced gains (channel level)."""
+    cache_key = "subscriber_weekly"
+    if not refresh:
+        cached = _cache_get(cache_key)
+        if cached:
+            return cached
+
+    if not _configured():
+        return {"ok": False, "configured": False, "weeks": [], "message": "Analytics OAuth 미설정"}
+
+    start_date, end_date = _date_range(49)
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            token, channel_id = await _get_token_and_channel(client)
+            net_body = await _analytics_get_safe(
+                client,
+                token,
+                channel_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics="subscribersGained,subscribersLost",
+                dimensions="week",
+                sort="week",
+                max_results=12,
+            )
+            ad_body = await _analytics_get_safe(
+                client,
+                token,
+                channel_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics="subscribersGained",
+                dimensions="week",
+                filters="insightTrafficSourceType==ADVERTISING",
+                sort="week",
+                max_results=12,
+            )
+
+        ad_by_week = {
+            row.get("week"): _safe_int(row.get("subscribersGained"))
+            for row in _parse_rows(ad_body)
+            if row.get("week") is not None
+        }
+
+        weeks: list[dict[str, Any]] = []
+        for row in _parse_rows(net_body):
+            week = row.get("week")
+            if week is None:
+                continue
+            gained = _safe_int(row.get("subscribersGained"))
+            lost = _safe_int(row.get("subscribersLost"))
+            ad_gained = ad_by_week.get(week, 0)
+            week_end = _week_index_to_end_date(week)
+            weeks.append(
+                {
+                    "week": week,
+                    "weekEnd": week_end.isoformat() if week_end else None,
+                    "gained": gained,
+                    "lost": lost,
+                    "net": gained - lost,
+                    "adGained": ad_gained,
+                    "organicGained": max(0, gained - ad_gained),
+                }
+            )
+
+        weeks.sort(key=lambda item: _safe_int(item.get("week")))
+        payload = {
+            "ok": True,
+            "configured": True,
+            "period": {"startDate": start_date, "endDate": end_date},
+            "weeks": weeks[-7:],
+            "message": None,
+        }
+        _cache_set(cache_key, payload)
+        return payload
+    except Exception as exc:
+        return {
+            "ok": False,
+            "configured": True,
+            "weeks": [],
+            "message": f"주간 구독자 Analytics 조회 실패: {exc}",
+        }
+
+
+def _week_index_to_end_date(week_index: Any) -> date | None:
+    text = str(week_index or "").strip()
+    if len(text) != 6 or not text.isdigit():
+        return None
+    try:
+        return date.fromisocalendar(int(text[:4]), int(text[4:]), 7)
+    except ValueError:
+        return None
+
+
 async def fetch_analytics_overview(refresh: bool = False) -> dict[str, Any]:
     cache_key = "overview"
     if not refresh:

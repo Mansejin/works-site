@@ -239,6 +239,13 @@
     return n.toLocaleString("ko-KR");
   }
 
+  function formatSigned(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    const sign = n > 0 ? "+" : "";
+    return `${sign}${n.toLocaleString("ko-KR")}`;
+  }
+
   function setStatus(text, kind) {
     if (!els.status) return;
     els.status.textContent = text;
@@ -578,7 +585,11 @@
                 const idx = items[0]?.dataIndex;
                 const p = trend.points[idx];
                 if (!p) return "";
-                return `광고 기여 추정: ${formatNum(p.adDriven)}명`;
+                const lines = [`광고 누적 추정: ${formatNum(p.adDriven)}명`];
+                if (p.totalDelta != null) lines.push(`이번 주 순증: ${formatSigned(p.totalDelta)}`);
+                if (p.organicDelta != null) lines.push(`이번 주 자연: ${formatSigned(p.organicDelta)}`);
+                if (p.adDelta != null) lines.push(`이번 주 광고: ${formatSigned(p.adDelta)}`);
+                return lines.join("\n");
               },
             },
           },

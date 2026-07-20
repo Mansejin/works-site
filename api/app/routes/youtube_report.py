@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -22,6 +22,7 @@ from app.youtube_analytics import (
     fetch_analytics_overview,
     fetch_demographics,
     fetch_retention,
+    fetch_subscriber_weekly_trend,
     fetch_traffic_sources,
     fetch_video_content_types,
     fetch_video_detail_analytics,
@@ -486,50 +487,201 @@ def _build_recent_videos_bar(
     return rows
 
 
+_PROMO_DATE_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
+
+
+def _promo_capture_date(promo: dict[str, Any]) -> date | None:
+    for key in ("capturedAt", "endDate", "completedAt", "updatedAt"):
+        raw = promo.get(key)
+        if not raw:
+            continue
+        try:
+            return date.fromisoformat(str(raw)[:10])
+        except ValueError:
+            continue
+    for note in promo.get("notes") or []:
+        match = _PROMO_DATE_RE.search(str(note))
+        if not match:
+            continue
+        try:
+            return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        except ValueError:
+            continue
+    return None
+
+
+def _snapshot_week_end_dates(snapshot_count: int) -> list[date]:
+    today = date.today()
+    return [today - timedelta(weeks=(snapshot_count - 1 - index)) for index in range(snapshot_count)]
+
+
+def _promo_ad_subscribers_by_date(promotions: list[dict[str, Any]]) -> list[tuple[date, int]]:
+    rows: list[tuple[date, int]] = []
+    for promo in promotions:
+        if not _is_subscribe_promotion(promo):
+            continue
+        subs = _parse_int(promo.get("subscribers"))
+        if subs <= 0:
+            continue
+        captured = _promo_capture_date(promo)
+        if captured:
+            rows.append((captured, subs))
+    rows.sort(key=lambda item: item[0])
+    return rows
+
+
+def _cumulative_promo_subscribers(promo_timeline: list[tuple[date, int]], as_of: date) -> int:
+    return sum(subs for captured, subs in promo_timeline if captured <= as_of)
+
+
+def _week_index_to_end_date(week_index: Any) -> date | None:
+    text = str(week_index or "").strip()
+    if len(text) != 6 or not text.isdigit():
+        return None
+    try:
+        return date.fromisocalendar(int(text[:4]), int(text[4:]), 7)
+    except ValueError:
+        return None
+
+
+def _align_analytics_weeks(
+    analytics_weeks: list[dict[str, Any]],
+    target_dates: list[date],
+) -> list[dict[str, Any] | None]:
+    indexed: list[tuple[date, dict[str, Any]]] = []
+    for week in analytics_weeks:
+        end = _week_index_to_end_date(week.get("week"))
+        if end:
+            indexed.append((end, week))
+    indexed.sort(key=lambda item: item[0])
+
+    aligned: list[dict[str, Any] | None] = []
+    used: set[int] = set()
+    for target in target_dates:
+        best_idx: int | None = None
+        best_delta = 999
+        for idx, (end, week) in enumerate(indexed):
+            if idx in used:
+                continue
+            delta = abs((end - target).days)
+            if delta < best_delta:
+                best_delta = delta
+                best_idx = idx
+        if best_idx is not None and best_delta <= 5:
+            used.add(best_idx)
+            aligned.append(indexed[best_idx][1])
+        else:
+            aligned.append(None)
+    return aligned
+
+
 def _build_subscriber_trend(
     snapshots_data: dict[str, Any],
     live_subscribers: int | None,
     *,
-    analytics: dict[str, Any] | None = None,
+    promotions: list[dict[str, Any]] | None = None,
+    analytics_weeks: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     snapshots = list(snapshots_data.get("snapshots") or [])
-    if live_subscribers and snapshots:
-        snapshots[-1] = {
-            **snapshots[-1],
-            "label": snapshots[-1].get("label") or "최신",
-            "total": live_subscribers,
-        }
-        organic = snapshots[-1].get("organic")
-        if organic is None:
-            promo_subs = sum(_parse_int(p.get("subscribers")) for p in read_promotions().get("promotions") or [])
-            snapshots[-1]["organic"] = max(0, live_subscribers - promo_subs)
+    if not snapshots:
+        return {"points": [], "adSubsTotal": 0, "note": "스냅샷 데이터 없음", "method": "none"}
 
-    ad_subs_total = sum(_parse_int(p.get("subscribers")) for p in read_promotions().get("promotions") or [])
+    promotions = promotions or read_promotions().get("promotions") or []
+    promo_timeline = _promo_ad_subscribers_by_date(promotions)
+    ad_subs_total = sum(subs for _, subs in promo_timeline)
+    week_ends = _snapshot_week_end_dates(len(snapshots))
 
-    points = []
-    for row in snapshots:
-        total = _parse_int(row.get("total"))
-        organic = row.get("organic")
-        if organic is None:
-            organic = max(0, total - ad_subs_total)
+    for index, snap in enumerate(snapshots):
+        raw = snap.get("date") or snap.get("weekEnd")
+        if not raw:
+            continue
+        try:
+            week_ends[index] = date.fromisoformat(str(raw)[:10])
+        except ValueError:
+            continue
+
+    aligned_analytics = (
+        _align_analytics_weeks((analytics_weeks or {}).get("weeks") or [], week_ends)
+        if analytics_weeks and analytics_weeks.get("ok")
+        else [None] * len(snapshots)
+    )
+
+    can_rebuild_totals = (
+        live_subscribers is not None
+        and live_subscribers > 0
+        and len(aligned_analytics) == len(snapshots)
+        and all(item is not None for item in aligned_analytics)
+    )
+
+    totals: list[int]
+    if can_rebuild_totals:
+        totals = [0] * len(snapshots)
+        totals[-1] = live_subscribers
+        for index in range(len(snapshots) - 2, -1, -1):
+            net = _parse_int(aligned_analytics[index + 1].get("net"))
+            totals[index] = max(0, totals[index + 1] - net)
+    else:
+        totals = [_parse_int(snap.get("total")) for snap in snapshots]
+        if live_subscribers and snapshots:
+            totals[-1] = live_subscribers
+
+    points: list[dict[str, Any]] = []
+    prev_total: int | None = None
+    for index, snap in enumerate(snapshots):
+        total = totals[index]
+        week_end = week_ends[index]
+        ad_cumulative = _cumulative_promo_subscribers(promo_timeline, week_end)
+        organic = max(0, total - ad_cumulative)
+
+        aw = aligned_analytics[index]
+        ad_delta = _parse_int(aw.get("adGained")) if aw else None
+        organic_delta = _parse_int(aw.get("organicGained")) if aw else None
+
+        if ad_delta is None and index > 0:
+            prev_week_end = week_ends[index - 1]
+            ad_delta = max(
+                0,
+                _cumulative_promo_subscribers(promo_timeline, week_end)
+                - _cumulative_promo_subscribers(promo_timeline, prev_week_end),
+            )
+
+        total_delta = None if prev_total is None else total - prev_total
+        if organic_delta is None and total_delta is not None and ad_delta is not None:
+            organic_delta = max(0, total_delta - ad_delta)
+
         points.append(
             {
-                "label": row.get("label") or "",
+                "label": snap.get("label") or "",
+                "date": week_end.isoformat(),
                 "total": total,
-                "organic": _parse_int(organic),
-                "adDriven": max(0, total - _parse_int(organic)),
+                "organic": organic,
+                "adDriven": max(0, total - organic),
+                "totalDelta": total_delta,
+                "organicDelta": organic_delta,
+                "adDelta": ad_delta,
             }
         )
+        prev_total = total
 
-    if analytics and analytics.get("ok"):
-        note = ""
+    has_analytics = bool(analytics_weeks and analytics_weeks.get("ok"))
+    if has_analytics:
+        note = (
+            "총 구독자는 Analytics 주간 순증으로 역산하고, "
+            "광고·자연 증가는 구독 캠페인 종료일과 Analytics 광고 유입을 합산한 추정입니다."
+        )
+        method = "analytics+promo"
     else:
-        note = "주간 스냅샷 데이터 기준 추정치입니다."
+        note = (
+            "광고 구독은 구독 캠페인 종료일 기준 누적이며, "
+            "자연 증가는 총 구독자에서 광고 누적을 뺀 값입니다."
+        )
+        method = "promo-dated"
 
     return {
         "points": points,
         "adSubsTotal": ad_subs_total,
         "note": note,
+        "method": method,
     }
 
 
@@ -610,6 +762,7 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
         )
 
         analytics_overview = await fetch_analytics_overview(refresh=refresh)
+        subscriber_weekly = await fetch_subscriber_weekly_trend(refresh=refresh)
         ads_status = await get_ads_status()
         if google_ads_sync_enabled() and google_ads_config() and not ads_status.get("lastSync"):
             await sync_campaigns(force=False)
@@ -693,7 +846,10 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             "viewsTrend7d": snapshots_data.get("viewsTrend7d") or [],
             "viewsTrendNote": views_trend_note,
             "subscriberTrend": _build_subscriber_trend(
-                snapshots_data, live_subs, analytics=analytics_overview
+                snapshots_data,
+                live_subs,
+                promotions=promotions,
+                analytics_weeks=subscriber_weekly,
             ),
             "promotions": enriched_promos,
             "memo": _overview_memo(promotions_data),
