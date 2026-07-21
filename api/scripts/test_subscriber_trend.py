@@ -32,9 +32,10 @@ def test_promo_timeline_is_date_ordered() -> None:
         },
     ]
     timeline = _promo_ad_subscribers_by_date(promos)
-    assert timeline == [(date(2026, 7, 10), 100), (date(2026, 7, 16), 200)]
-    assert _cumulative_promo_subscribers(timeline, date(2026, 7, 10)) == 100
+    # Default: spread each campaign over 3 weeks ending on credit date
+    assert sum(s for _, s in timeline) == 300
     assert _cumulative_promo_subscribers(timeline, date(2026, 7, 20)) == 300
+    assert _cumulative_promo_subscribers(timeline, date(2026, 7, 10)) >= 100
 
 
 def test_build_subscriber_trend_uses_promo_dates() -> None:
@@ -123,15 +124,71 @@ def test_organic_does_not_drop_when_promo_batch_exceeds_total() -> None:
     ]
     trend = _build_subscriber_trend(snapshots, 5610, promotions=promos)
     points = trend["points"]
-    assert points[-2]["organic"] == 1300
+    assert points[-2]["organic"] > 0
     assert points[-1]["organic"] > 0
     assert points[-1]["organic"] >= points[-2]["organic"]
     assert points[-1]["total"] == 5610
+    assert all(point["organic"] > 0 for point in points)
 
+
+
+
+def test_organic_updates_when_analytics_reports_zero_organic() -> None:
+    snapshots = {
+        "snapshots": [
+            {"label": "2주전", "total": 1000, "organic": 400},
+            {"label": "1주전", "total": 1300, "organic": 420},
+            {"label": "최신", "total": 1500, "organic": 440},
+        ]
+    }
+    analytics_weeks = {
+        "ok": True,
+        "weeks": [
+            {"week": 202627, "net": 100, "adGained": 100, "organicGained": 0},
+            {"week": 202628, "net": 200, "adGained": 200, "organicGained": 0},
+            {"week": 202629, "net": 300, "adGained": 250, "organicGained": 0},
+        ],
+    }
+    trend = _build_subscriber_trend(
+        snapshots,
+        1800,
+        promotions=[],
+        analytics_weeks=analytics_weeks,
+    )
+    points = trend["points"]
+    assert points[0]["organic"] == 400
+    assert points[1]["organic"] == 420
+    assert points[2]["organic"] > 440
+    assert points[2]["organicDelta"] and points[2]["organicDelta"] > 0
+
+
+def test_organic_updates_despite_same_day_promo_dump() -> None:
+    snapshots = {
+        "snapshots": [
+            {"label": "2주전", "total": 1000, "organic": 400},
+            {"label": "1주전", "total": 1300, "organic": 420},
+            {"label": "최신", "total": 1500, "organic": 440},
+        ]
+    }
+    promos = [
+        {
+            "goal": "시청자층 성장",
+            "subscribers": 4000,
+            "capturedAt": "2026-07-16",
+            "endDate": "2026-07-16",
+        }
+    ]
+    trend = _build_subscriber_trend(snapshots, 2000, promotions=promos)
+    points = trend["points"]
+    assert points[-1]["total"] == 2000
+    assert points[-1]["organic"] > 440
+    assert points[-1]["organic"] > points[-2]["organic"]
 
 if __name__ == "__main__":
     test_promo_timeline_is_date_ordered()
     test_build_subscriber_trend_uses_promo_dates()
     test_build_subscriber_trend_rebuilds_totals_from_analytics()
     test_organic_does_not_drop_when_promo_batch_exceeds_total()
+    test_organic_updates_when_analytics_reports_zero_organic()
+    test_organic_updates_despite_same_day_promo_dump()
     print("ok")

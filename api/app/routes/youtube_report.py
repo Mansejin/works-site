@@ -529,7 +529,27 @@ def _promo_date_from_notes(notes: Any) -> str | None:
     return None
 
 
+_DEFAULT_PROMO_SPREAD_WEEKS = 3
+
+
+def _promo_spread_weeks(promo: dict[str, Any], credit_end: date) -> int:
+    """How many weeks to spread promo subs over (avoids Studio capture-day dumps)."""
+    start_raw = _parse_promo_iso_date(promo.get("startDate"))
+    if start_raw:
+        start = date.fromisoformat(start_raw)
+        if start < credit_end:
+            days = (credit_end - start).days
+            return max(1, min(8, (days + 6) // 7))
+    return _DEFAULT_PROMO_SPREAD_WEEKS
+
+
 def _promo_ad_subscribers_by_date(promotions: list[dict[str, Any]]) -> list[tuple[date, int]]:
+    """Timeline of promo-attributed subs.
+
+    Studio sync often stamps many campaigns with the same endDate/capturedAt, which
+    previously dumped thousands of ad subs into a single week and froze organic growth.
+    Spread each campaign's subscribers across its run (or 3 weeks by default).
+    """
     rows: list[tuple[date, int]] = []
     for promo in promotions:
         if not _is_subscribe_promotion(promo):
@@ -538,8 +558,15 @@ def _promo_ad_subscribers_by_date(promotions: list[dict[str, Any]]) -> list[tupl
         if subs <= 0:
             continue
         credit_date = _promo_subscriber_credit_date(promo)
-        if credit_date:
-            rows.append((credit_date, subs))
+        if not credit_date:
+            continue
+        weeks = _promo_spread_weeks(promo, credit_date)
+        base, rem = divmod(subs, weeks)
+        for offset in range(weeks):
+            portion = base + (rem if offset == weeks - 1 else 0)
+            if portion <= 0:
+                continue
+            rows.append((credit_date - timedelta(weeks=(weeks - 1 - offset)), portion))
     rows.sort(key=lambda item: item[0])
     return rows
 
@@ -670,14 +697,25 @@ def _build_subscriber_trend(
 
     points: list[dict[str, Any]] = []
     organic_stock = 0
+    last_index = len(snapshots) - 1
     for index, snap in enumerate(snapshots):
         total = totals[index]
         week_end = week_ends[index]
         total_delta = None if index == 0 else total - totals[index - 1]
+        snap_total = _parse_int(snap.get("total"))
+        stored_organic_raw = snap.get("organic")
+        has_stored_organic = stored_organic_raw is not None and str(stored_organic_raw).strip() != ""
+        stored_organic = _parse_int(stored_organic_raw) if has_stored_organic else None
+        live_bumped = (
+            index == last_index
+            and live_subscribers is not None
+            and live_subscribers > 0
+            and total > snap_total
+            and has_stored_organic
+        )
 
         aw = aligned_analytics[index]
         analytics_ad_delta = _parse_int(aw.get("adGained")) if aw else None
-        analytics_organic_delta = _parse_int(aw.get("organicGained")) if aw else None
 
         promo_delta = (
             _promo_ad_delta(promo_timeline, week_end, week_ends[index - 1]) if index > 0 else None
@@ -688,11 +726,31 @@ def _build_subscriber_trend(
             total_delta=total_delta,
         )
 
-        if index == 0:
-            opening_ad = min(_cumulative_promo_subscribers(promo_timeline, week_end), total)
-            organic_stock = max(0, total - opening_ad)
-        elif analytics_organic_delta is not None:
-            organic_stock += analytics_organic_delta
+        # Prefer snapshot organic; always grow by residual (total_delta - ad_delta).
+        # Do not add Analytics organicGained alone — when it is 0 the gray line froze.
+        if has_stored_organic and not live_bumped:
+            organic_stock = max(0, min(stored_organic or 0, total))
+        elif live_bumped:
+            base = max(0, min(stored_organic or 0, snap_total))
+            bump = total - snap_total
+            residual = max(0, bump - (ad_delta or 0))
+            # When promo/analytics claims the entire tip, keep organic moving using the
+            # historical organic share of growth from the snapshot series.
+            if residual == 0 and bump > 0:
+                first = snapshots[0]
+                first_total = _parse_int(first.get("total"))
+                first_organic_raw = first.get("organic")
+                if first_organic_raw is not None and snap_total > first_total:
+                    first_organic = _parse_int(first_organic_raw)
+                    share = max(0.0, (base - first_organic) / (snap_total - first_total))
+                    residual = max(1, int(round(bump * share)))
+                else:
+                    residual = max(1, int(round(bump * 0.05)))
+            organic_stock = max(0, min(total, base + residual))
+        elif index == 0:
+            # Do not subtract cumulative promo from the first point — capture-day dumps
+            # (even when spread) would zero the baseline. Weekly deltas handle ad share.
+            organic_stock = total
         elif total_delta is not None:
             organic_stock += max(0, total_delta - ad_delta)
 
@@ -703,10 +761,6 @@ def _build_subscriber_trend(
         organic_delta = None
         if index > 0:
             organic_delta = organic - points[index - 1]["organic"]
-        if analytics_organic_delta is not None:
-            organic_delta = analytics_organic_delta
-        elif total_delta is not None:
-            organic_delta = max(0, total_delta - ad_delta)
 
         points.append(
             {
@@ -725,13 +779,14 @@ def _build_subscriber_trend(
     if has_analytics:
         note = (
             "총 구독자는 Analytics 주간 순증으로 역산합니다. "
-            "자연·광고 누적은 주간 Analytics(우선)와 캠페인 반영분을 합산한 추정입니다."
+            "자연 증가는 주간 총 증가분에서 광고 기여를 뺀 잔여분입니다. "
+            "스냅샷 organic이 있으면 이를 기준으로 이어갑니다."
         )
         method = "analytics+promo"
     else:
         note = (
-            "자연·광고 누적은 주간 순증 기준으로 쌓은 추정치입니다. "
-            "캠페인 구독 합계가 한 주에 몰리면 광고 쪽으로 우선 배분됩니다."
+            "자연 증가는 주간 총 증가분에서 광고 기여(캠페인·분산 귀속)를 뺀 잔여분입니다. "
+            "캠페인 구독은 종료일 하루에 몰지 않고 집행 기간(없으면 3주)에 나눠 반영합니다."
         )
         method = "promo-dated"
 
@@ -741,6 +796,38 @@ def _build_subscriber_trend(
         "note": note,
         "method": method,
     }
+
+
+
+def _persist_trend_snapshots(
+    snapshots_data: dict[str, Any],
+    live_subscribers: int | None,
+    trend: dict[str, Any],
+) -> dict[str, Any]:
+    """Write back latest total/organic so the natural-growth line keeps updating on disk."""
+    points = trend.get("points") or []
+    snaps = list(snapshots_data.get("snapshots") or [])
+    if not points or not snaps:
+        return trend
+    last_point = points[-1]
+    last = dict(snaps[-1])
+    last["total"] = int(last_point.get("total") or last.get("total") or 0)
+    last["organic"] = int(last_point.get("organic") or last.get("organic") or 0)
+    if last_point.get("date"):
+        last["date"] = last_point["date"]
+    if live_subscribers and live_subscribers > 0:
+        last["total"] = int(live_subscribers)
+        last["organic"] = min(int(last["organic"]), int(last["total"]))
+    snaps[-1] = last
+    payload = {
+        "snapshots": snaps,
+        "viewsTrend7d": snapshots_data.get("viewsTrend7d") or [],
+    }
+    try:
+        write_snapshots(payload)
+    except OSError:
+        pass
+    return trend
 
 
 def _overview_memo(promotions_data: dict[str, Any]) -> str:
@@ -904,11 +991,15 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             ),
             "viewsTrend7d": snapshots_data.get("viewsTrend7d") or [],
             "viewsTrendNote": views_trend_note,
-            "subscriberTrend": _build_subscriber_trend(
+            "subscriberTrend": _persist_trend_snapshots(
                 snapshots_data,
                 live_subs,
-                promotions=promotions,
-                analytics_weeks=subscriber_weekly,
+                _build_subscriber_trend(
+                    snapshots_data,
+                    live_subs,
+                    promotions=promotions,
+                    analytics_weeks=subscriber_weekly,
+                ),
             ),
             "promotions": enriched_promos,
             "memo": _overview_memo(promotions_data),

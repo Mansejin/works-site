@@ -265,15 +265,16 @@ async def fetch_subscriber_weekly_trend(refresh: bool = False) -> dict[str, Any]
             lost = _safe_int(row.get("subscribersLost"))
             ad_gained = ad_by_week.get(week, 0)
             week_end = _week_index_to_end_date(week)
+            net = gained - lost
             weeks.append(
                 {
                     "week": week,
                     "weekEnd": week_end.isoformat() if week_end else None,
                     "gained": gained,
                     "lost": lost,
-                    "net": gained - lost,
-                    "adGained": ad_gained,
-                    "organicGained": max(0, gained - ad_gained),
+                    "net": net,
+                    "adGained": min(ad_gained, max(0, net)),
+                    "organicGained": max(0, net - min(ad_gained, max(0, net))),
                 }
             )
 
