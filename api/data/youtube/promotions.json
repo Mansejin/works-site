@@ -5,42 +5,42 @@
     {
       "id": "lumena-objet-subs",
       "title": "루메나 오브제 제습기 (구독)",
-      "videoTitle": "10만 원 대 예쁜 제습기? 루메나 오브제 제습기 솔직 리뷰",
+      "videoTitle": "10만 원 대 예쁜 제습기? 루메나 오브제 제습기 직접 써봤습니다",
       "videoId": "",
-      "status": "대기중",
+      "status": "진행중",
       "goal": "시청자층 성장",
       "budget": 170000,
-      "cost": 0,
-      "impressions": 0,
-      "views": 0,
-      "subscribers": 0,
+      "cost": 22125,
+      "impressions": 11200,
+      "views": 141,
+      "subscribers": 52,
       "followOnViews": 0,
       "source": "manual",
+      "capturedAt": "2026-07-22",
       "notes": [
-        "Studio 캡처 2026-07-20",
-        "대기 중"
-      ],
-      "capturedAt": "2026-07-20"
+        "Studio 캡처 2026-07-22",
+        "활성 · 시청자층 성장"
+      ]
     },
     {
       "id": "lumena-objet-views",
       "title": "루메나 오브제 제습기 (조회수)",
-      "videoTitle": "10만 원 대 예쁜 제습기? 루메나 오브제 제습기 솔직 리뷰",
+      "videoTitle": "10만 원 대 예쁜 제습기? 루메나 오브제 제습기 직접 써봤습니다",
       "videoId": "",
-      "status": "대기중",
+      "status": "진행중",
       "goal": "동영상 조회수",
       "budget": 90000,
-      "cost": 0,
-      "impressions": 0,
-      "views": 0,
+      "cost": 11973,
+      "impressions": 2824,
+      "views": 455,
       "subscribers": 0,
       "followOnViews": 0,
       "source": "manual",
+      "capturedAt": "2026-07-22",
       "notes": [
-        "Studio 캡처 2026-07-20",
-        "대기 중"
-      ],
-      "capturedAt": "2026-07-20"
+        "Studio 캡처 2026-07-22",
+        "활성 · 동영상 조회수"
+      ]
     },
     {
       "id": "dreame-mf10-subs",
