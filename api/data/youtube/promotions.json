@@ -4,6 +4,46 @@
   ],
   "promotions": [
     {
+      "id": "lumena-objet-subs",
+      "title": "루메나 오브제 제습기 (구독)",
+      "videoTitle": "10만 원 대 예쁜 제습기? 루메나 오브제 제습기 직접 써봤습니다",
+      "videoId": "",
+      "status": "진행중",
+      "goal": "시청자층 성장",
+      "budget": 170000,
+      "cost": 22125,
+      "impressions": 11200,
+      "views": 141,
+      "subscribers": 52,
+      "followOnViews": 0,
+      "source": "manual",
+      "capturedAt": "2026-07-22",
+      "notes": [
+        "Studio 캡처 2026-07-22",
+        "활성 · 시청자층 성장"
+      ]
+    },
+    {
+      "id": "lumena-objet-views",
+      "title": "루메나 오브제 제습기 (조회수)",
+      "videoTitle": "10만 원 대 예쁜 제습기? 루메나 오브제 제습기 직접 써봤습니다",
+      "videoId": "",
+      "status": "진행중",
+      "goal": "동영상 조회수",
+      "budget": 90000,
+      "cost": 11973,
+      "impressions": 2824,
+      "views": 455,
+      "subscribers": 0,
+      "followOnViews": 0,
+      "source": "manual",
+      "capturedAt": "2026-07-22",
+      "notes": [
+        "Studio 캡처 2026-07-22",
+        "활성 · 동영상 조회수"
+      ]
+    },
+    {
       "id": "lenovo-ideatab11-subs",
       "title": "레노버 아이디어 탭 11 (구독)",
       "videoTitle": "펜까지 기본인데 26만 원? 레노버 아이디어 탭 11 솔직 리뷰 #태블릿 #레노버 #아이디어탭11",
