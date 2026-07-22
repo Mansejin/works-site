@@ -12,7 +12,7 @@
   <script src="../js/team-gate.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <link rel="stylesheet" href="../css/theme-dark.css?v=1" />
-  <link rel="stylesheet" href="css/style.css?v=16" />
+  <link rel="stylesheet" href="css/style.css?v=17" />
   <script>
     window.__earlyErrors = window.__earlyErrors || [];
     window.addEventListener('error', function (e) {
@@ -103,6 +103,27 @@
 
             <div id="plan-summary" class="plan-summary"></div>
             <p id="plan-missing" class="empty-hint hidden">기획안이 없습니다. 위에서 프로젝트를 고르거나 「기획안 편집」에서 작성하세요.</p>
+
+            <div class="upload-meta-panel hidden" id="upload-meta-panel">
+              <div class="upload-meta-head">
+                <h3>업로드 메타 · 제목 · 더보기</h3>
+                <div class="upload-meta-actions">
+                  <button id="btn-upload-meta-generate" class="btn btn-primary btn-sm" type="button">기획안에서 생성</button>
+                  <button id="btn-upload-title-copy" class="btn btn-secondary btn-sm" type="button">제목 복사</button>
+                  <button id="btn-upload-desc-copy" class="btn btn-secondary btn-sm" type="button">더보기 복사</button>
+                </div>
+              </div>
+              <p class="hint">기획안 제목·요약·설명란 초안·태그·구성(QC)으로 유튜브 업로드용 제목과 더보기 설명란을 채웁니다. 타임라인 시각은 목표 러닝타임 기준 추정입니다.</p>
+              <label class="field">
+                업로드 제목
+                <input id="upload-title-input" type="text" maxlength="100" placeholder="기획안 불러온 뒤 「기획안에서 생성」" />
+              </label>
+              <label class="field">
+                더보기 (설명란)
+                <textarea id="upload-desc-input" rows="10" placeholder="소개 · 링크 · 태그 · 챕터 타임라인"></textarea>
+              </label>
+              <p id="upload-meta-note" class="hint muted hidden"></p>
+            </div>
 
             <div class="chapter-qc-panel" id="chapter-qc-panel">
               <div class="chapter-qc-head">
@@ -358,10 +379,11 @@
   <script src="../js/theme.js"></script>
   <script src="../js/plan-defaults.js?v=2"></script>
   <script src="../js/chapter-title-qc.js?v=3"></script>
+  <script src="../js/upload-meta.js?v=1"></script>
   <script src="../js/brand-guide-qc.js?v=1"></script>
   <script src="../js/plan-brief-sync.js?v=2"></script>
   <script src="js/works-api.js?v=5"></script>
   <script src="js/sheet-sync.js?v=3"></script>
-  <script src="js/main.js?v=44"></script>
+  <script src="js/main.js?v=45"></script>
 </body>
 </html>

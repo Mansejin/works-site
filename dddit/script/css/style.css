@@ -1079,6 +1079,50 @@ body.hosted [data-local-only] { display: none !important; }
 .panel { /* noop */ }
 .hint-inline { font-weight: 400; color: var(--text-muted); font-size: 0.78rem; }
 
+.upload-meta-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+}
+
+.upload-meta-panel.hidden {
+  display: none;
+}
+
+.upload-meta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.upload-meta-head h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.upload-meta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#upload-title-input {
+  font-weight: 600;
+}
+
+#upload-desc-input {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 .chapter-qc-panel {
   display: flex;
   flex-direction: column;
