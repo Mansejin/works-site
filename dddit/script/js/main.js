@@ -1750,6 +1750,8 @@ const state = {
   allRows: [],
   pipelineStep: 1,
   sheetOpenUrl: '',
+  uploadTitle: '',
+  uploadDescription: '',
 };
 
 /** 진행 중인 AI 작업 취소 */
@@ -2040,6 +2042,7 @@ function reloadChaptersFromPlanQc(options = {}) {
   renderChapterQcPreview(state.chapters);
   renderChapters();
   saveProject();
+  generateUploadMetaFromPlan({ silent: true });
   const count = state.chapters.length;
   if (!options.silent) {
     showToast(`챕터 ${count}개 · 짧은 제목 적용`);
@@ -2102,6 +2105,76 @@ function renderPlanSummary() {
   }
   renderChapterQcPreview(state.chapters);
   renderGuideCoverageQc();
+  renderUploadMetaPanel();
+  if (plan && !String(state.uploadTitle || '').trim() && !String(state.uploadDescription || '').trim()) {
+    generateUploadMetaFromPlan({ silent: true });
+  }
+}
+
+function syncUploadMetaFromDOM() {
+  state.uploadTitle = String($('#upload-title-input')?.value || '').trim();
+  state.uploadDescription = String($('#upload-desc-input')?.value || '').trim();
+}
+
+function renderUploadMetaPanel() {
+  const panel = $('#upload-meta-panel');
+  const plan = loadPlanData();
+  if (!panel) return;
+  if (!plan) {
+    panel.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+  const titleEl = $('#upload-title-input');
+  const descEl = $('#upload-desc-input');
+  const noteEl = $('#upload-meta-note');
+  if (titleEl && document.activeElement !== titleEl) titleEl.value = state.uploadTitle || '';
+  if (descEl && document.activeElement !== descEl) descEl.value = state.uploadDescription || '';
+  const empty = !String(state.uploadTitle || '').trim() && !String(state.uploadDescription || '').trim();
+  if (noteEl) {
+    noteEl.classList.toggle('hidden', !empty);
+    if (empty) noteEl.textContent = '「기획안에서 생성」으로 제목·더보기를 채울 수 있습니다.';
+  }
+}
+
+function generateUploadMetaFromPlan(options = {}) {
+  const plan = loadPlanData();
+  if (!plan) {
+    if (!options.silent) showToast('기획안이 없습니다.', true);
+    return null;
+  }
+  const gen = window.DdditUploadMeta?.generateFromPlan;
+  if (!gen) {
+    if (!options.silent) showToast('업로드 메타 모듈을 불러오지 못했습니다.', true);
+    return null;
+  }
+  const chapters = state.chapters.length
+    ? state.chapters
+    : chaptersFromPlanStructure(plan?.structure);
+  const result = gen(plan, chapters, options);
+  state.uploadTitle = result.uploadTitle || '';
+  state.uploadDescription = result.uploadDescription || '';
+  renderUploadMetaPanel();
+  saveProject();
+  if (!options.silent) {
+    const mins = result.meta?.totalMinutes ?? '?';
+    showToast(`제목·더보기 생성 · 챕터 ${result.meta?.chapterCount || 0}개 · ~${mins}분 추정`);
+  }
+  return result;
+}
+
+async function copyUploadMeta(label, text) {
+  const value = String(text || '').trim();
+  if (!value) {
+    showToast(`${label}이 비어 있습니다.`, true);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+    showToast(`${label} 복사됨`);
+  } catch {
+    showToast('복사에 실패했습니다.', true);
+  }
 }
 
 function renderGuideCoverageQc() {
@@ -2655,6 +2728,7 @@ function saveProject() {
   try {
     syncSupplementsFromDOM();
     syncChaptersFromDOM();
+    syncUploadMetaFromDOM();
     state.proseDraft = $('#prose-draft')?.value || state.proseDraft;
     localStorage.setItem(projectStorageKey(), JSON.stringify({
       adMode: Boolean(state.adMode),
@@ -2666,6 +2740,8 @@ function saveProject() {
       proseDraft: state.proseDraft,
       proseHistory: state.proseHistory || [],
       pipelineStep: state.pipelineStep,
+      uploadTitle: state.uploadTitle || '',
+      uploadDescription: state.uploadDescription || '',
       savedAt: new Date().toISOString(),
     }));
   } catch { /* quota */ }
@@ -2687,6 +2763,8 @@ function loadProject() {
     state.proseDraft = saved.proseDraft || '';
     state.proseHistory = Array.isArray(saved.proseHistory) ? saved.proseHistory : [];
     state.pipelineStep = saved.pipelineStep || 1;
+    state.uploadTitle = saved.uploadTitle || '';
+    state.uploadDescription = saved.uploadDescription || '';
     state.adMode = typeof saved.adMode === 'boolean' ? saved.adMode : defaultAdModeForProject();
   } catch { /* ignore */ }
 }
@@ -3568,6 +3646,17 @@ function bindEvents() {
   $('#btn-add-chapter')?.addEventListener('click', addChapter);
   $('#btn-chapter-qc')?.addEventListener('click', () => reloadChaptersFromPlanQc());
   $('#btn-chapter-qc-step2')?.addEventListener('click', () => reloadChaptersFromPlanQc());
+  $('#btn-upload-meta-generate')?.addEventListener('click', () => generateUploadMetaFromPlan());
+  $('#btn-upload-title-copy')?.addEventListener('click', () => {
+    syncUploadMetaFromDOM();
+    copyUploadMeta('제목', state.uploadTitle);
+  });
+  $('#btn-upload-desc-copy')?.addEventListener('click', () => {
+    syncUploadMetaFromDOM();
+    copyUploadMeta('더보기', state.uploadDescription);
+  });
+  $('#upload-title-input')?.addEventListener('input', () => { syncUploadMetaFromDOM(); saveProject(); });
+  $('#upload-desc-input')?.addEventListener('input', () => { syncUploadMetaFromDOM(); saveProject(); });
   $('#btn-guide-qc-refresh')?.addEventListener('click', () => {
     renderGuideCoverageQc();
     showToast('가이드 QC를 갱신했습니다.');
