@@ -54,12 +54,29 @@ python3 scripts/apply_cloudflare_access.py
 # DRY_RUN=1 python3 scripts/apply_cloudflare_access.py
 ```
 
-Cloud Agent에 `CF_API_TOKEN` 시크릿을 넣고 같은 명령을 재실행하면 DNS Proxied + Bypass/Protect 앱을 맞춥니다.
+Cloud Agent에 `CF_API_TOKEN` 시크릿을 넣고 **새 Cloud Agent를 시작**(또는 기존 세션 재시작)한 뒤 같은 명령을 실행하면 DNS Proxied + Bypass/Protect 앱을 맞춥니다.
+
+> **중요:** Secrets는 에이전트 **시작 시점**에만 주입됩니다.  
+> 이미 돌아가는 세션에 토큰을 추가해도 `env`에 안 보입니다.  
+> 확인: `echo ${CF_API_TOKEN:+set}` 또는 `CLOUD_AGENT_INJECTED_SECRET_NAMES`에 `CF_API_TOKEN` 포함 여부.
+
+**시크릿 넣는 위치:** [Dashboard → Cloud Agents → Secrets](https://cursor.com/dashboard/cloud-agents)  
+(또는 웹 agents 화면의 **Set Up Cloud Agents**)
+
+**토큰 권한 (Custom Token):**
+- Account → Zero Trust → Edit
+- Zone → DNS → Edit
+- Zone → SSL and Certificates → Edit
+- Zone resources: `mansejin.com`
 
 ### B. Cloudflare MCP
 
-Cursor에 `https://mcp.cloudflare.com/mcp` 연결(OAuth) 후 동일 작업을 도구로 수행.  
-이 Cloud Agent 런타임에는 Cloudflare MCP가 아직 주입되지 않았고, OAuth도 headless에서 완료할 수 없습니다.
+1. Desktop MCP ≠ Cloud Agent MCP. Desktop Settings에만 있으면 Cloud Agent에는 안 보입니다.
+2. Cloud Agent용: [cursor.com/agents](https://cursor.com/agents) → **에이전트 대화/입력창 옆 MCP 드롭다운**에서 추가·OAuth.  
+   팀: Dashboard → Integrations 하단 **Team MCP Servers** (Slack/GitHub Connect 목록과는 별개).
+3. Access/DNS에 필요한 서버: HTTP `https://mcp.cloudflare.com/mcp` (`cloudflare` 3 tools: search/execute).  
+   `bindings` / `builds` / `docs` / `observability`만으로는 Access 앱·DNS를 못 바꿉니다.
+4. OAuth는 에이전트 실행 **전에** 웹에서 완료. headless 세션 안에서는 새로 끝낼 수 없습니다.
 
 권한 예: Account Zero Trust Write, Zone DNS Edit, Zone SSL Edit.
 
