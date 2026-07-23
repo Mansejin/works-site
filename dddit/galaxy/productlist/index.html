@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
-  <meta name="description" content="디디딧 · 갤럭시 Z 폴드8 구매 후보 메모" />
+  <meta name="description" content="디디딧 · 갤럭시 언팩 실구매 후보 메모" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <title>구매 후보 · 갤럭시 Z 폴드8 · 디디딧</title>
+  <title>구매 후보 · 갤럭시 언팩 · 디디딧</title>
   <style>
     :root {
       --bg: #f4f6f8;
@@ -417,10 +417,10 @@
       <div class="card-header">
         <span class="badge">디디딧</span>
         <h1>구매 후보 · 스펙 메모</h1>
-        <p class="subtitle">갤럭시 Z 폴드8 / 폴드8 울트라 · 본인 구매 예정 (광고 아님)</p>
+        <p class="subtitle">폴드8 · 플립8 실구매 확정 · 워치·글래스는 확인 후 선택 (광고 아님)</p>
         <div class="meta">
           <span><strong>채널</strong> 디디딧</span>
-          <span><strong>유형</strong> 구매 리뷰</span>
+          <span><strong>유형</strong> 실구매 실사용</span>
           <span><strong>출시</strong> 사전 7/28 · 정식 8/7</span>
         </div>
       </div>
@@ -447,16 +447,40 @@
   <script id="product-data" type="application/json">
 [
   {
-    "name": "갤럭시 Z 폴드8 울트라 256GB",
+    "name": "【실구매】갤럭시 Z 폴드8 울트라 256GB",
     "color": "Violet Shadow / Graphite / Cream (+Green Shadow 온라인)",
     "qty": "1",
     "link": "출고 2,577,300원 · 8.0\"+6.5\" · 펼침 4.1mm · 215g · 200MP · 5000mAh · 45W · 사전7/28–8/3 · 정식8/7"
   },
   {
-    "name": "갤럭시 Z 폴드8 256GB",
+    "name": "【실구매】갤럭시 Z 폴드8 256GB",
     "color": "Lavender / Graphite / Cream (+Pistachio 온라인)",
     "qty": "1",
     "link": "출고 2,278,100원 · 7.6\"(4:3)+5.5\"(10:16) · 펼침 4.5mm · 201g · 듀얼50MP · 4800mAh · 45W"
+  },
+  {
+    "name": "【실구매】갤럭시 Z 플립8 256GB",
+    "color": "확인 후",
+    "qty": "1",
+    "link": "출고 1,683,000원 · 사전7/28–8/3 · 정식8/7 · 접힘·커버 디스플레이·데일리 실사용"
+  },
+  {
+    "name": "【후보】갤럭시 워치 울트라2 47mm LTE",
+    "color": "Titanium Silver / Titanium Gray",
+    "qty": "확인 후",
+    "link": "출고 969,100원 · 리뷰 가치 확인 후 구매 · 사전7/28 · 정식8/7"
+  },
+  {
+    "name": "【후보】갤럭시 워치9 (40/44mm)",
+    "color": "확인 후",
+    "qty": "확인 후",
+    "link": "BT 499,000~539,000 · LTE 529,100~569,800 · 리뷰 가치 확인 후 구매"
+  },
+  {
+    "name": "【후보】지능형 글래스 (AI 아이웨어)",
+    "color": "디자인 2종 (언팩)",
+    "qty": "확인 후",
+    "link": "구글·젠틀몬스터·워비파커 · 연내·가을 출시 · 가격 미정 · 출시·스펙 확인 후 구매 여부"
   },
   {
     "name": "공식 치수 · 울트라",
@@ -471,16 +495,10 @@
     "link": "접힘 81.9×123.9×9.7mm · 펼침 161.4×123.9×4.5mm · Flex Titanium · Vision Booster"
   },
   {
-    "name": "참고 · 삼성 뉴스룸",
+    "name": "참고 · 삼성 뉴스룸 (내부)",
     "color": "—",
     "qty": "—",
     "link": "https://news.samsung.com/global/samsung-galaxy-z-fold8-ultra-fold8-and-flip8foldables-perfected-for-every-way-of-living"
-  },
-  {
-    "name": "참고 · 테크몽 영상",
-    "color": "—",
-    "qty": "—",
-    "link": "https://www.youtube.com/watch?v=lgwX_39N0Y4"
   }
 ]
   </script>
@@ -489,6 +507,7 @@
   <script>
     const STORAGE_KEY = "works/dddit/galaxy/productlist";
     const PROJECT = "galaxy";
+    const DATA_REVISION = 2;
     const LEGACY_STORAGE_KEYS = [
       "works/dddit/productlist/galaxy",
       "works/dddit/productlist",
@@ -691,8 +710,17 @@
     function saveToLocalStorage(rows) {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ updatedAt: Date.now(), rows })
+        JSON.stringify({ updatedAt: Date.now(), revision: DATA_REVISION, rows })
       );
+    }
+
+    function needsDefaultRefresh(rows) {
+      if (!rows?.length) return true;
+      const blob = rows.map((r) => `${r.name || ""}|${r.link || ""}`).join("\n");
+      if (/테크몽|techmong/i.test(blob)) return true;
+      if (!/플립8|Flip\s*8/i.test(blob)) return true;
+      if (!/워치\s*울트라2|Watch\s*Ultra/i.test(blob)) return true;
+      return false;
     }
 
     function loadFromLocalStorage() {
@@ -708,7 +736,10 @@
           }
         }
         if (!raw) return null;
-        return JSON.parse(raw).rows || null;
+        const parsed = JSON.parse(raw);
+        const savedRev = Number(parsed.revision || 0);
+        if (savedRev < DATA_REVISION) return null;
+        return parsed.rows || null;
       } catch {
         return null;
       }
@@ -900,8 +931,14 @@
         try {
           const remote = await window.DdditProductlistSync.load(PROJECT);
           if (remote && window.DdditProductlistSync.hasContent(remote.rows)) {
-            rows = remote.rows.map(normalizeRow);
-            setSyncStatus("서버 데이터");
+            const remoteRows = remote.rows.map(normalizeRow);
+            if (!needsDefaultRefresh(remoteRows)) {
+              rows = remoteRows;
+              setSyncStatus("서버 데이터");
+            } else {
+              shouldSeedServer = true;
+              setSyncStatus("기본 목록 갱신");
+            }
           }
         } catch (err) {
           console.warn(err);
@@ -911,12 +948,16 @@
 
       if (!rows) {
         const localRows = loadFromLocalStorage();
-        if (window.DdditProductlistSync?.hasContent?.(localRows) || (localRows && localRows.some((r) => (r.name || r.link || "").trim()))) {
+        if (
+          !needsDefaultRefresh(localRows) &&
+          (window.DdditProductlistSync?.hasContent?.(localRows) ||
+            (localRows && localRows.some((r) => (r.name || r.link || "").trim())))
+        ) {
           rows = localRows.map(normalizeRow);
         } else {
           rows = embeddedRows;
+          shouldSeedServer = true;
         }
-        shouldSeedServer = true;
       }
 
       renderRows(rows.map(normalizeRow));
