@@ -21,14 +21,18 @@ def _signing_secret() -> str:
     return team_gate_passcode()
 
 
+def _sign(payload: str, secret: str) -> str:
+    return hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+
+
 def issue_team_token() -> tuple[str, int]:
     secret = _signing_secret()
     if not secret:
         raise RuntimeError("team gate is not configured")
     expires_at = int(time.time()) + 7 * 24 * 3600
     payload = str(expires_at)
-    sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
-    return f"{payload}.{sig}", expires_at
+    # Full HMAC hex. Also accept legacy 32-char truncated sigs in verify.
+    return f"{payload}.{_sign(payload, secret)}", expires_at
 
 
 def verify_team_token(token: str) -> bool:
@@ -42,8 +46,11 @@ def verify_team_token(token: str) -> bool:
         return False
     if expires_at < int(time.time()):
         return False
-    expected = hmac.new(secret.encode(), exp_str.encode(), hashlib.sha256).hexdigest()[:32]
-    return hmac.compare_digest(sig, expected)
+    expected = _sign(exp_str, secret)
+    if hmac.compare_digest(sig, expected):
+        return True
+    # Legacy tokens issued with truncated signature
+    return hmac.compare_digest(sig, expected[:32])
 
 
 def verify_team_passcode(passcode: str) -> bool:

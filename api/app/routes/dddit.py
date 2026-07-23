@@ -44,9 +44,14 @@ def team_gate_status() -> dict[str, Any]:
 
 
 @router.post("/team-gate/login")
-def team_gate_login(body: TeamGateLoginBody) -> dict[str, Any]:
+def team_gate_login(request: Request, body: TeamGateLoginBody) -> dict[str, Any]:
     if not team_gate_enabled():
         return {"ok": True, "enabled": False, "bypass": True}
+    client = request.client.host if request.client else "unknown"
+    from app.rate_limit import LOGIN_LIMITER
+
+    if not LOGIN_LIMITER.allow(f"login:{client}"):
+        raise HTTPException(status_code=429, detail="Too many login attempts")
     if not verify_team_passcode(body.passcode):
         raise HTTPException(status_code=401, detail="Invalid passcode")
     token, expires_at = issue_team_token()
@@ -102,13 +107,23 @@ async def sheet_ensure(project: str = "default") -> dict[str, Any]:
 
 
 @router.get("/sheet/get")
-async def sheet_get(project: str = "default") -> dict[str, Any]:
+async def sheet_get(request: Request, project: str = "default") -> dict[str, Any]:
     try:
         if sheets_native_configured():
-            return await native_sheet_get(project)
-        return await _apps_script_request("GET", {"action": "get", "project": project})
+            data = await native_sheet_get(project)
+        else:
+            data = await _apps_script_request("GET", {"action": "get", "project": project})
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    # Public brand reads must not leak Drive spreadsheet IDs/URLs.
+    token = (request.headers.get("X-Dddit-Team-Token") or "").strip()
+    if not verify_team_token(token) and isinstance(data, dict):
+        redacted = dict(data)
+        for key in ("spreadsheetId", "spreadsheetUrl", "sheetId", "sheetUrl"):
+            redacted.pop(key, None)
+        return redacted
+    return data
 
 
 @router.post("/sheet/replace")

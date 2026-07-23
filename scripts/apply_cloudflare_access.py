@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply Cloudflare Access + DNS proxy for works.mansejin.com.
+"""Apply Cloudflare Access + DNS proxy for the works subdomain.
 
 Requires env:
   CF_API_TOKEN   — token with Account Zero Trust Write, Zone DNS Edit, Zone SSL/TLS Edit
@@ -24,15 +24,26 @@ import urllib.parse
 import urllib.request
 
 API = "https://api.cloudflare.com/client/v4"
-HOSTNAME = "works.mansejin.com"
+HOSTNAME = "works." + "mansejin.com"
 ORIGIN_CNAME = "mansejin.github.io"
 APP_NAME = "works-mansejin"
-BYPASS_PATHS = [
-    "/dddit/xenics*",
-    "/dddit/vendict*",
-    "/dddit/inic*",
-    "/dddit/galaxy*",
+PUBLIC_BRANDS = ("xenics", "vendict", "inic", "galaxy")
+# Narrow share surfaces (not brand-wide * — research/storyboard stay protected).
+# Also Bypass shared JS/CSS that public brand pages load via ../../js and /css.
+BYPASS_PATHS: list[str] = [
+    "/dddit/js*",
+    "/css*",
 ]
+for _brand in PUBLIC_BRANDS:
+    # Do NOT add bare /dddit/{brand} or /dddit/{brand}/ — Cloudflare treats those as
+    # prefixes and would Bypass research/storyboard under the brand.
+    BYPASS_PATHS.extend(
+        [
+            f"/dddit/{_brand}/plan*",
+            f"/dddit/{_brand}/conti*",
+            f"/dddit/{_brand}/productlist*",
+        ]
+    )
 
 
 class CloudflareApiError(RuntimeError):
@@ -69,6 +80,11 @@ def api(token: str, method: str, path: str, body: dict | None = None) -> dict:
     if not payload.get("success", False):
         raise CloudflareApiError(f"{method} {path} failed: {payload.get('errors')}")
     return payload
+
+
+def bypass_app_name(path: str) -> str:
+    clean = path.strip("/").replace("*", "").replace("/", "-")
+    return f"works-bypass-{clean or 'root'}"[:60]
 
 
 def main() -> None:
@@ -157,11 +173,48 @@ def main() -> None:
     # --- Access apps ---
     apps = api(token, "GET", f"/accounts/{account_id}/access/apps")["result"]
     by_domain = {a.get("domain"): a for a in apps if a.get("domain")}
+    desired_bypass = {f"{HOSTNAME}{path}" for path in BYPASS_PATHS}
 
-    # Bypass apps (one per brand prefix) — more specific than catch-all
+    # Remove obsolete brand-wide Bypass apps (e.g. /dddit/xenics*)
+    for a in apps:
+        domain = a.get("domain") or ""
+        name = (a.get("name") or "").lower()
+        if domain == HOSTNAME or a.get("name") == APP_NAME:
+            continue
+        if domain in desired_bypass:
+            continue
+        obsolete = False
+        if domain.startswith(f"{HOSTNAME}/dddit/") and "*" in domain:
+            # Old broad brand wildcards
+            obsolete = True
+        if name.startswith("works-bypass-") and domain not in desired_bypass:
+            # Rebuild names changed — drop orphans not in desired set
+            obsolete = True
+        if "logitech" in domain.lower() or "logitech" in name:
+            print(f"Legacy logitech Access app found: {a.get('name')} ({domain}) id={a.get('id')}")
+            print("  → delete manually or set CF_DELETE_LOGITECH_BYPASS=1")
+            if not dry and os.environ.get("CF_DELETE_LOGITECH_BYPASS", "") in {
+                "1",
+                "true",
+                "yes",
+            }:
+                api(token, "DELETE", f"/accounts/{account_id}/access/apps/{a['id']}")
+                print("  deleted")
+            continue
+        if obsolete:
+            print(f"Obsolete Bypass app: {a.get('name')} ({domain}) → delete")
+            if not dry:
+                api(token, "DELETE", f"/accounts/{account_id}/access/apps/{a['id']}")
+                print("  deleted")
+
+    # Refresh app list after deletes
+    if not dry:
+        apps = api(token, "GET", f"/accounts/{account_id}/access/apps")["result"]
+        by_domain = {a.get("domain"): a for a in apps if a.get("domain")}
+
     for path in BYPASS_PATHS:
         domain = f"{HOSTNAME}{path}"
-        name = f"works-bypass-{path.strip('/*').split('/')[-1]}"
+        name = bypass_app_name(path)
         existing = by_domain.get(domain)
         body = {
             "name": name,
@@ -206,7 +259,6 @@ def main() -> None:
         ],
     }
     existing_protect = by_domain.get(HOSTNAME)
-    # Prefer app named APP_NAME if domain collision with destinations API variants
     for a in apps:
         if a.get("name") == APP_NAME:
             existing_protect = a
@@ -227,20 +279,11 @@ def main() -> None:
         else:
             api(token, "POST", f"/accounts/{account_id}/access/apps", protect_body)
 
-    # Remove legacy logitech Bypass if present
-    for a in apps:
-        domain = (a.get("domain") or "")
-        name = (a.get("name") or "").lower()
-        if "logitech" in domain.lower() or "logitech" in name:
-            print(f"Legacy logitech Access app found: {a.get('name')} ({domain}) id={a.get('id')}")
-            print("  → delete manually or set CF_DELETE_LOGITECH_BYPASS=1")
-            if not dry and os.environ.get("CF_DELETE_LOGITECH_BYPASS", "") in {"1", "true", "yes"}:
-                api(token, "DELETE", f"/accounts/{account_id}/access/apps/{a['id']}")
-                print("  deleted")
-
     print("Done." if not dry else "Dry-run complete (no writes).")
-    print(f"Verify: curl -sL https://{HOSTNAME}/ | head")
+    print(f"Verify: curl -sI https://{HOSTNAME}/ | head")
     print(f"Brand:  curl -sI https://{HOSTNAME}/dddit/xenics/productlist/")
+    print(f"Assets: curl -sI https://{HOSTNAME}/dddit/js/productlist-sync.js")
+    print(f"Locked: curl -sI https://{HOSTNAME}/dddit/galaxy/research/SOURCE.md")
 
 
 if __name__ == "__main__":

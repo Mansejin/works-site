@@ -423,6 +423,9 @@ function connectCollab() {
 
   wsProvider = new WebsocketProvider(api.collabWsUrl(), api.collabRoom(project), ydoc, {
     connect: true,
+    params: {
+      token: window.DdditApiAuth?.getTeamToken?.() || "",
+    },
   });
 
   wsProvider.awareness.setLocalStateField("user", user);

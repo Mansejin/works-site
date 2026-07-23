@@ -68,17 +68,27 @@
   }
 
   async function loadFromServer() {
-    const res = await fetch(`${API_BASE}/api/logitechg/schedule`);
+    const headers = window.DdditApiAuth?.authHeaders?.() || {};
+    const res = await fetch(`${API_BASE}/api/logitechg/schedule`, { headers });
+    if (window.DdditApiAuth?.handleUnauthorized?.(res)) {
+      throw new Error("Team authentication required");
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
 
   async function saveToServer(positions, updatedAt) {
+    const headers = window.DdditApiAuth?.authHeaders?.({
+      "Content-Type": "application/json",
+    }) || { "Content-Type": "application/json" };
     const res = await fetch(`${API_BASE}/api/logitechg/schedule`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ updatedAt, positions }),
     });
+    if (window.DdditApiAuth?.handleUnauthorized?.(res)) {
+      throw new Error("Team authentication required");
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }

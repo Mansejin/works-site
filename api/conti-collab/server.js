@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
@@ -13,6 +14,10 @@ const PORT = Number(process.env.PORT || 8789);
 const CONTI_DIR = process.env.CONTI_DATA_DIR || path.join(__dirname, "..", "data", "conti");
 const YJS_DIR = path.join(CONTI_DIR, ".yjs");
 const PERSIST_DEBOUNCE_MS = Number(process.env.CONTI_PERSIST_DEBOUNCE_MS || 2000);
+const TEAM_SECRET =
+  (process.env.DDDIT_TEAM_GATE_SECRET || process.env.DDDIT_TEAM_GATE_PASSCODE || "").trim();
+const REQUIRE_TOKEN = process.env.CONTI_WS_REQUIRE_TOKEN !== "0";
+
 
 const HEADERS = ["대본", "장면", "자막", "코멘트"];
 const ROOM_PREFIX = "conti-";
@@ -150,15 +155,72 @@ const server = http.createServer((_req, res) => {
   res.end("conti-collab ok\n");
 });
 
+function signingSecret() {
+  return TEAM_SECRET;
+}
+
+function verifyTeamToken(token) {
+  const secret = signingSecret();
+  if (!secret || !token) return false;
+  const parts = String(token).split(".");
+  if (parts.length !== 2) return false;
+  const [expStr, sig] = parts;
+  const expiresAt = Number(expStr);
+  if (!Number.isFinite(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) {
+    return false;
+  }
+  const expected = crypto.createHmac("sha256", secret).update(expStr).digest("hex");
+  if (sig.length === expected.length) {
+    try {
+      return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+    } catch {
+      return false;
+    }
+  }
+  // Legacy truncated signatures (32 hex chars)
+  if (sig.length === 32) {
+    try {
+      return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected.slice(0, 32)));
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function tokenFromUpgradeRequest(request) {
+  try {
+    const url = new URL(request.url || "/", "http://localhost");
+    return (url.searchParams.get("token") || "").trim();
+  } catch {
+    return "";
+  }
+}
+
 const wss = new WebSocketServer({ noServer: true });
 wss.on("connection", setupWSConnection);
 
 server.on("upgrade", (request, socket, head) => {
+  if (REQUIRE_TOKEN) {
+    if (!signingSecret()) {
+      socket.write("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    const token = tokenFromUpgradeRequest(request);
+    if (!verifyTeamToken(token)) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+  }
   wss.handleUpgrade(request, socket, head, (ws) => {
     wss.emit("connection", ws, request);
   });
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`[conti-collab] ws://${HOST}:${PORT} data=${CONTI_DIR}`);
+  console.log(
+    `[conti-collab] ws://${HOST}:${PORT} data=${CONTI_DIR} auth=${REQUIRE_TOKEN ? "token" : "off"}`
+  );
 });
