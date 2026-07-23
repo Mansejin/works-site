@@ -4,11 +4,13 @@
 Requires env:
   CF_API_TOKEN   — token with Account Zero Trust Write, Zone DNS Edit, Zone SSL/TLS Edit
 Optional:
-  CF_ACCOUNT_ID  — skip account discovery
+  CF_ACCOUNT_ID  — skip account discovery (zone-scoped tokens often cannot list /accounts;
+                   script falls back to zone.account.id)
   CF_ZONE_ID     — skip zone discovery
   WORKS_ACCESS_ALLOW_EMAILS — comma-separated emails for Allow policy
                               (default: everyone — tighten after first login works)
   DRY_RUN=1      — print planned changes only
+  CF_DELETE_LOGITECH_BYPASS=1 — delete legacy logitech Access apps if found
 
 See scripts/cloudflare-access-checklist.md
 """
@@ -33,6 +35,12 @@ BYPASS_PATHS = [
 ]
 
 
+class CloudflareApiError(RuntimeError):
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
+
 def die(msg: str, code: int = 1) -> None:
     print(f"ERROR: {msg}", file=sys.stderr)
     sys.exit(code)
@@ -55,9 +63,11 @@ def api(token: str, method: str, path: str, body: dict | None = None) -> dict:
             payload = json.load(res)
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")
-        die(f"{method} {path} → HTTP {e.code}: {detail}")
+        raise CloudflareApiError(
+            f"{method} {path} → HTTP {e.code}: {detail}", status=e.code
+        ) from e
     if not payload.get("success", False):
-        die(f"{method} {path} failed: {payload.get('errors')}")
+        raise CloudflareApiError(f"{method} {path} failed: {payload.get('errors')}")
     return payload
 
 
@@ -78,19 +88,33 @@ def main() -> None:
         if e.strip()
     ]
 
-    if not account_id:
-        accounts = api(token, "GET", "/accounts?per_page=50")["result"]
-        if not accounts:
-            die("No Cloudflare accounts visible to this token")
-        account_id = accounts[0]["id"]
-        print(f"account_id={account_id} ({accounts[0].get('name')})")
-
     if not zone_id:
         zones = api(token, "GET", "/zones?name=mansejin.com")["result"]
         if not zones:
             die("Zone mansejin.com not found")
-        zone_id = zones[0]["id"]
+        zone = zones[0]
+        zone_id = zone["id"]
         print(f"zone_id={zone_id}")
+        if not account_id:
+            account_id = (zone.get("account") or {}).get("id")
+            if account_id:
+                acct_name = (zone.get("account") or {}).get("name")
+                print(f"account_id={account_id} (from zone; {acct_name})")
+
+    if not account_id:
+        accounts = api(token, "GET", "/accounts?per_page=50")["result"]
+        if not accounts:
+            die(
+                "No Cloudflare account_id — set CF_ACCOUNT_ID "
+                "(zone-scoped tokens often cannot list /accounts)"
+            )
+        account_id = accounts[0]["id"]
+        print(f"account_id={account_id} ({accounts[0].get('name')})")
+    elif os.environ.get("CF_ACCOUNT_ID"):
+        print(f"account_id={account_id} (from CF_ACCOUNT_ID)")
+
+    if os.environ.get("CF_ZONE_ID"):
+        print(f"zone_id={zone_id} (from CF_ZONE_ID)")
 
     # --- DNS: works CNAME proxied ---
     records = api(
@@ -116,12 +140,19 @@ def main() -> None:
         api(token, "PUT", f"/zones/{zone_id}/dns_records/{rec['id']}", dns_body)
         print("DNS updated (Proxied)")
 
-    # --- SSL Full ---
-    ssl = api(token, "GET", f"/zones/{zone_id}/settings/ssl")["result"]
-    print(f"SSL mode={ssl.get('value')} (want full or strict)")
-    if not dry and ssl.get("value") not in {"full", "strict"}:
-        api(token, "PATCH", f"/zones/{zone_id}/settings/ssl", {"value": "full"})
-        print("SSL set to full")
+    # --- SSL Full (zone-settings may be denied on narrow tokens) ---
+    try:
+        ssl = api(token, "GET", f"/zones/{zone_id}/settings/ssl")["result"]
+        print(f"SSL mode={ssl.get('value')} (want full or strict)")
+        if not dry and ssl.get("value") not in {"full", "strict"}:
+            api(token, "PATCH", f"/zones/{zone_id}/settings/ssl", {"value": "full"})
+            print("SSL set to full")
+    except CloudflareApiError as e:
+        print(
+            f"WARN: SSL settings skipped ({e}). Confirm Full/strict in Dashboard "
+            "(Zone → SSL/TLS). Continuing with DNS + Access.",
+            file=sys.stderr,
+        )
 
     # --- Access apps ---
     apps = api(token, "GET", f"/accounts/{account_id}/access/apps")["result"]
@@ -213,4 +244,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except CloudflareApiError as e:
+        die(str(e))

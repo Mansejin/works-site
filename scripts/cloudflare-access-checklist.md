@@ -50,11 +50,14 @@
 export CF_API_TOKEN=...   # Zero Trust Write + Zone DNS/SSL Edit
 # optional: WORKS_ACCESS_ALLOW_EMAILS=you@example.com
 # optional: CF_DELETE_LOGITECH_BYPASS=1
+# optional: CF_ACCOUNT_ID / CF_ZONE_ID (zone-scoped 토큰은 /accounts 가 비는 경우가 많음 — 스크립트가 zone.account로 보완)
 python3 scripts/apply_cloudflare_access.py
 # DRY_RUN=1 python3 scripts/apply_cloudflare_access.py
 ```
 
 Cloud Agent에 `CF_API_TOKEN` 시크릿을 넣고 **새 Cloud Agent를 시작**(또는 기존 세션 재시작)한 뒤 같은 명령을 실행하면 DNS Proxied + Bypass/Protect 앱을 맞춥니다.
+
+Zone Settings(SSL) Edit이 토큰에 없으면 SSL 단계는 WARN으로 건너뛰고 DNS·Access만 적용합니다. Dashboard에서 **SSL/TLS = Full 또는 Full (strict)** 를 한 번 확인하세요. Access 전파에는 보통 1–2분이 걸릴 수 있습니다.
 
 > **중요:** Secrets는 에이전트 **시작 시점**에만 주입됩니다.  
 > 이미 돌아가는 세션에 토큰을 추가해도 `env`에 안 보입니다.  
