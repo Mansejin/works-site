@@ -581,14 +581,20 @@
           legend: { position: "bottom" },
           tooltip: {
             callbacks: {
+              label(ctx) {
+                const v = ctx.parsed?.y;
+                return `${ctx.dataset.label}: ${formatNum(v)}`;
+              },
               afterBody(items) {
                 const idx = items[0]?.dataIndex;
                 const p = trend.points[idx];
                 if (!p) return "";
-                const lines = [`광고 누적 추정: ${formatNum(p.adDriven)}명`];
+                const lines = [
+                  `광고 누적 (추정): ${formatNum(p.adDriven)}명`,
+                ];
                 if (p.totalDelta != null) lines.push(`이번 주 순증: ${formatSigned(p.totalDelta)}`);
-                if (p.organicDelta != null) lines.push(`이번 주 자연: ${formatSigned(p.organicDelta)}`);
                 if (p.adDelta != null) lines.push(`이번 주 광고: ${formatSigned(p.adDelta)}`);
+                if (p.organicDelta != null) lines.push(`이번 주 자연: ${formatSigned(p.organicDelta)}`);
                 return lines.join("\n");
               },
             },

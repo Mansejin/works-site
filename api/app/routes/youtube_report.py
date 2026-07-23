@@ -639,7 +639,8 @@ def _bounded_weekly_ad_delta(
     promo_delta: int | None,
     total_delta: int | None,
 ) -> int:
-    candidate = ad_delta if ad_delta is not None else promo_delta or 0
+    # Analytics ADVERTISING often undercounts Studio promotions — take the larger signal.
+    candidate = max(ad_delta or 0, promo_delta or 0)
     if total_delta is not None and total_delta >= 0:
         return min(max(0, candidate), total_delta)
     return max(0, candidate)
@@ -656,7 +657,8 @@ def _build_subscriber_trend(
     if not snapshots:
         return {"points": [], "adSubsTotal": 0, "note": "스냅샷 데이터 없음", "method": "none"}
 
-    promotions = promotions or read_promotions().get("promotions") or []
+    if promotions is None:
+        promotions = read_promotions().get("promotions") or []
     promo_timeline = _promo_ad_subscribers_by_date(promotions)
     ad_subs_total = sum(subs for _, subs in promo_timeline)
     week_ends = _snapshot_week_end_dates(len(snapshots))
@@ -726,26 +728,36 @@ def _build_subscriber_trend(
             total_delta=total_delta,
         )
 
-        # Prefer snapshot organic; always grow by residual (total_delta - ad_delta).
-        # Do not add Analytics organicGained alone — when it is 0 the gray line froze.
+        # Prefer snapshot organic; grow by residual (total_delta - ad_delta).
+        # Do not invent organic share when ads claim the tip — that inverted ad vs organic.
         if has_stored_organic and not live_bumped:
             organic_stock = max(0, min(stored_organic or 0, total))
         elif live_bumped:
             base = max(0, min(stored_organic or 0, snap_total))
             bump = total - snap_total
-            residual = max(0, bump - (ad_delta or 0))
-            # When promo/analytics claims the entire tip, keep organic moving using the
-            # historical organic share of growth from the snapshot series.
-            if residual == 0 and bump > 0:
+            measured_ad = ad_delta or 0
+            # Ongoing Studio promos often miss Analytics ADVERTISING + post-capture
+            # promo timeline. If measured ad is far below the channel's historical
+            # ad share of growth, blend toward that history so tip isn't flipped to organic.
+            if bump > 0 and measured_ad < bump * 0.5:
                 first = snapshots[0]
                 first_total = _parse_int(first.get("total"))
                 first_organic_raw = first.get("organic")
-                if first_organic_raw is not None and snap_total > first_total:
+                if (
+                    first_organic_raw is not None
+                    and snap_total > first_total > 0
+                    and (stored_organic or 0) >= _parse_int(first_organic_raw)
+                ):
                     first_organic = _parse_int(first_organic_raw)
-                    share = max(0.0, (base - first_organic) / (snap_total - first_total))
-                    residual = max(1, int(round(bump * share)))
-                else:
-                    residual = max(1, int(round(bump * 0.05)))
+                    grown = snap_total - first_total
+                    organic_grown = (stored_organic or 0) - first_organic
+                    hist_organic_share = max(0.0, min(1.0, organic_grown / grown))
+                    hist_ad_share = 1.0 - hist_organic_share
+                    if hist_ad_share >= 0.5:
+                        measured_ad = max(measured_ad, int(round(bump * hist_ad_share)))
+                        measured_ad = min(measured_ad, bump)
+                        ad_delta = measured_ad
+            residual = max(0, bump - measured_ad)
             organic_stock = max(0, min(total, base + residual))
         elif index == 0:
             # Do not subtract cumulative promo from the first point — capture-day dumps
@@ -759,8 +771,11 @@ def _build_subscriber_trend(
         ad_driven = max(0, total - organic)
 
         organic_delta = None
+        ad_delta_out = ad_delta
         if index > 0:
             organic_delta = organic - points[index - 1]["organic"]
+            # Keep weekly tip math consistent: organic + ad ≈ total delta.
+            ad_delta_out = max(0, (total_delta or 0) - (organic_delta or 0))
 
         points.append(
             {
@@ -771,7 +786,7 @@ def _build_subscriber_trend(
                 "adDriven": ad_driven,
                 "totalDelta": total_delta,
                 "organicDelta": organic_delta,
-                "adDelta": ad_delta,
+                "adDelta": ad_delta_out,
             }
         )
 

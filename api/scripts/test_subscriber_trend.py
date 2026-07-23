@@ -76,9 +76,9 @@ def test_build_subscriber_trend_uses_promo_dates() -> None:
 def test_build_subscriber_trend_rebuilds_totals_from_analytics() -> None:
     snapshots = {
         "snapshots": [
-            {"label": "2주전", "total": 1},
-            {"label": "1주전", "total": 1},
-            {"label": "최신", "total": 1},
+            {"label": "2주전", "total": 1, "date": "2026-07-05"},
+            {"label": "1주전", "total": 1, "date": "2026-07-12"},
+            {"label": "최신", "total": 1, "date": "2026-07-19"},
         ]
     }
     analytics_weeks = {
@@ -89,7 +89,7 @@ def test_build_subscriber_trend_rebuilds_totals_from_analytics() -> None:
             {"week": 202629, "net": 300, "adGained": 180, "organicGained": 120},
         ],
     }
-    week_ends = [date(2026, 7, 6), date(2026, 7, 13), date(2026, 7, 20)]
+    week_ends = [date(2026, 7, 5), date(2026, 7, 12), date(2026, 7, 19)]
     aligned = _align_analytics_weeks(analytics_weeks["weeks"], week_ends)
     assert all(item is not None for item in aligned)
 
@@ -136,9 +136,9 @@ def test_organic_does_not_drop_when_promo_batch_exceeds_total() -> None:
 def test_organic_updates_when_analytics_reports_zero_organic() -> None:
     snapshots = {
         "snapshots": [
-            {"label": "2주전", "total": 1000, "organic": 400},
-            {"label": "1주전", "total": 1300, "organic": 420},
-            {"label": "최신", "total": 1500, "organic": 440},
+            {"label": "2주전", "total": 1000, "organic": 400, "date": "2026-07-05"},
+            {"label": "1주전", "total": 1300, "organic": 420, "date": "2026-07-12"},
+            {"label": "최신", "total": 1500, "organic": 440, "date": "2026-07-19"},
         ]
     }
     analytics_weeks = {
@@ -158,16 +158,58 @@ def test_organic_updates_when_analytics_reports_zero_organic() -> None:
     points = trend["points"]
     assert points[0]["organic"] == 400
     assert points[1]["organic"] == 420
-    assert points[2]["organic"] > 440
-    assert points[2]["organicDelta"] and points[2]["organicDelta"] > 0
+    # live bump 300 with analytics ad 250 → organic stock 440+50=490
+    assert points[2]["organic"] == 490
+    assert points[2]["organicDelta"] == 70  # 490 - previous 420
+    assert points[2]["adDelta"] == 230  # totalDelta 300 - organicDelta 70
+    assert points[2]["adDelta"] > points[2]["organicDelta"]
+
+
+def test_promo_beats_undercounted_analytics_ad() -> None:
+    """Studio promo subs should win when Analytics ADVERTISING undercounts."""
+    snapshots = {
+        "snapshots": [
+            {"label": "2주전", "total": 1000, "organic": 400, "date": "2026-07-05"},
+            {"label": "1주전", "total": 1300, "organic": 420, "date": "2026-07-12"},
+            {"label": "최신", "total": 1500, "organic": 440, "date": "2026-07-19"},
+        ]
+    }
+    promos = [
+        {
+            "goal": "시청자층 성장",
+            "subscribers": 4000,
+            "capturedAt": "2026-07-16",
+            "endDate": "2026-07-16",
+        }
+    ]
+    analytics_weeks = {
+        "ok": True,
+        "weeks": [
+            {"week": 202627, "net": 100, "adGained": 10, "organicGained": 90},
+            {"week": 202628, "net": 200, "adGained": 10, "organicGained": 190},
+            {"week": 202629, "net": 500, "adGained": 18, "organicGained": 480},
+        ],
+    }
+    trend = _build_subscriber_trend(
+        snapshots,
+        2000,
+        promotions=promos,
+        analytics_weeks=analytics_weeks,
+    )
+    points = trend["points"]
+    assert points[-1]["total"] == 2000
+    # Tip growth should be mostly ad (promo), not organic
+    assert points[-1]["adDelta"] >= points[-1]["organicDelta"]
+    assert points[-1]["organic"] <= 500
+    assert points[-1]["adDriven"] > points[-1]["organic"]
 
 
 def test_organic_updates_despite_same_day_promo_dump() -> None:
     snapshots = {
         "snapshots": [
-            {"label": "2주전", "total": 1000, "organic": 400},
-            {"label": "1주전", "total": 1300, "organic": 420},
-            {"label": "최신", "total": 1500, "organic": 440},
+            {"label": "2주전", "total": 1000, "organic": 400, "date": "2026-07-05"},
+            {"label": "1주전", "total": 1300, "organic": 420, "date": "2026-07-12"},
+            {"label": "최신", "total": 1500, "organic": 440, "date": "2026-07-19"},
         ]
     }
     promos = [
@@ -181,8 +223,41 @@ def test_organic_updates_despite_same_day_promo_dump() -> None:
     trend = _build_subscriber_trend(snapshots, 2000, promotions=promos)
     points = trend["points"]
     assert points[-1]["total"] == 2000
-    assert points[-1]["organic"] > 440
-    assert points[-1]["organic"] > points[-2]["organic"]
+    # Promo claims the tip — organic stays at snapshot baseline (no invented growth)
+    assert points[-1]["organic"] == 440
+    assert points[-1]["adDriven"] == 1560
+    assert points[-1]["adDelta"] >= points[-1]["organicDelta"]
+
+def test_live_tip_uses_historical_ad_share_when_signals_undercount() -> None:
+    """When Analytics/promo miss the tip, use snapshot ad-share so organic isn't inflated."""
+    snapshots = {
+        "snapshots": [
+            {"label": "2주전", "total": 1000, "organic": 400, "date": "2026-07-05"},
+            {"label": "1주전", "total": 1300, "organic": 420, "date": "2026-07-12"},
+            {"label": "최신", "total": 1500, "organic": 440, "date": "2026-07-19"},
+        ]
+    }
+    # Growth 1000→1500 gained only +40 organic → ~92% historical ad share
+    analytics_weeks = {
+        "ok": True,
+        "weeks": [
+            {"week": 202627, "net": 100, "adGained": 10, "organicGained": 90},
+            {"week": 202628, "net": 200, "adGained": 10, "organicGained": 190},
+            {"week": 202629, "net": 500, "adGained": 18, "organicGained": 480},
+        ],
+    }
+    trend = _build_subscriber_trend(
+        snapshots,
+        2000,
+        promotions=[],
+        analytics_weeks=analytics_weeks,
+    )
+    points = trend["points"]
+    assert points[-1]["total"] == 2000
+    assert points[-1]["adDelta"] > points[-1]["organicDelta"]
+    assert points[-1]["organic"] < 600
+    assert points[-1]["adDriven"] > points[-1]["organic"]
+
 
 if __name__ == "__main__":
     test_promo_timeline_is_date_ordered()
@@ -190,5 +265,7 @@ if __name__ == "__main__":
     test_build_subscriber_trend_rebuilds_totals_from_analytics()
     test_organic_does_not_drop_when_promo_batch_exceeds_total()
     test_organic_updates_when_analytics_reports_zero_organic()
+    test_promo_beats_undercounted_analytics_ad()
     test_organic_updates_despite_same_day_promo_dump()
+    test_live_tip_uses_historical_ad_share_when_signals_undercount()
     print("ok")
