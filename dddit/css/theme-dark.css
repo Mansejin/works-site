@@ -348,6 +348,24 @@ html[data-theme="dark"] .help-note {
   color: var(--text-muted);
 }
 
+html[data-theme="dark"] .issue-block {
+  background: linear-gradient(180deg, #2a1a10 0%, #1f1610 100%);
+  border-color: #9a4a1a;
+}
+
+html[data-theme="dark"] .issue-block-head h2,
+html[data-theme="dark"] .issue-title {
+  color: #fdba74;
+}
+
+html[data-theme="dark"] .issue-body {
+  color: #fed7aa;
+}
+
+html[data-theme="dark"] .issue-meta {
+  color: #fb923c;
+}
+
 html[data-theme="dark"] .overview-text,
 html[data-theme="dark"] [contenteditable="true"] {
   color: var(--text);

@@ -586,6 +586,64 @@
       line-height: 1.5;
     }
 
+    .issue-block {
+      background: linear-gradient(180deg, #fff7ed 0%, #fffbeb 100%);
+      border: 1px solid #fdba74;
+      border-radius: var(--radius);
+      padding: 14px 16px 15px;
+      box-shadow: var(--shadow);
+    }
+
+    .issue-block-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .issue-block-head h2 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #9a3412;
+      letter-spacing: -0.01em;
+    }
+
+    .issue-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #ea580c;
+      color: #fff;
+    }
+
+    .issue-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #7c2d12;
+      margin-bottom: 6px;
+      line-height: 1.35;
+    }
+
+    .issue-body {
+      font-size: 0.82rem;
+      color: #9a3412;
+      line-height: 1.55;
+    }
+
+    .issue-body p { margin: 0 0 6px; }
+    .issue-body p:last-child { margin-bottom: 0; }
+    .issue-meta {
+      margin-top: 8px;
+      font-size: 0.76rem;
+      color: #c2410c;
+      font-weight: 600;
+    }
+
     @media (max-width: 960px) {
       .dash-row { grid-template-columns: 1fr; }
       .yt-videos { grid-template-columns: repeat(2, 1fr); }
@@ -615,6 +673,25 @@
     </header>
 
     <div class="dashboard">
+      <section class="issue-block" aria-label="채널 이슈">
+        <div class="issue-block-head">
+          <h2>이슈</h2>
+          <span class="issue-badge">진행 중</span>
+        </div>
+        <p class="issue-title">저스에어빔 영상 · YouTube 저작권 삭제</p>
+        <div class="issue-body">
+          <p>
+            저스에어빔 영상이 저작권 경고로 YouTube에서 삭제 처리됐습니다.
+            이전에 권리자 측에서 삭제 요청 메일이 왔고, 저작권 삭제를 경고하기도 했습니다.
+          </p>
+          <p>
+            메일로 일부 소통 후 대응을 중단했다가 YouTube 측에서 삭제됐습니다.
+            현재 반론(카운터 노티스)을 제출했으며, 복구까지 최대 10일 소요될 수 있습니다.
+          </p>
+          <p class="issue-meta">상태 · 반론 제출 완료 · 복구 대기 (최대 10일)</p>
+        </div>
+      </section>
+
       <section class="block yt-panel" id="yt-panel">
         <div class="block-head">
           <h2><span class="block-icon">▶</span> <span id="yt-channel-title">디디딧 YouTube</span></h2>
