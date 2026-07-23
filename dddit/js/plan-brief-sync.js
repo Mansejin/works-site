@@ -7,6 +7,7 @@ window.DdditPlanBriefSync = (function () {
     vendict: { adBrand: '벤딕트', label: '벤딕트', planPath: '/dddit/vendict/plan/' },
     xenics: { adBrand: '제닉스', label: 'Xenics', planPath: '/dddit/xenics/plan/' },
     inic: { adBrand: '아이닉', label: '아이닉', planPath: '/dddit/inic/plan/' },
+    galaxy: { adBrand: '', label: '갤럭시 Z 폴드8', planPath: '/dddit/galaxy/plan/' },
   };
 
   function planStorageKey(project) {
