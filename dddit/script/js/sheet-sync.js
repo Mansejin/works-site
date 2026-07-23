@@ -9,6 +9,7 @@ window.DdditSheetSync = (function () {
     xenics: 'Xenics',
     vendict: '벤딕트',
     inic: '아이닉',
+    galaxy: '갤럭시 Z 폴드8',
     default: '기본',
   };
 

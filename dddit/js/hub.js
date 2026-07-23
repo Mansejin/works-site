@@ -6,6 +6,14 @@
 
   const PROJECTS = [
     {
+      id: "galaxy",
+      name: "갤럭시 Z 폴드8 · 울트라",
+      path: "galaxy/",
+      brand: "삼성 갤럭시",
+      status: "진행 중",
+      summary: "본인 구매 예정 비교 리뷰 · 비협찬 · 사전 7/28 · 출시 8/7",
+    },
+    {
       id: "xenics",
       name: "Xenics 데스크테리어 협찬",
       path: "xenics/",
