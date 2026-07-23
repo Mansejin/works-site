@@ -38,19 +38,11 @@
     return /\/dddit\/gate\.html$/i.test(location.pathname);
   }
 
-  /** 브랜드 공유 페이지만 공개 (Access Bypass와 맞춤). storyboard 등은 게이트 유지. */
+  /** 브랜드 공유 페이지만 공개 (Access Bypass와 맞춤). 브랜드 홈·storyboard 등은 게이트 유지. */
   function isPublicBrandSharePath() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
 
-    // /dddit/{brand} — 브랜드 홈
-    const brandRoot = path.match(/^\/dddit\/([^/]+)$/);
-    if (brandRoot) {
-      const brand = brandRoot[1];
-      if (INTERNAL_DDDIT_TOP.has(brand)) return false;
-      return PUBLIC_BRANDS.has(brand);
-    }
-
-    // /dddit/{brand}/(productlist|plan|conti)[/...]
+    // /dddit/{brand}/(productlist|plan|conti)[/...] — 홈은 Access Protect 대상
     const shareTool = path.match(/^\/dddit\/([^/]+)\/([^/]+)(?:\/.*)?$/);
     if (!shareTool) return false;
     const brand = shareTool[1];
@@ -87,14 +79,27 @@
 
   async function bootProtectedPage() {
     if (!IS_PROD || isGatePage() || isPublicBrandSharePath()) return;
-    if (sessionStorage.getItem(BYPASS_KEY) === "1") return;
+    if (sessionStorage.getItem(BYPASS_KEY) === "1") {
+      // Client bypass is only honored when the API reports the gate is off.
+      // (Do not skip status check — that would defeat the gate UI.)
+    }
 
     blockPage();
     try {
       const status = await fetchGateStatus();
       if (!status.enabled) {
+        try {
+          sessionStorage.setItem(BYPASS_KEY, "1");
+        } catch {
+          /* ignore */
+        }
         revealPage();
         return;
+      }
+      try {
+        sessionStorage.removeItem(BYPASS_KEY);
+      } catch {
+        /* ignore */
       }
 
       const token = sessionStorage.getItem(TOKEN_KEY);

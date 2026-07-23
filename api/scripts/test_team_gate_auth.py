@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 os.environ["DDDIT_TEAM_GATE_PASSCODE"] = "test-pass-123"
 os.environ.pop("DDDIT_TEAM_GATE_SECRET", None)
+os.environ.pop("DDDIT_STUDIO_IMPORT_SECRET", None)
 
 from fastapi.testclient import TestClient
 
@@ -31,6 +32,7 @@ def main() -> None:
     assert login.status_code == 200
     token = login.json()["token"]
     assert token
+    headers = {"X-Dddit-Team-Token": token}
 
     # Sensitive GET blocked without token
     denied = client.get("/api/dddit/hub")
@@ -43,25 +45,81 @@ def main() -> None:
     denied_config = client.get("/api/dddit/config")
     assert denied_config.status_code == 401
 
-    # Brand-share public reads stay open
-    # (may 200/404 depending on data — must not be 401)
+    # Logitech schedule requires token
+    assert client.get("/api/logitechg/schedule").status_code == 401
+    assert client.put("/api/logitechg/schedule", json={"positions": {}}).status_code == 401
+    assert client.get("/api/logitechg/schedule", headers=headers).status_code == 200
+
+    # Brand-share public reads stay open for allowlisted brands only
     for path in (
         "/api/dddit/conti/projects",
         "/api/dddit/conti?project=xenics",
         "/api/dddit/sheet/get?project=xenics",
+        "/api/dddit/productlist?project=xenics",
     ):
         res = client.get(path)
         assert res.status_code != 401, path
 
+    # Internal / unknown projects require token
+    assert client.get("/api/dddit/conti?project=default").status_code == 401
+    assert client.get("/api/dddit/sheet/get?project=default").status_code == 401
+    assert client.get("/api/dddit/productlist?project=default").status_code == 401
+
+    # Productlist PUT: non-brand blocked; brand needs works Origin
+    assert (
+        client.put(
+            "/api/dddit/productlist",
+            json={"project": "zzzaudit", "rows": []},
+        ).status_code
+        == 401
+    )
+    assert (
+        client.put(
+            "/api/dddit/productlist",
+            json={"project": "xenics", "rows": []},
+        ).status_code
+        == 401
+    )
+    ok_pl = client.put(
+        "/api/dddit/productlist",
+        json={"project": "xenics", "rows": [{"name": "a", "link": "https://example.com"}]},
+        headers={"Origin": "https://" + "works.mansejin.com"},  # pragma: allowlist secret
+    )
+    assert ok_pl.status_code == 200, ok_pl.text
+
+    # Studio import: Origin alone is not enough
+    assert (
+        client.post(
+            "/api/dddit/youtube/report/studio-promotions/import",
+            json={"promotions": []},
+            headers={"Origin": "https://studio.youtube.com"},
+        ).status_code
+        == 401
+    )
+    os.environ["DDDIT_STUDIO_IMPORT_SECRET"] = "studio-secret"
+    studio_client = TestClient(create_app())
+    assert (
+        studio_client.post(
+            "/api/dddit/youtube/report/studio-promotions/import",
+            json={"promotions": []},
+            headers={
+                "Origin": "https://studio.youtube.com",
+                "X-Dddit-Studio-Import-Key": "studio-secret",
+            },
+        ).status_code
+        != 401
+    )
+
     # Authenticated access works
-    ok = client.get("/api/dddit/hub", headers={"X-Dddit-Team-Token": token})
+    ok = client.get("/api/dddit/hub", headers=headers)
     assert ok.status_code == 200, ok.text
 
     # Disabled gate opens all routes
     os.environ["DDDIT_TEAM_GATE_PASSCODE"] = ""
-    # recreate app so env is re-read
+    os.environ.pop("DDDIT_STUDIO_IMPORT_SECRET", None)
     open_client = TestClient(create_app())
     assert open_client.get("/api/dddit/hub").status_code == 200
+    assert open_client.get("/api/logitechg/schedule").status_code == 200
 
     print("ok")
 

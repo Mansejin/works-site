@@ -1,2 +1,12 @@
 # Local agent skills
 .agents/
+
+# Secrets / credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+credentials*.json
+token.json
+**/service-account*.json
