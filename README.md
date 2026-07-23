@@ -2,7 +2,7 @@
 
 개인·업무용 페이지. `mansejin.com` 메인 도구함과 분리된 서브도메인.
 
-- 루트: https://works.mansejin.com (비공개, 목록 없음)
+- 루트: https://works.mansejin.com (내부용 목록, noindex)
 - 디디딧 워크스페이스: https://works.mansejin.com/dddit/
 - 콘티 작성기: https://works.mansejin.com/dddit/script/
 - Xenics 프로젝트: https://works.mansejin.com/dddit/xenics/
@@ -10,30 +10,51 @@
 - 벤딕트 프로젝트: https://works.mansejin.com/dddit/vendict/
 - 아이닉 프로젝트: https://works.mansejin.com/dddit/inic/
 - (내부) 벤딕트 시나리오: https://works.mansejin.com/dddit/script/?project=vendict — **허브에서만** 접근, 브랜드 페이지에 링크 금지
+- 로지텍G: https://works.mansejin.com/logitechG/
 - 로지텍G 납품 일정: https://works.mansejin.com/logitechG/schedule/
 - SUPERSTRIKE 클릭 챌린지: https://works.mansejin.com/logitechG/promotion/cpstest/
+- 프로젝트: https://works.mansejin.com/project/
+- Tina Singer MV PPM: https://works.mansejin.com/project/tinasinger/mv/ppm/
 
 ## 경로 구조
 
 ```
 works.mansejin.com/
-└── dddit/
-    ├── index.html                  # 채널 워크스페이스
-    ├── js/hub.js
-    ├── script/                     # 콘티 작성기 + Google 시트 연동
-    │   ├── google-apps-script/     # Apps Script 배포용
-    │   └── js/sheet-sync.js
-    └── xenics/
-        ├── index.html
-        ├── plan/
-        ├── storyboard/               → conti/ 리다이렉트
-        ├── conti/                    # 완성 콘티 읽기 전용
-        └── productlist/
-    └── vendict/                      # 벤딕트 차량용 청소기 협찬
-        ├── index.html
-        ├── plan/
-        ├── conti/
-        └── productlist/
+├── index.html                      # 섹션 허브 (내부용, noindex)
+├── css/landing.css                 # 공통 랜딩 스타일
+├── dddit/
+│   ├── index.html                  # 채널 워크스페이스
+│   ├── js/hub.js
+│   ├── script/                     # 콘티 작성기 + Google 시트 연동
+│   │   ├── google-apps-script/     # Apps Script 배포용
+│   │   └── js/sheet-sync.js
+│   ├── xenics/
+│   │   ├── index.html
+│   │   ├── plan/
+│   │   ├── storyboard/               → conti/ 리다이렉트
+│   │   ├── conti/                    # 완성 콘티 읽기 전용
+│   │   └── productlist/
+│   └── vendict/                      # 벤딕트 차량용 청소기 협찬
+│       ├── index.html
+│       ├── plan/
+│       ├── conti/
+│       └── productlist/
+├── logitechG/
+│   ├── index.html
+│   ├── schedule/
+│   └── promotion/
+│       ├── index.html
+│       └── cpstest/
+├── project/
+│   ├── index.html
+│   └── tinasinger/
+│       ├── index.html
+│       └── mv/
+│           ├── index.html
+│           └── ppm/
+│               ├── index.html
+│               └── callsheet/
+└── api/                              # works-api 소스 (NAS 배포)
 ```
 
 추후 다른 프로젝트는 `/dddit/프로젝트명/` 형태로 추가합니다.  
