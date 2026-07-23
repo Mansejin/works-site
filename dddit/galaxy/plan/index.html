@@ -106,13 +106,16 @@
 
     .field-text {
       min-height: 48px;
-      padding: 10px 12px;
+      padding: 12px 14px;
       border: 1px solid var(--border);
       border-radius: 8px;
-      font-size: 0.9rem;
-      line-height: 1.65;
+      font-size: 0.92rem;
+      line-height: 1.75;
+      letter-spacing: -0.01em;
       outline: none;
       white-space: pre-wrap;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
     }
 
     .field-text:focus {
@@ -125,7 +128,8 @@
       color: var(--text-muted);
     }
 
-    .field-text.tall { min-height: 120px; }
+    .field-text.tall { min-height: 140px; }
+    .field-text.xl { min-height: 260px; }
 
     .schedule-grid {
       display: grid;
@@ -151,7 +155,7 @@
     .review-section .field-text {
       background: #fff;
       border-color: #fde68a;
-      min-height: 200px;
+      min-height: 280px;
     }
 
     .help-note {
@@ -261,7 +265,8 @@
         <div class="section-title">콘셉트</div>
         <div class="field">
           <label>콘텐츠 방향</label>
-          <div id="f-concept" class="field-text tall" contenteditable="true" data-placeholder="촬영·편집 방향, 무엇을 보여줄지"></div>
+          <p class="field-hint">살 것 / 후보 / 본편에서 뭘 보여줄지만 짧게.</p>
+          <div id="f-concept" class="field-text xl" contenteditable="true" data-placeholder="촬영·편집 방향, 무엇을 보여줄지"></div>
         </div>
         <div class="field">
           <label>핵심 메시지</label>
@@ -277,6 +282,7 @@
         </div>
         <div class="field">
           <label>영상 구성</label>
+          <p class="field-hint">파트 번호로만. 한 줄에 하나.</p>
           <div id="f-structure" class="field-text tall" contenteditable="true" data-placeholder="파트별 흐름 (인트로 → … → 마무리)"></div>
         </div>
       </div>
@@ -311,11 +317,12 @@
         <div class="section-title">협찬 · 브랜드</div>
         <div class="field">
           <label>필수 언급 · 준수 사항</label>
-          <div id="f-brand-must" class="field-text" contenteditable="true" data-placeholder="브랜드명 표기, 협찬 고지 등"></div>
+          <p class="field-hint">광고 여부 · 표기 · 일정·가격 · 설명란 규칙.</p>
+          <div id="f-brand-must" class="field-text xl" contenteditable="true" data-placeholder="브랜드명 표기, 협찬 고지 등"></div>
         </div>
         <div class="field">
           <label>지양 사항</label>
-          <div id="f-brand-avoid" class="field-text" contenteditable="true" data-placeholder="비교·비방, 과장 표현 등"></div>
+          <div id="f-brand-avoid" class="field-text tall" contenteditable="true" data-placeholder="비교·비방, 과장 표현 등"></div>
         </div>
       </div>
     </div>
@@ -324,8 +331,8 @@
       <div class="section-title">리뷰 가이드</div>
       <div class="field">
         <label>촬영 · 멘트 · 노출 가이드</label>
-        <p class="field-hint">실구매 후 실사용 촬영·멘트·팩트체크. 워치·글래스는 후보만 짧게. (광고 아님)</p>
-        <div id="f-review-guide" class="field-text tall" contenteditable="true" data-placeholder="촬영 앵글, 멘트 톤, 필수 고지, 장단점 표현 방식 등"></div>
+        <p class="field-hint">위에서부터: 살 것 → 후보 → 폴드/플립에서 볼 것 → 파트 나누기.</p>
+        <div id="f-review-guide" class="field-text xl" contenteditable="true" data-placeholder="촬영 앵글, 멘트 톤, 필수 고지, 장단점 표현 방식 등"></div>
       </div>
     </div>
 
@@ -358,7 +365,7 @@
 
   <script src="../../js/brand-portal-page.js"></script>
   <script src="../../js/description-qc.js?v=1"></script>
-  <script src="../../js/plan-defaults.js?v=4"></script>
-  <script src="../js/plan.js?v=2"></script>
+  <script src="../../js/plan-defaults.js?v=5"></script>
+  <script src="../js/plan.js?v=3"></script>
 </body>
 </html>
