@@ -1,7 +1,8 @@
 /**
- * 디디딧 내부 페이지 팀 게이트 (works.mansejin.com)
- * 브랜드 공유 페이지(브랜드 홈·plan/conti/productlist)는 제외.
- * NAS DDDIT_TEAM_GATE_PASSCODE 설정 시에만 활성화됩니다.
+ * works.mansejin.com 팀 게이트
+ * 보호: `/`, `/logitechG`, `/project`, `/api`, `/script`, `/dddit` 내부 등
+ * 공개: 브랜드 공유(xenics/vendict/inic/galaxy 홈·plan/conti/productlist)
+ * NAS DDDIT_TEAM_GATE_PASSCODE 설정 시에만 활성화.
  * 상태 조회 실패 시 실패-폐쇄(로그인 화면으로 이동).
  */
 (function () {
@@ -9,7 +10,7 @@
 
   const TOKEN_KEY = "works/dddit/team-gate-token";
   const BYPASS_KEY = "works/dddit/team-gate-bypass";
-  const INTERNAL_TOP = new Set([
+  const INTERNAL_DDDIT_TOP = new Set([
     "script",
     "conti",
     "report",
@@ -21,6 +22,7 @@
     "gate.html",
   ]);
   const BRAND_SHARE_SECTIONS = new Set(["productlist", "plan", "conti"]);
+  const PUBLIC_BRANDS = new Set(["xenics", "vendict", "inic", "galaxy"]);
 
   const IS_PROD =
     location.protocol === "https:" && /^works\.mansejin\.com$/i.test(location.hostname);
@@ -36,17 +38,26 @@
     return /\/dddit\/gate\.html$/i.test(location.pathname);
   }
 
+  /** 브랜드 공유 페이지만 공개 (Access Bypass와 맞춤). storyboard 등은 게이트 유지. */
   function isPublicBrandSharePath() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
-    // /dddit/{brand} — 브랜드에 공유하는 프로젝트 홈
+
+    // /dddit/{brand} — 브랜드 홈
     const brandRoot = path.match(/^\/dddit\/([^/]+)$/);
-    if (brandRoot && !INTERNAL_TOP.has(brandRoot[1])) return true;
+    if (brandRoot) {
+      const brand = brandRoot[1];
+      if (INTERNAL_DDDIT_TOP.has(brand)) return false;
+      return PUBLIC_BRANDS.has(brand);
+    }
 
     // /dddit/{brand}/(productlist|plan|conti)[/...]
     const shareTool = path.match(/^\/dddit\/([^/]+)\/([^/]+)(?:\/.*)?$/);
     if (!shareTool) return false;
-    if (INTERNAL_TOP.has(shareTool[1])) return false;
-    return BRAND_SHARE_SECTIONS.has(shareTool[2]);
+    const brand = shareTool[1];
+    const section = shareTool[2];
+    if (INTERNAL_DDDIT_TOP.has(brand)) return false;
+    if (!PUBLIC_BRANDS.has(brand)) return false;
+    return BRAND_SHARE_SECTIONS.has(section);
   }
 
   function revealPage() {

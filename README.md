@@ -77,10 +77,9 @@ works.mansejin.com/
 
 | 타입 | 이름 | 값 | 프록시 |
 |------|------|-----|--------|
-| CNAME | `works` | `mansejin.github.io` | **DNS only (회색 구름)** |
+| CNAME | `works` | `mansejin.github.io` | **Proxied (주황)** — Access용. TLS 이슈 시 일시 DNS only |
 
-GitHub Pages 서브도메인은 회색 구름이 맞습니다.  
-내부 페이지 정적 파일까지 막으려면 Cloudflare Access + 주황 구름으로 전환해야 합니다. 절차: [`docs/team-gate-hardening.md`](docs/team-gate-hardening.md).
+Access + Bypass/Protect 정책: [`docs/team-gate-hardening.md`](docs/team-gate-hardening.md), [`scripts/cloudflare-access-checklist.md`](scripts/cloudflare-access-checklist.md).
 
 works-api는 `DDDIT_TEAM_GATE_PASSCODE` 설정 시 팀 토큰 없이 민감 데이터 API를 거부합니다.
 
