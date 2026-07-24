@@ -31,7 +31,7 @@ DDDIT_STUDIO_IMPORT_SECRET=...      # 북마크릿 헤더와 동일 값
 
 프론트는 로그인 후 `sessionStorage` 토큰을 내부 API·conti-ws(`?token=`)에 붙입니다.
 
-브라우저 팀 게이트 (`/dddit/js/team-gate.js` + `/dddit/gate.html`):
+브라우저 팀 게이트 (`/dddit/js/team-gate.js` + `/gate.html`):
 
 - **보호**: `/`, `/logitechG/*`, `/project/*`, `/api/*`(Pages 문서), `/script/*`, `/dddit` 내부
 - **공개**: `/dddit/{xenics|vendict|inic|galaxy}` 의 `plan` / `conti` / `productlist` (브랜드 홈은 Protect)

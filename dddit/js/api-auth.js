@@ -1,6 +1,6 @@
 /**
  * Shared works-api auth headers for dddit clients.
- * Token is issued by /dddit/gate.html → sessionStorage.
+ * Token is issued by /gate.html → sessionStorage.
  */
 (function (global) {
   "use strict";
@@ -33,8 +33,8 @@
     }
     if (/^works\.mansejin\.com$/i.test(location.hostname)) {
       const returnTo = location.pathname + location.search + location.hash;
-      if (!/\/dddit\/gate\.html$/i.test(location.pathname)) {
-        location.replace(`/dddit/gate.html?return=${encodeURIComponent(returnTo)}`);
+      if (!/(?:^|\/)gate\.html$/i.test(location.pathname)) {
+        location.replace(`/gate.html?return=${encodeURIComponent(returnTo)}`);
       }
     }
     return true;

@@ -4,7 +4,7 @@
 Path split (personal vs company):
   - Catch-all works host     → OWNER emails only (/, /project hub, …)
   - /dddit* /logitechG*      → COMPANY emails (includes owners)
-  - /project/tinasinger* + /dddit/gate.html → Bypass (팀 비밀번호만)
+  - /project/tinasinger* + /gate.html → Bypass (팀 비밀번호만)
   - Brand plan/conti/productlist + /dddit/js* + /css* → Bypass (public)
 
 Do NOT create Protect apps for bare `/project` or `/project/` — Cloudflare
@@ -51,7 +51,9 @@ PUBLIC_BRANDS = ("xenics", "vendict", "inic", "galaxy")
 BYPASS_PATHS: list[str] = [
     "/dddit/js*",
     "/css*",
-    # Passcode gate must be reachable without CF Access (tinasinger redirects here).
+    # Passcode gate at site root (works-wide, not under /dddit*).
+    "/gate.html",
+    # Legacy redirect target still under /dddit — keep Bypass until caches clear.
     "/dddit/gate.html",
     # /project hub stays Access-protected via catch-all host app.
     # Children Bypass → team passcode only (exact + slash + wildcard).
@@ -377,7 +379,7 @@ def main() -> None:
     print("Done." if not dry else "Dry-run complete (no writes).")
     print("Expect:")
     print(f"  / , /project      → owner only ({', '.join(owner_emails)})")
-    print("  /project/tinasinger* + /dddit/gate.html → Bypass (팀 비번만)")
+    print("  /project/tinasinger* + /gate.html → Bypass (팀 비번만)")
     print(f"  /dddit /logitechG → company ({', '.join(company_emails)})")
     print("  /dddit/*/productlist|plan|conti → public Bypass")
 

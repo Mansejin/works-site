@@ -30,11 +30,11 @@
 
   function gateUrl() {
     const returnTo = location.pathname + location.search + location.hash;
-    return `/dddit/gate.html?return=${encodeURIComponent(returnTo)}`;
+    return `/gate.html?return=${encodeURIComponent(returnTo)}`;
   }
 
   function isGatePage() {
-    return /\/dddit\/gate\.html$/i.test(location.pathname);
+    return /(?:^|\/)gate\.html$/i.test(location.pathname);
   }
 
   /** /project 허브는 Access, /project/하위는 Access Bypass → 팀 비번만 */
