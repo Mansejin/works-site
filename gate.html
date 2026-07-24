@@ -81,7 +81,7 @@
 </head>
 <body>
   <div class="card">
-    <h1>works 팀 로그인</h1>
+    <h1>팀 로그인</h1>
     <p id="gate-help">내부 페이지는 팀 비밀번호가 필요합니다. Cloudflare Access로 이미 들어온 경우 자동으로 넘어갑니다.</p>
     <form id="gate-form">
       <label for="passcode">비밀번호</label>
@@ -111,17 +111,11 @@
         return true;
       }
       const safeReturn = isSafeReturn(returnUrl) ? returnUrl : "/";
-      const isProjectChildReturn = /^\/project\/.+/i.test(safeReturn.replace(/\/+$/, "") || "/");
 
       const form = document.getElementById("gate-form");
       const passcodeInput = document.getElementById("passcode");
       const btn = document.getElementById("btn-login");
       const errorEl = document.getElementById("gate-error");
-      const helpEl = document.getElementById("gate-help");
-
-      if (isProjectChildReturn && helpEl) {
-        helpEl.textContent = "이 프로젝트 하위 페이지는 Cloudflare Access 없이 팀 비밀번호만 사용합니다.";
-      }
 
       function showError(message) {
         errorEl.textContent = message;
