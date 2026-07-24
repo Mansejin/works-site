@@ -102,6 +102,7 @@
         .map((line, li) => {
           const key = memoKey(si, li);
           const val = memos[key] || "";
+          const isInst = /^\(.*\)$/.test(line);
           return `<div class="row">
             <div class="lyric${isInst ? " is-inst" : ""}">${escapeHtml(line)}</div>
             <textarea class="memo" data-key="${key}" rows="1" placeholder="장면 메모">${escapeHtml(val)}</textarea>
