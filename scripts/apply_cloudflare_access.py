@@ -35,12 +35,17 @@ COMPANY_APPS = (
     ("works-dddit", "/dddit*"),
     ("works-logitechg", "/logitechG*"),
 )
+PERSONAL_HUB_APPS = (
+    ("works-project-hub-exact", "/project"),
+    ("works-project-hub", "/project/"),
+)
 PUBLIC_BRANDS = ("xenics", "vendict", "inic", "galaxy")
 BYPASS_PATHS: list[str] = [
     "/dddit/js*",
     "/css*",
-    # /project hub stays Access-protected (catch-all); children use team passcode only
-    "/project/*",
+    # /project and /project/ stay Access-protected (explicit hub apps + catch-all).
+    # Children Bypass → team passcode only.
+    "/project/tinasinger*",
 ]
 for _brand in PUBLIC_BRANDS:
     BYPASS_PATHS.extend(
@@ -266,7 +271,8 @@ def main() -> None:
     by_domain = {a.get("domain"): a for a in apps if a.get("domain")}
     desired_bypass = {f"{HOSTNAME}{p}" for p in BYPASS_PATHS}
     desired_company = {f"{HOSTNAME}{p}" for _, p in COMPANY_APPS}
-    desired_all = desired_bypass | desired_company | {HOSTNAME}
+    desired_hubs = {f"{HOSTNAME}{p}" for _, p in PERSONAL_HUB_APPS}
+    desired_all = desired_bypass | desired_company | desired_hubs | {HOSTNAME}
 
     for a in apps:
         domain = a.get("domain") or ""
@@ -339,6 +345,19 @@ def main() -> None:
             domain=f"{HOSTNAME}{path}",
             policy_name="company-team",
             emails=company_emails,
+            dry=dry,
+        )
+
+    for name, path in PERSONAL_HUB_APPS:
+        upsert_app(
+            token,
+            account_id,
+            by_domain,
+            apps,
+            name=name,
+            domain=f"{HOSTNAME}{path}",
+            policy_name="personal-only",
+            emails=owner_emails,
             dry=dry,
         )
 
