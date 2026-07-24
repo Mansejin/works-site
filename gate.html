@@ -111,6 +111,8 @@
         return true;
       }
       const safeReturn = isSafeReturn(returnUrl) ? returnUrl : "/";
+      // /project/* children are Access Bypass → never skip passcode via CF JWT.
+      const isProjectChildReturn = /^\/project\/.+/i.test(safeReturn.replace(/\/+$/, "") || "/");
 
       const form = document.getElementById("gate-form");
       const passcodeInput = document.getElementById("passcode");
