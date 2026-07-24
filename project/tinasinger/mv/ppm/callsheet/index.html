@@ -22,6 +22,8 @@
     </div>
   </div>
 
+  <div class="page-viewport">
+  <div class="page-frame">
   <main class="page">
     <header class="banner">
       <div class="banner-brand">
@@ -60,10 +62,10 @@
 
     <div class="body">
       <section class="main-col">
-        <div class="block">
-          <div class="block-head">
-            <h2>스케줄</h2>
-            <button type="button" class="row-btn row-btn--add edit-only no-print" id="btnAddSchedule" hidden>+ 행 추가</button>
+        <div class="block block--schedule">
+          <h2>스케줄</h2>
+          <div class="schedule-toolbar edit-only no-print" hidden>
+            <button type="button" class="row-btn row-btn--add" id="btnAddSchedule">+ 행 추가</button>
           </div>
           <div class="schedule-wrap">
             <table class="schedule" id="scheduleTable">
@@ -188,6 +190,8 @@
       <span class="cs-edit" data-key="foot" spellcheck="false">Call Sheet · 1회차 · 2026.07.25</span>
     </footer>
   </main>
+  </div>
+  </div>
 
   <div class="edit-modal" id="editModal" hidden>
     <form class="edit-modal-card" id="editForm">
