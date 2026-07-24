@@ -1,9 +1,9 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "works/project/tinasinger/mv/ppm/lyrics-scene-memo/v1";
+  const STORAGE_KEY = "works/project/tinasinger/mv/ppm/lyrics-scene-memo/v2";
 
-  /** From PPM slides.js lyrics blocks — split on / */
+  /** Full lyrics — Right Here, Right Now */
   const SECTIONS = [
     {
       label: "Verse 1",
@@ -30,6 +30,14 @@
       ],
     },
     {
+      label: "Post-Chorus 1",
+      lines: [
+        "Right here right now",
+        "내 이름 불러준다면",
+        "Right here right now",
+      ],
+    },
+    {
       label: "Verse 2",
       lines: [
         "언젠가는 내 노래로",
@@ -39,12 +47,18 @@
       ],
     },
     {
+      label: "Pre-Chorus 2",
+      lines: ["이제 시작된 스토리", "모두 나의 멜로디"],
+    },
+    {
       label: "Chorus 2",
       lines: [
         "난 너에게 노래할거야",
         "내 맘을 다 전할래",
         "Right here right now",
         "나를 기다려준 너를 위해",
+        "내 진심이 닿을 수 있다면",
+        "어디든 달려갈게",
       ],
     },
   ];
