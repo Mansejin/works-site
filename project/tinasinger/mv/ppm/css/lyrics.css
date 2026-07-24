@@ -6,7 +6,7 @@
   --line: #e2e5ea;
   --soft: #f6f7f9;
   --accent: #2a3340;
-  --font: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
 }
 
 * {
@@ -79,6 +79,12 @@ body {
   font-size: 0.78rem;
   color: var(--muted);
   margin-bottom: 14px;
+}
+
+.boot {
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 24px 0;
 }
 
 .section {
