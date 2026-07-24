@@ -19,9 +19,15 @@ services:
     restart: unless-stopped
     ports:
       - "8789:8789"
+    env_file:
+      - .env
     volumes:
       - ./data:/data
     environment:
       HOST: "0.0.0.0"
       PORT: "8789"
       CONTI_DATA_DIR: "/data/conti"
+      # Team token HMAC for WS upgrade auth (server.js). Falls back to passcode.
+      DDDIT_TEAM_GATE_SECRET: ${DDDIT_TEAM_GATE_SECRET:-}
+      DDDIT_TEAM_GATE_PASSCODE: ${DDDIT_TEAM_GATE_PASSCODE:-}
+      CONTI_WS_REQUIRE_TOKEN: ${CONTI_WS_REQUIRE_TOKEN:-1}
