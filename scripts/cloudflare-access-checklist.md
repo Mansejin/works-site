@@ -12,7 +12,22 @@
 
 > Cloud Agent에 Cloudflare MCP/API 토큰이 없으면 Dashboard에서 동일 단계를 수동 적용합니다.
 
-## 1) Self-hosted Access app
+## Access path split (personal vs company)
+
+| Path | Who |
+|------|-----|
+| `/` , `/project*` , 기타 catch-all | **본인만** (`WORKS_ACCESS_OWNER_EMAILS`) |
+| `/dddit*` , `/logitechG*` | **회사 팀** (`WORKS_ACCESS_COMPANY_EMAILS`, owner 포함) |
+| `/dddit/{brand}/plan\|conti\|productlist*` | **공개 Bypass** |
+| `/dddit/js*` , `/css*` | **공개 Bypass** (브랜드 페이지 자산) |
+
+적용:
+
+```bash
+# defaults baked into scripts/apply_cloudflare_access.py
+python3 scripts/apply_cloudflare_access.py
+```
+
 
 1. Zero Trust → **Access controls** → **Applications** → Create
 2. Type: **Self-hosted**

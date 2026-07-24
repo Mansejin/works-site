@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Apply Cloudflare Access + DNS proxy for the works subdomain.
 
+Path split (personal vs company):
+  - Catch-all works host     → OWNER emails only (/, /project, …)
+  - /dddit* /logitechG*      → COMPANY emails (includes owners)
+  - Brand plan/conti/productlist + /dddit/js* + /css* → Bypass (public)
+
 Requires env:
-  CF_API_TOKEN   — token with Account Zero Trust Write, Zone DNS Edit, Zone SSL/TLS Edit
+  CF_API_TOKEN
 Optional:
-  CF_ACCOUNT_ID  — skip account discovery (zone-scoped tokens often cannot list /accounts;
-                   script falls back to zone.account.id)
-  CF_ZONE_ID     — skip zone discovery
-  WORKS_ACCESS_ALLOW_EMAILS — comma-separated emails for Allow policy
-                              (default: everyone — tighten after first login works)
-  DRY_RUN=1      — print planned changes only
-  CF_DELETE_LOGITECH_BYPASS=1 — delete legacy logitech Access apps if found
+  CF_ACCOUNT_ID / CF_ZONE_ID
+  WORKS_ACCESS_OWNER_EMAILS   — personal root allowlist
+  WORKS_ACCESS_COMPANY_EMAILS — company path allowlist (should include owners)
+  WORKS_ACCESS_ALLOW_EMAILS   — legacy alias merged into company list
+  DRY_RUN=1
+  CF_DELETE_LOGITECH_BYPASS=1
 
 See scripts/cloudflare-access-checklist.md
 """
@@ -26,17 +30,17 @@ import urllib.request
 API = "https://api.cloudflare.com/client/v4"
 HOSTNAME = "works." + "mansejin.com"
 ORIGIN_CNAME = "mansejin.github.io"
-APP_NAME = "works-mansejin"
+PERSONAL_APP_NAME = "works"
+COMPANY_APPS = (
+    ("works-dddit", "/dddit*"),
+    ("works-logitechg", "/logitechG*"),
+)
 PUBLIC_BRANDS = ("xenics", "vendict", "inic", "galaxy")
-# Narrow share surfaces (not brand-wide * — research/storyboard stay protected).
-# Also Bypass shared JS/CSS that public brand pages load via ../../js and /css.
 BYPASS_PATHS: list[str] = [
     "/dddit/js*",
     "/css*",
 ]
 for _brand in PUBLIC_BRANDS:
-    # Do NOT add bare /dddit/{brand} or /dddit/{brand}/ — Cloudflare treats those as
-    # prefixes and would Bypass research/storyboard under the brand.
     BYPASS_PATHS.extend(
         [
             f"/dddit/{_brand}/plan*",
@@ -44,6 +48,18 @@ for _brand in PUBLIC_BRANDS:
             f"/dddit/{_brand}/productlist*",
         ]
     )
+
+DEFAULT_OWNER_EMAILS = (
+    "adoholabusiness@gmail.com",
+    "Sae3648@gmail.com",
+)
+DEFAULT_COMPANY_EXTRA = (
+    "peppe841107@gmail.com",
+    "ddditchannel@gmail.com",
+    "jskim@ohola.co.kr",
+    "sjoh@ohola.co.kr",
+    "smpark@ohola.co.kr",
+)
 
 
 class CloudflareApiError(RuntimeError):
@@ -87,22 +103,94 @@ def bypass_app_name(path: str) -> str:
     return f"works-bypass-{clean or 'root'}"[:60]
 
 
+def parse_emails(*raw_lists: str) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_lists:
+        for part in (raw or "").split(","):
+            email = part.strip()
+            if not email:
+                continue
+            key = email.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(email)
+    return out
+
+
+def allow_include(emails: list[str]) -> list[dict]:
+    if not emails:
+        return [{"everyone": {}}]
+    return [{"email": {"email": e}} for e in emails]
+
+
+def upsert_app(
+    token: str,
+    account_id: str,
+    by_domain: dict,
+    apps: list,
+    *,
+    name: str,
+    domain: str,
+    policy_name: str,
+    emails: list[str],
+    dry: bool,
+) -> None:
+    existing = by_domain.get(domain)
+    for a in apps:
+        if a.get("name") == name:
+            existing = a
+            break
+    body = {
+        "name": name,
+        "domain": domain,
+        "type": "self_hosted",
+        "session_duration": "24h",
+        "auto_redirect_to_identity": False,
+        "app_launcher_visible": True,
+        "policies": [
+            {
+                "name": policy_name,
+                "decision": "allow",
+                "include": allow_include(emails),
+            }
+        ],
+    }
+    who = "emails:" + ",".join(emails) if emails else "everyone"
+    print(f"Access Protect app: {domain} ({'update' if existing else 'create'}; allow={who})")
+    if dry:
+        return
+    if existing:
+        api(token, "PUT", f"/accounts/{account_id}/access/apps/{existing['id']}", body)
+    else:
+        api(token, "POST", f"/accounts/{account_id}/access/apps", body)
+
+
 def main() -> None:
     token = os.environ.get("CF_API_TOKEN") or os.environ.get("CLOUDFLARE_API_TOKEN")
     if not token:
-        die(
-            "CF_API_TOKEN missing. Add a Cloudflare API token secret to this Cloud Agent "
-            "(or run locally), then re-run. MCP OAuth is not available in this environment."
-        )
+        die("CF_API_TOKEN missing.")
 
     dry = os.environ.get("DRY_RUN", "").strip() in {"1", "true", "yes"}
     account_id = os.environ.get("CF_ACCOUNT_ID")
     zone_id = os.environ.get("CF_ZONE_ID")
-    allow_emails = [
-        e.strip()
-        for e in os.environ.get("WORKS_ACCESS_ALLOW_EMAILS", "").split(",")
-        if e.strip()
-    ]
+
+    owner_emails = parse_emails(os.environ.get("WORKS_ACCESS_OWNER_EMAILS", ""))
+    if not owner_emails:
+        owner_emails = list(DEFAULT_OWNER_EMAILS)
+
+    company_emails = parse_emails(
+        os.environ.get("WORKS_ACCESS_COMPANY_EMAILS", ""),
+        os.environ.get("WORKS_ACCESS_ALLOW_EMAILS", ""),
+    )
+    if not company_emails:
+        company_emails = parse_emails(
+            ",".join(DEFAULT_OWNER_EMAILS),
+            ",".join(DEFAULT_COMPANY_EXTRA),
+        )
+    # Owners must reach company paths too
+    company_emails = parse_emails(",".join(company_emails), ",".join(owner_emails))
 
     if not zone_id:
         zones = api(token, "GET", "/zones?name=mansejin.com")["result"]
@@ -114,16 +202,15 @@ def main() -> None:
         if not account_id:
             account_id = (zone.get("account") or {}).get("id")
             if account_id:
-                acct_name = (zone.get("account") or {}).get("name")
-                print(f"account_id={account_id} (from zone; {acct_name})")
+                print(
+                    f"account_id={account_id} "
+                    f"(from zone; {(zone.get('account') or {}).get('name')})"
+                )
 
     if not account_id:
         accounts = api(token, "GET", "/accounts?per_page=50")["result"]
         if not accounts:
-            die(
-                "No Cloudflare account_id — set CF_ACCOUNT_ID "
-                "(zone-scoped tokens often cannot list /accounts)"
-            )
+            die("No Cloudflare account_id — set CF_ACCOUNT_ID")
         account_id = accounts[0]["id"]
         print(f"account_id={account_id} ({accounts[0].get('name')})")
     elif os.environ.get("CF_ACCOUNT_ID"):
@@ -132,7 +219,10 @@ def main() -> None:
     if os.environ.get("CF_ZONE_ID"):
         print(f"zone_id={zone_id} (from CF_ZONE_ID)")
 
-    # --- DNS: works CNAME proxied ---
+    print(f"owner_emails={','.join(owner_emails)}")
+    print(f"company_emails={','.join(company_emails)}")
+
+    # --- DNS ---
     records = api(
         token,
         "GET",
@@ -156,7 +246,7 @@ def main() -> None:
         api(token, "PUT", f"/zones/{zone_id}/dns_records/{rec['id']}", dns_body)
         print("DNS updated (Proxied)")
 
-    # --- SSL Full (zone-settings may be denied on narrow tokens) ---
+    # --- SSL ---
     try:
         ssl = api(token, "GET", f"/zones/{zone_id}/settings/ssl")["result"]
         print(f"SSL mode={ssl.get('value')} (want full or strict)")
@@ -164,35 +254,31 @@ def main() -> None:
             api(token, "PATCH", f"/zones/{zone_id}/settings/ssl", {"value": "full"})
             print("SSL set to full")
     except CloudflareApiError as e:
-        print(
-            f"WARN: SSL settings skipped ({e}). Confirm Full/strict in Dashboard "
-            "(Zone → SSL/TLS). Continuing with DNS + Access.",
-            file=sys.stderr,
-        )
+        print(f"WARN: SSL settings skipped ({e})", file=sys.stderr)
 
     # --- Access apps ---
     apps = api(token, "GET", f"/accounts/{account_id}/access/apps")["result"]
     by_domain = {a.get("domain"): a for a in apps if a.get("domain")}
-    desired_bypass = {f"{HOSTNAME}{path}" for path in BYPASS_PATHS}
+    desired_bypass = {f"{HOSTNAME}{p}" for p in BYPASS_PATHS}
+    desired_company = {f"{HOSTNAME}{p}" for _, p in COMPANY_APPS}
+    desired_all = desired_bypass | desired_company | {HOSTNAME}
 
-    # Remove obsolete brand-wide Bypass apps (e.g. /dddit/xenics*)
     for a in apps:
         domain = a.get("domain") or ""
         name = (a.get("name") or "").lower()
-        if domain == HOSTNAME or a.get("name") == APP_NAME:
+        if domain in desired_all:
             continue
-        if domain in desired_bypass:
+        if name in {PERSONAL_APP_NAME, "works-mansejin"} and domain == HOSTNAME:
             continue
         obsolete = False
-        if domain.startswith(f"{HOSTNAME}/dddit/") and "*" in domain:
-            # Old broad brand wildcards
-            obsolete = True
         if name.startswith("works-bypass-") and domain not in desired_bypass:
-            # Rebuild names changed — drop orphans not in desired set
             obsolete = True
-        if "logitech" in domain.lower() or "logitech" in name:
-            print(f"Legacy logitech Access app found: {a.get('name')} ({domain}) id={a.get('id')}")
-            print("  → delete manually or set CF_DELETE_LOGITECH_BYPASS=1")
+        if name.startswith("works-") and domain not in desired_all and domain.startswith(HOSTNAME):
+            # old company/protect variants
+            if domain != HOSTNAME:
+                obsolete = True
+        if "logitech" in name and "bypass" in name:
+            print(f"Legacy logitech Bypass: {a.get('name')} ({domain})")
             if not dry and os.environ.get("CF_DELETE_LOGITECH_BYPASS", "") in {
                 "1",
                 "true",
@@ -202,22 +288,21 @@ def main() -> None:
                 print("  deleted")
             continue
         if obsolete:
-            print(f"Obsolete Bypass app: {a.get('name')} ({domain}) → delete")
+            print(f"Obsolete Access app: {a.get('name')} ({domain}) → delete")
             if not dry:
                 api(token, "DELETE", f"/accounts/{account_id}/access/apps/{a['id']}")
                 print("  deleted")
 
-    # Refresh app list after deletes
     if not dry:
         apps = api(token, "GET", f"/accounts/{account_id}/access/apps")["result"]
         by_domain = {a.get("domain"): a for a in apps if a.get("domain")}
 
+    # Bypass first (most specific public shares)
     for path in BYPASS_PATHS:
         domain = f"{HOSTNAME}{path}"
-        name = bypass_app_name(path)
         existing = by_domain.get(domain)
         body = {
-            "name": name,
+            "name": bypass_app_name(path),
             "domain": domain,
             "type": "self_hosted",
             "session_duration": "24h",
@@ -238,52 +323,38 @@ def main() -> None:
         else:
             api(token, "POST", f"/accounts/{account_id}/access/apps", body)
 
-    # Protect catch-all (no logitech Bypass)
-    include = (
-        [{"email": {"email": e}} for e in allow_emails]
-        if allow_emails
-        else [{"everyone": {}}]
+    # Company paths (more specific than catch-all)
+    for name, path in COMPANY_APPS:
+        upsert_app(
+            token,
+            account_id,
+            by_domain,
+            apps,
+            name=name,
+            domain=f"{HOSTNAME}{path}",
+            policy_name="company-team",
+            emails=company_emails,
+            dry=dry,
+        )
+
+    # Personal catch-all last conceptually (least specific domain)
+    upsert_app(
+        token,
+        account_id,
+        by_domain,
+        apps,
+        name=PERSONAL_APP_NAME,
+        domain=HOSTNAME,
+        policy_name="personal-only",
+        emails=owner_emails,
+        dry=dry,
     )
-    protect_body = {
-        "name": APP_NAME,
-        "domain": HOSTNAME,
-        "type": "self_hosted",
-        "session_duration": "24h",
-        "auto_redirect_to_identity": False,
-        "policies": [
-            {
-                "name": "team-only",
-                "decision": "allow",
-                "include": include,
-            }
-        ],
-    }
-    existing_protect = by_domain.get(HOSTNAME)
-    for a in apps:
-        if a.get("name") == APP_NAME:
-            existing_protect = a
-            break
-    print(
-        f"Access Protect app: {HOSTNAME} "
-        f"({'update' if existing_protect else 'create'}; "
-        f"allow={'emails:'+','.join(allow_emails) if allow_emails else 'everyone'})"
-    )
-    if not dry:
-        if existing_protect:
-            api(
-                token,
-                "PUT",
-                f"/accounts/{account_id}/access/apps/{existing_protect['id']}",
-                protect_body,
-            )
-        else:
-            api(token, "POST", f"/accounts/{account_id}/access/apps", protect_body)
 
     print("Done." if not dry else "Dry-run complete (no writes).")
-    print(f"Verify: curl -sI https://{HOSTNAME}/ | head")
-    print(f"Brand:  curl -sI https://{HOSTNAME}/dddit/xenics/productlist/")
-    print(f"Assets: curl -sI https://{HOSTNAME}/dddit/js/productlist-sync.js")
-    print(f"Locked: curl -sI https://{HOSTNAME}/dddit/galaxy/research/SOURCE.md")
+    print("Expect:")
+    print(f"  /                 → owner only ({', '.join(owner_emails)})")
+    print(f"  /dddit /logitechG → company ({', '.join(company_emails)})")
+    print("  /dddit/*/productlist|plan|conti → public Bypass")
 
 
 if __name__ == "__main__":
