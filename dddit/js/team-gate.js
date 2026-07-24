@@ -1,7 +1,7 @@
 /**
  * works.mansejin.com 팀 게이트
  * - Access로 막힌 페이지: CF 로그인만으로 통과 (팀 비번 생략, Access JWT → API 토큰 교환)
- * - Access Bypass인 /project/* 하위: 팀 비밀번호만
+ * - Access Bypass인 /project/* 하위: 팀 비밀번호만 → /gate.html
  * - 브랜드 공유 plan/conti/productlist: 공개
  */
 (function () {
