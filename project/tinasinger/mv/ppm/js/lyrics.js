@@ -1,10 +1,14 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "works/project/tinasinger/mv/ppm/lyrics-scene-memo/v2";
+  const STORAGE_KEY = "works/project/tinasinger/mv/ppm/lyrics-scene-memo/v3";
 
-  /** Full lyrics — Right Here, Right Now */
+  /** Full lyrics + 전주/반주 — Right Here, Right Now */
   const SECTIONS = [
+    {
+      label: "전주",
+      lines: ["(전주)", "(전주)"],
+    },
     {
       label: "Verse 1",
       lines: [
@@ -38,6 +42,10 @@
       ],
     },
     {
+      label: "반주",
+      lines: ["(반주)", "(반주)"],
+    },
+    {
       label: "Verse 2",
       lines: [
         "언젠가는 내 노래로",
@@ -60,6 +68,10 @@
         "내 진심이 닿을 수 있다면",
         "어디든 달려갈게",
       ],
+    },
+    {
+      label: "엔딩 반주",
+      lines: ["(엔딩 반주)", "(엔딩 반주)"],
     },
   ];
 
@@ -91,7 +103,7 @@
           const key = memoKey(si, li);
           const val = memos[key] || "";
           return `<div class="row">
-            <div class="lyric">${escapeHtml(line)}</div>
+            <div class="lyric${isInst ? " is-inst" : ""}">${escapeHtml(line)}</div>
             <textarea class="memo" data-key="${key}" rows="1" placeholder="장면 메모">${escapeHtml(val)}</textarea>
           </div>`;
         })

@@ -112,6 +112,12 @@ body {
   padding-top: 4px;
 }
 
+.lyric.is-inst {
+  font-weight: 550;
+  color: var(--muted);
+  font-style: italic;
+}
+
 .memo {
   width: 100%;
   font: inherit;
