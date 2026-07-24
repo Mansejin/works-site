@@ -24,6 +24,7 @@ _PUBLIC_GET = {
 }
 _PUBLIC_POST = {
     "/api/dddit/team-gate/login",
+    "/api/dddit/team-gate/access-login",
 }
 
 # Studio bookmarklet: Origin alone is spoofable — require shared secret header.

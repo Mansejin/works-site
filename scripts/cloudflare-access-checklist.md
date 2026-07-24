@@ -16,10 +16,13 @@
 
 | Path | Who |
 |------|-----|
-| `/` , `/project*` , 기타 catch-all | **본인만** (`WORKS_ACCESS_OWNER_EMAILS`) |
+| `/` , `/project` (허브만) , 기타 catch-all | **본인만** (`WORKS_ACCESS_OWNER_EMAILS`) |
+| `/project/*` (하위) | **Access Bypass** — 팀 비밀번호만 |
 | `/dddit*` , `/logitechG*` | **회사 팀** (`WORKS_ACCESS_COMPANY_EMAILS`, owner 포함) |
 | `/dddit/{brand}/plan\|conti\|productlist*` | **공개 Bypass** |
 | `/dddit/js*` , `/css*` | **공개 Bypass** (브랜드 페이지 자산) |
+
+Access로 들어온 사용자는 팀 게이트 비밀번호를 생략합니다 (`access-login` + CF JWT).
 
 적용:
 

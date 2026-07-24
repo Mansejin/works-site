@@ -38,6 +38,12 @@ class TeamGateLoginBody(BaseModel):
     passcode: str = ""
 
 
+class TeamGateAccessLoginBody(BaseModel):
+    """Browser sends CF_Authorization JWT after Access login (HttpOnly disabled)."""
+
+    accessJwt: str = ""
+
+
 @router.get("/team-gate/status")
 def team_gate_status() -> dict[str, Any]:
     return {"ok": True, "enabled": team_gate_enabled()}
@@ -56,6 +62,48 @@ def team_gate_login(request: Request, body: TeamGateLoginBody) -> dict[str, Any]
         raise HTTPException(status_code=401, detail="Invalid passcode")
     token, expires_at = issue_team_token()
     return {"ok": True, "enabled": True, "token": token, "expiresAt": expires_at}
+
+
+@router.post("/team-gate/access-login")
+def team_gate_access_login(request: Request, body: TeamGateAccessLoginBody) -> dict[str, Any]:
+    """Exchange a valid Cloudflare Access JWT for a works team API token.
+
+    Used when the user already passed Access (email allowlist) so they skip
+    the team passcode UI. JWT is verified against the Zero Trust certs + AUD.
+    """
+    if not team_gate_enabled():
+        return {"ok": True, "enabled": False, "bypass": True}
+
+    client = request.client.host if request.client else "unknown"
+    from app.rate_limit import LOGIN_LIMITER
+
+    if not LOGIN_LIMITER.allow(f"access-login:{client}"):
+        raise HTTPException(status_code=429, detail="Too many login attempts")
+
+    jwt_token = (body.accessJwt or "").strip()
+    if not jwt_token:
+        jwt_token = (request.headers.get("Cf-Access-Jwt-Assertion") or "").strip()
+    if not jwt_token:
+        auth = (request.headers.get("Authorization") or "").strip()
+        if auth.lower().startswith("bearer "):
+            jwt_token = auth[7:].strip()
+
+    from app.cf_access_jwt import verify_access_jwt
+
+    try:
+        claims = verify_access_jwt(jwt_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+    token, expires_at = issue_team_token()
+    return {
+        "ok": True,
+        "enabled": True,
+        "token": token,
+        "expiresAt": expires_at,
+        "email": claims.get("email"),
+        "via": "cloudflare-access",
+    }
 
 
 @router.get("/team-gate/verify")

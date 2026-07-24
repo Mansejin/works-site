@@ -82,7 +82,7 @@
 <body>
   <div class="card">
     <h1>works 팀 로그인</h1>
-    <p>works 내부 페이지는 팀 비밀번호가 필요합니다.</p>
+    <p id="gate-help">내부 페이지는 팀 비밀번호가 필요합니다. Cloudflare Access로 이미 들어온 경우 자동으로 넘어갑니다.</p>
     <form id="gate-form">
       <label for="passcode">비밀번호</label>
       <input id="passcode" type="password" autocomplete="current-password" placeholder="비밀번호 입력" required />
@@ -103,7 +103,6 @@
 
       const params = new URLSearchParams(location.search);
       const returnUrl = params.get("return") || "/";
-      // same-origin path only (`/`, `/dddit/...`, `/logitechG/...` 등). 외부·프로토콜 상대 URL 거부.
       function isSafeReturn(url) {
         if (!url || typeof url !== "string") return false;
         if (url.startsWith("//") || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) return false;
@@ -112,15 +111,36 @@
         return true;
       }
       const safeReturn = isSafeReturn(returnUrl) ? returnUrl : "/";
+      const isProjectChildReturn = /^\/project\/.+/i.test(safeReturn.replace(/\/+$/, "") || "/");
 
       const form = document.getElementById("gate-form");
       const passcodeInput = document.getElementById("passcode");
       const btn = document.getElementById("btn-login");
       const errorEl = document.getElementById("gate-error");
+      const helpEl = document.getElementById("gate-help");
+
+      if (isProjectChildReturn && helpEl) {
+        helpEl.textContent = "이 프로젝트 하위 페이지는 Cloudflare Access 없이 팀 비밀번호만 사용합니다.";
+      }
 
       function showError(message) {
         errorEl.textContent = message;
         errorEl.classList.add("show");
+      }
+
+      function readCfAccessJwt() {
+        try {
+          const parts = document.cookie.split(";");
+          for (const part of parts) {
+            const [k, ...rest] = part.trim().split("=");
+            if (k === "CF_Authorization") {
+              return decodeURIComponent(rest.join("=") || "");
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+        return "";
       }
 
       async function finishLogin(data) {
@@ -132,6 +152,25 @@
           sessionStorage.removeItem(BYPASS_KEY);
         }
         location.replace(safeReturn);
+      }
+
+      async function tryAccessExchange() {
+        if (!IS_PROD || isProjectChildReturn) return false;
+        const accessJwt = readCfAccessJwt();
+        if (!accessJwt) return false;
+        try {
+          const res = await fetch(`${API_BASE}/api/dddit/team-gate/access-login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accessJwt }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.token) return false;
+          await finishLogin(data);
+          return true;
+        } catch {
+          return false;
+        }
       }
 
       async function tryExistingSession() {
@@ -152,6 +191,8 @@
           showError("서버에 연결하지 못했습니다. works-api 상태를 확인하세요.");
           return;
         }
+
+        if (await tryAccessExchange()) return;
 
         const token = sessionStorage.getItem(TOKEN_KEY);
         if (!token) return;

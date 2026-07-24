@@ -60,6 +60,12 @@ def main() -> None:
         res = client.get(path)
         assert res.status_code != 401, path
 
+    # access-login without jwt → 401 (not missing middleware)
+    assert (
+        client.post("/api/dddit/team-gate/access-login", json={"accessJwt": ""}).status_code
+        == 401
+    )
+
     # Internal / unknown projects require token
     assert client.get("/api/dddit/conti?project=default").status_code == 401
     assert client.get("/api/dddit/sheet/get?project=default").status_code == 401

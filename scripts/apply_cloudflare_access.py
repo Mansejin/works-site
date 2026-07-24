@@ -39,6 +39,8 @@ PUBLIC_BRANDS = ("xenics", "vendict", "inic", "galaxy")
 BYPASS_PATHS: list[str] = [
     "/dddit/js*",
     "/css*",
+    # /project hub stays Access-protected (catch-all); children use team passcode only
+    "/project/*",
 ]
 for _brand in PUBLIC_BRANDS:
     BYPASS_PATHS.extend(
@@ -149,6 +151,9 @@ def upsert_app(
         "session_duration": "24h",
         "auto_redirect_to_identity": False,
         "app_launcher_visible": True,
+        # Allow JS to read CF_Authorization for Access→team-token exchange
+        "http_only_cookie_attribute": False,
+        "same_site_cookie_attribute": "lax",
         "policies": [
             {
                 "name": policy_name,
