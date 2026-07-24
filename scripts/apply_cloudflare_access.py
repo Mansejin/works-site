@@ -2,9 +2,14 @@
 """Apply Cloudflare Access + DNS proxy for the works subdomain.
 
 Path split (personal vs company):
-  - Catch-all works host     → OWNER emails only (/, /project, …)
+  - Catch-all works host     → OWNER emails only (/, /project hub, …)
   - /dddit* /logitechG*      → COMPANY emails (includes owners)
+  - /project/tinasinger* + /dddit/gate.html → Bypass (팀 비밀번호만)
   - Brand plan/conti/productlist + /dddit/js* + /css* → Bypass (public)
+
+Do NOT create Protect apps for bare `/project` or `/project/` — Cloudflare
+treats those as path prefixes and they swallow `/project/tinasinger*`.
+Hub stays covered by the catch-all host app instead.
 
 Requires env:
   CF_API_TOKEN
@@ -35,16 +40,23 @@ COMPANY_APPS = (
     ("works-dddit", "/dddit*"),
     ("works-logitechg", "/logitechG*"),
 )
-PERSONAL_HUB_APPS = (
-    ("works-project-hub-exact", "/project"),
-    ("works-project-hub", "/project/"),
+# Legacy — bare /project(/) Protect apps act as prefixes and block children.
+# Kept only so apply() can delete them if they reappear.
+OBSOLETE_HUB_DOMAINS = (
+    f"{HOSTNAME}/project",
+    f"{HOSTNAME}/project/",
+    f"{HOSTNAME}/project*",
 )
 PUBLIC_BRANDS = ("xenics", "vendict", "inic", "galaxy")
 BYPASS_PATHS: list[str] = [
     "/dddit/js*",
     "/css*",
-    # /project and /project/ stay Access-protected (explicit hub apps + catch-all).
-    # Children Bypass → team passcode only.
+    # Passcode gate must be reachable without CF Access (tinasinger redirects here).
+    "/dddit/gate.html",
+    # /project hub stays Access-protected via catch-all host app.
+    # Children Bypass → team passcode only (exact + slash + wildcard).
+    "/project/tinasinger",
+    "/project/tinasinger/",
     "/project/tinasinger*",
 ]
 for _brand in PUBLIC_BRANDS:
@@ -271,8 +283,7 @@ def main() -> None:
     by_domain = {a.get("domain"): a for a in apps if a.get("domain")}
     desired_bypass = {f"{HOSTNAME}{p}" for p in BYPASS_PATHS}
     desired_company = {f"{HOSTNAME}{p}" for _, p in COMPANY_APPS}
-    desired_hubs = {f"{HOSTNAME}{p}" for _, p in PERSONAL_HUB_APPS}
-    desired_all = desired_bypass | desired_company | desired_hubs | {HOSTNAME}
+    desired_all = desired_bypass | desired_company | {HOSTNAME}
 
     for a in apps:
         domain = a.get("domain") or ""
@@ -282,6 +293,8 @@ def main() -> None:
         if name in {PERSONAL_APP_NAME, "works-mansejin"} and domain == HOSTNAME:
             continue
         obsolete = False
+        if domain in OBSOLETE_HUB_DOMAINS or "project-hub" in name:
+            obsolete = True
         if name.startswith("works-bypass-") and domain not in desired_bypass:
             obsolete = True
         if name.startswith("works-") and domain not in desired_all and domain.startswith(HOSTNAME):
@@ -348,20 +361,7 @@ def main() -> None:
             dry=dry,
         )
 
-    for name, path in PERSONAL_HUB_APPS:
-        upsert_app(
-            token,
-            account_id,
-            by_domain,
-            apps,
-            name=name,
-            domain=f"{HOSTNAME}{path}",
-            policy_name="personal-only",
-            emails=owner_emails,
-            dry=dry,
-        )
-
-    # Personal catch-all last conceptually (least specific domain)
+    # Personal catch-all covers / and /project hub (no bare /project Protect apps).
     upsert_app(
         token,
         account_id,
@@ -376,7 +376,8 @@ def main() -> None:
 
     print("Done." if not dry else "Dry-run complete (no writes).")
     print("Expect:")
-    print(f"  /                 → owner only ({', '.join(owner_emails)})")
+    print(f"  / , /project      → owner only ({', '.join(owner_emails)})")
+    print("  /project/tinasinger* + /dddit/gate.html → Bypass (팀 비번만)")
     print(f"  /dddit /logitechG → company ({', '.join(company_emails)})")
     print("  /dddit/*/productlist|plan|conti → public Bypass")
 
