@@ -21,11 +21,12 @@ Live Access + API fixes from that pass are tracked below.
 ## TODO (next)
 
 ### High
-- [ ] Set `WORKS_ACCESS_ALLOW_EMAILS` (or IdP group) — Access Allow is currently `everyone`
-- [ ] Set `DDDIT_TEAM_GATE_SECRET` separate from passcode on NAS
-- [ ] Set `DDDIT_STUDIO_IMPORT_SECRET` on NAS + update Studio bookmarklet header
+- [x] Set `DDDIT_TEAM_GATE_SECRET` separate from passcode on NAS (`nas-harden-security-env.sh`)
+- [x] Set `DDDIT_STUDIO_IMPORT_SECRET` on NAS (+ bookmarklet header required)
+- [x] Set `WORKS_ACCESS_ALLOW_EMAILS` (owner) — Access Allow tightened from everyone
 - [ ] Confirm SSL/TLS = Full (or strict) in Cloudflare Dashboard (API token lacked settings)
 - [ ] Cloudflare WAF rate rule on `/api/dddit/team-gate/login` (defense beyond in-process)
+- [ ] Put `X-Dddit-Studio-Import-Key` into Studio console sync snippet (secret is on NAS `.env`)
 
 ### Medium
 - [ ] Stop committing `api/data/youtube/promotions.json` (move to NAS-only) / scrub history if needed

@@ -85,10 +85,16 @@ jobs:
             export PATH="/usr/local/bin:/var/packages/ContainerManager/target/usr/bin:/var/packages/Docker/target/usr/bin:/var/packages/Git/target/usr/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
             export WORKS_BRANCH
             export WORKS_DOCKER_SUDO="${WORKS_DOCKER_SUDO:-1}"
+            export NAS_REPO_PATH="$REPO"
             curl -fsSL "https://raw.githubusercontent.com/Mansejin/works-site/${WORKS_BRANCH}/api/scripts/nas-docker-update.sh" -o /tmp/works-api-deploy.sh
             sed -i 's/\r$//' /tmp/works-api-deploy.sh 2>/dev/null || true
             cd "$REPO"
             sh /tmp/works-api-deploy.sh --full-build
+            # Ensure TEAM_GATE_SECRET + STUDIO_IMPORT_SECRET exist, recreate containers
+            curl -fsSL "https://raw.githubusercontent.com/Mansejin/works-site/${WORKS_BRANCH}/api/scripts/nas-harden-security-env.sh" -o /tmp/works-api-harden-env.sh
+            sed -i 's/\r$//' /tmp/works-api-harden-env.sh 2>/dev/null || true
+            chmod +x /tmp/works-api-harden-env.sh
+            sh /tmp/works-api-harden-env.sh
         env:
           WORKS_BRANCH: ${{ github.event.inputs.branch || github.ref_name }}
           NAS_REPO_PATH: ${{ secrets.NAS_REPO_PATH }}
