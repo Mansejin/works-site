@@ -1,0 +1,91 @@
+/* 디디딧 (DDDIT) — design tokens
+   Source: channel @DD-DIT logos + magazine direction (the-edit principles)
+*/
+
+:root {
+  /* Brand */
+  --brand: #8f14f3;
+  --brand-ink: #6b0fbe;
+  --brand-soft: #f3e8ff;
+  --on-brand: #ffffff;
+
+  /* Magazine surface (default) */
+  --paper: #f6f4f1;
+  --paper-pure: #ffffff;
+  --ink: #111111;
+  --ink-muted: #5c5c5c;
+  --hairline: #e4e0da;
+
+  /* Cinema surface */
+  --void: #000000;
+  --void-elevated: #141414;
+  --ink-on-void: #f5f5f5;
+  --ink-muted-on-void: #9a9a9a;
+  --hairline-on-void: rgba(255, 255, 255, 0.12);
+
+  /* Type */
+  --font-display: "Pretendard", "Noto Sans KR", sans-serif;
+  --font-body: "Pretendard", "Noto Sans KR", sans-serif;
+  --font-meta: "Pretendard", "Noto Sans KR", sans-serif;
+
+  --fs-display: clamp(2.25rem, 4vw + 1rem, 3.75rem);
+  --fs-title: clamp(1.5rem, 2vw + 0.75rem, 2.25rem);
+  --fs-body: 1.0625rem;
+  --fs-meta: 0.75rem;
+  --lh-body: 1.7;
+  --lh-display: 1.15;
+  --measure: 40rem;
+
+  /* Space (8px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+  --space-9: 6rem;
+
+  /* Shape */
+  --radius: 4px;
+  --radius-sm: 2px;
+  --header-h: 4.5rem;
+  --content-max: 72rem;
+  --gutter: clamp(1rem, 3vw, 2rem);
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur: 280ms;
+}
+
+/* Surface helpers */
+[data-surface="magazine"] {
+  --bg: var(--paper);
+  --fg: var(--ink);
+  --fg-muted: var(--ink-muted);
+  --line: var(--hairline);
+  --accent: var(--brand-ink);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+[data-surface="cinema"] {
+  --bg: var(--void);
+  --fg: var(--ink-on-void);
+  --fg-muted: var(--ink-muted-on-void);
+  --line: var(--hairline-on-void);
+  --accent: var(--brand);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+[data-surface="stamp"] {
+  --bg: var(--brand);
+  --fg: var(--on-brand);
+  --fg-muted: rgba(255, 255, 255, 0.72);
+  --line: rgba(255, 255, 255, 0.28);
+  --accent: var(--on-brand);
+  background: var(--bg);
+  color: var(--fg);
+}

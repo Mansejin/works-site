@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>아이패드 홈 화면, 업무용과 휴식용 — 디디딧</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="brand/tokens.css" />
+  <link rel="stylesheet" href="wire.css" />
+</head>
+<body>
+  <header class="mast" data-on="cinema" id="mast">
+    <a class="mast__logo" href="index.html" aria-label="디디딧 홈">
+      <img src="brand/logos/logo-purple-on-black.png" alt="디디딧" id="logoImg" />
+    </a>
+    <div class="mast__actions">
+      <span class="mast__tag">Setup</span>
+      <button class="burger" id="openPanel" aria-label="목차 열기" aria-expanded="false" aria-controls="panel">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="backdrop" id="backdrop" hidden></div>
+  <aside class="panel" id="panel" aria-hidden="true">
+    <div class="panel__top">
+      <p>Contents</p>
+      <button type="button" id="closePanel" aria-label="닫기">닫기</button>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="reads.html">All reads</a>
+      <a href="#lede">결론</a>
+      <a href="#body">본문</a>
+    </nav>
+  </aside>
+
+  <article>
+    <header class="cover" id="cover">
+      <div class="cover__media">
+        <div class="ph ph--media" aria-hidden="true">Cover still<br/>TBA</div>
+      </div>
+      <div class="cover__text">
+        <div class="cover__logo">
+          <img src="brand/logos/logo-purple-on-black.png" alt="" />
+        </div>
+        <p class="cover__meta">Setup · Tablet</p>
+        <h1 class="cover__title">아이패드 홈 화면, 업무용과 휴식용</h1>
+        <p class="cover__dek">한 페이지에 일을 모으고, 집에서는 검정 톤으로 쉬게 나누는 방법.</p>
+      </div>
+    </header>
+
+    <section class="lede" id="lede" data-surface="magazine">
+      <div class="lede__inner">
+        <h2>한 줄 결론</h2>
+        <p>위젯만 꾸미면 반쪽이다. 집중 모드 + 위치 자동화까지 묶어야 ‘회사/집’이 손 없이 갈린다. Wedgetsmith·i-Screen·Notion·단축어가 최소 세트다.</p>
+      </div>
+    </section>
+
+    <section class="prose" id="body" data-surface="magazine">
+      <div class="prose__inner">
+        <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
+        <h2>Discover</h2>
+        <p>아이패드가 유튜브 머신으로만 쓰일 때, 홈 화면을 업무용(화이트)·휴식용(블랙) 두 장으로 나눈다. 준비는 배경을 단색·견고하게로 맞추고, Notion / Wedgetsmith / i-Screen을 깔면 된다. 회사 도착·집 도착 자동화까지 쓸 사람에게 맞다. 위젯 꾸미기만 하고 자동화는 안 할 거면, 기대치를 ‘예쁜 런처’로 낮추면 된다.</p>
+        <h2>Design</h2>
+        <p><strong>업무용</strong>은 좌·중·우 구역이다. Notion(문서·최근 항목), 화이트 노이즈, Gmail, 시계·캘린더·리마인더, 스플릿 앱·회의록(Goodnotes) 단축어, 배터리, YouTube 검색·ChatGPT. Wedgetsmith는 테마를 한 번 만든 뒤 Apply to Other Widgets로 톤을 맞춘다.</p>
+        <p><strong>휴식용</strong>은 블랙 톤. 시계·OTT 액션·밀리의 서재·날씨·비 소리·문페이즈·인스타·배터리, i-Screen 사진·뮤직(애플뮤직/스포티파이만), 게임 위젯. i-Screen은 저장 전 광고가 있다.</p>
+        <p><strong>자동화:</strong> 집중 모드 ‘회사’/‘집’에 각 잠금·홈 연결 → 단축어로 모드 전환 → 자동화 ‘도착’을 회사·집 좌표에 걸고 즉시 실행.</p>
+        <h2>Detail</h2>
+        <p>위젯 추가는 빈 화면 길게 → + → 앱·사이즈. 다중 앱 단축어는 창을 왼쪽/오른쪽(또는 3분할)로 지정한다. 뮤직 위젯 연동 범위, i-Screen 광고, 자동화의 ‘확인 후 실행’을 즉시로 바꾸는 실수가 반복 이슈다. 화면이 예뻐도 위치 권한·집중 모드 연결이 어긋나면 전환은 안 한다.</p>
+      </div>
+    </section>
+  </article>
+
+  <footer class="site-foot">
+    <a href="reads.html">← All reads</a>
+    <span>DDDIT · SRT draft wire</span>
+  </footer>
+  <p class="wire-note">Wire · SRT draft</p>
+
+  <script>
+    const panel = document.getElementById('panel');
+    const backdrop = document.getElementById('backdrop');
+    const openBtn = document.getElementById('openPanel');
+    const closeBtn = document.getElementById('closePanel');
+    const mast = document.getElementById('mast');
+    const logoImg = document.getElementById('logoImg');
+    const cover = document.getElementById('cover');
+
+    function setOpen(open) {
+      panel.classList.toggle('is-open', open);
+      backdrop.classList.toggle('is-open', open);
+      backdrop.hidden = !open;
+      panel.setAttribute('aria-hidden', String(!open));
+      openBtn.setAttribute('aria-expanded', String(open));
+      document.body.style.overflow = open ? 'hidden' : '';
+    }
+    openBtn.addEventListener('click', () => setOpen(true));
+    closeBtn.addEventListener('click', () => setOpen(false));
+    backdrop.addEventListener('click', () => setOpen(false));
+
+    const io = new IntersectionObserver(([e]) => {
+      const onCover = e.isIntersecting && e.intersectionRatio > 0.25;
+      mast.dataset.on = onCover ? 'cinema' : 'magazine';
+      logoImg.src = onCover
+        ? 'brand/logos/logo-purple-on-black.png'
+        : 'brand/logos/logo-purple-on-light.png';
+    }, { threshold: [0.25, 0.5] });
+    io.observe(cover);
+  </script>
+
+</body>
+</html>

@@ -1,10 +1,11 @@
-# works-site
+﻿# works-site
 
 개인·업무용 페이지. `mansejin.com` 메인 도구함과 분리된 서브도메인.
 
 - 루트: https://works.mansejin.com (내부용 목록, noindex)
 - 디디딧 워크스페이스: https://works.mansejin.com/dddit/
 - 콘티 작성기: https://works.mansejin.com/dddit/script/
+- 매거진 와이어(초안): https://works.mansejin.com/dddit/magazine/
 - Xenics 프로젝트: https://works.mansejin.com/dddit/xenics/
 - Xenics 콘티: https://works.mansejin.com/dddit/script/?project=xenics
 - 벤딕트 프로젝트: https://works.mansejin.com/dddit/vendict/

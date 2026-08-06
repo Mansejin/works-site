@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>갤럭시 S26, 사자마자 켤 설정 — 디디딧</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="brand/tokens.css" />
+  <link rel="stylesheet" href="wire.css" />
+</head>
+<body>
+  <header class="mast" data-on="cinema" id="mast">
+    <a class="mast__logo" href="index.html" aria-label="디디딧 홈">
+      <img src="brand/logos/logo-purple-on-black.png" alt="디디딧" id="logoImg" />
+    </a>
+    <div class="mast__actions">
+      <span class="mast__tag">Setup</span>
+      <button class="burger" id="openPanel" aria-label="목차 열기" aria-expanded="false" aria-controls="panel">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="backdrop" id="backdrop" hidden></div>
+  <aside class="panel" id="panel" aria-hidden="true">
+    <div class="panel__top">
+      <p>Contents</p>
+      <button type="button" id="closePanel" aria-label="닫기">닫기</button>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="reads.html">All reads</a>
+      <a href="#lede">결론</a>
+      <a href="#body">본문</a>
+    </nav>
+  </aside>
+
+  <article>
+    <header class="cover" id="cover">
+      <div class="cover__media">
+        <div class="ph ph--media" aria-hidden="true">Cover still<br/>TBA</div>
+      </div>
+      <div class="cover__text">
+        <div class="cover__logo">
+          <img src="brand/logos/logo-purple-on-black.png" alt="" />
+        </div>
+        <p class="cover__meta">Setup · Phone</p>
+        <h1 class="cover__title">갤럭시 S26, 사자마자 켤 설정</h1>
+        <p class="cover__dek">에어드롭 호환을 포함해, 개통 직후 손대면 좋은 여덟 가지.</p>
+      </div>
+    </header>
+
+    <section class="lede" id="lede" data-surface="magazine">
+      <div class="lede__inner">
+        <h2>한 줄 결론</h2>
+        <p>아이폰 친구와 사진 나눌 거면 ‘Apple 기기와 공유’를 먼저 켠다. 대용량 영상은 아직 느릴 수 있으니, 일상 공유와 원본 덤프를 기대한 사람을 나누어 보라.</p>
+      </div>
+    </section>
+
+    <section class="prose" id="body" data-surface="magazine">
+      <div class="prose__inner">
+        <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
+        <h2>Discover</h2>
+        <p>S26 시리즈에서 말이 많았던 건 퀵쉐어의 애플 기기 공유다. 아이폰 사용자와 파일을 주고받을 때, 그리고 아이폰에서 넘어온 사람이 제스처·프라이버시 화면을 맞출 때 이 체크리스트가 맞다. ‘설정 팁’이지 카메라·배터리 풀리뷰가 아니다.</p>
+        <h2>Design</h2>
+        <p>순서는 채널 기준이다.</p>
+        <ul><li><strong>기기 간 연결 → 퀵쉐어 → Apple 기기와 공유 ON.</strong> 안 보이면 받을 대상을 잠시 ‘모든 사람’. 메뉴 자체가 없으면 Play 서비스 출처에서 최신으로.</li><li><strong>프라이버시 디스플레이</strong> — 측면 버튼·자동 켜짐(잠금 해제·특정 앱).</li><li><strong>구글 디스커버</strong> — 홈 편집 → 설정에서 끄기.</li><li><strong>스와이프 제스처</strong> — 하단 버튼 대신 아이폰식 제스처.</li><li><strong>QHD+</strong> — 플러스/울트라. 기본 FHD+에서 올림. 동영상 밝기 보정도 함께.</li><li><strong>Edge 패널</strong> — 앱·핸들 위치 정리.</li><li><strong>포토 어시스트</strong> — 지우개·이동·프롬프트 생성.</li><li><strong>원 핸드 오퍼레이션</strong> — 스토어 앱. 가장자리 스와이프를 뒤로/캡처/카메라 등으로 매핑.</li></ul>
+        <h2>Detail</h2>
+        <p>에어드롭 호환은 초기라 대용량 영상은 시간이 걸린다는 체감이 있다. 사진 수십 장 수준은 쓸 만하고, 원본 영상을 자주 옮기면 최적화를 기다리는 편이 낫다. QHD+·AI 편집·원핸드 앱은 취향·배터리와 트레이드오프다. 메뉴명은 원 UI 업데이트로 바뀔 수 있다.</p>
+      </div>
+    </section>
+  </article>
+
+  <footer class="site-foot">
+    <a href="reads.html">← All reads</a>
+    <span>DDDIT · SRT draft wire</span>
+  </footer>
+  <p class="wire-note">Wire · SRT draft</p>
+
+  <script>
+    const panel = document.getElementById('panel');
+    const backdrop = document.getElementById('backdrop');
+    const openBtn = document.getElementById('openPanel');
+    const closeBtn = document.getElementById('closePanel');
+    const mast = document.getElementById('mast');
+    const logoImg = document.getElementById('logoImg');
+    const cover = document.getElementById('cover');
+
+    function setOpen(open) {
+      panel.classList.toggle('is-open', open);
+      backdrop.classList.toggle('is-open', open);
+      backdrop.hidden = !open;
+      panel.setAttribute('aria-hidden', String(!open));
+      openBtn.setAttribute('aria-expanded', String(open));
+      document.body.style.overflow = open ? 'hidden' : '';
+    }
+    openBtn.addEventListener('click', () => setOpen(true));
+    closeBtn.addEventListener('click', () => setOpen(false));
+    backdrop.addEventListener('click', () => setOpen(false));
+
+    const io = new IntersectionObserver(([e]) => {
+      const onCover = e.isIntersecting && e.intersectionRatio > 0.25;
+      mast.dataset.on = onCover ? 'cinema' : 'magazine';
+      logoImg.src = onCover
+        ? 'brand/logos/logo-purple-on-black.png'
+        : 'brand/logos/logo-purple-on-light.png';
+    }, { threshold: [0.25, 0.5] });
+    io.observe(cover);
+  </script>
+
+</body>
+</html>

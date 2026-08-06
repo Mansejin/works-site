@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>디디딧 — Home wire</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="brand/tokens.css" />
+  <link rel="stylesheet" href="wire.css" />
+</head>
+<body data-surface="cinema">
+  <header class="mast" data-on="cinema" id="mast">
+    <a class="mast__logo" href="index.html" aria-label="디디딧 홈">
+      <img src="brand/logos/logo-purple-on-black.png" alt="디디딧" />
+    </a>
+    <div class="mast__actions">
+      <span class="mast__tag">Discover. Design. Detail.</span>
+      <button class="burger" id="openPanel" aria-label="목차 열기" aria-expanded="false" aria-controls="panel">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="backdrop" id="backdrop" hidden></div>
+  <aside class="panel" id="panel" aria-hidden="true">
+    <div class="panel__top">
+      <p>Contents</p>
+      <button type="button" id="closePanel" aria-label="닫기">닫기</button>
+    </div>
+    <nav>
+      <a href="#watch">Watch</a>
+      <a href="#reads">Review</a>
+      <a href="reads.html">All reads</a>
+      <a href="https://www.youtube.com/@DD-DIT" target="_blank" rel="noopener">YouTube</a>
+    </nav>
+    <p class="panel__foot">Discover. Design. Detail.</p>
+  </aside>
+
+  <main>
+    <section class="spread spread--cinema" id="watch" data-surface="cinema">
+      <div class="spread__anchor">
+        <img
+          class="media-fill"
+          src="assets/yt-4-pHeR-cBD8pc.jpg"
+          alt="드리미 MF10 실사용 썸네일"
+          width="1280"
+          height="720"
+        />
+        <div class="spread__copy">
+          <p class="spread__eyebrow">Watch</p>
+          <h1 class="spread__title">드리미 MF10, 원룸에서 써 본 기록</h1>
+          <p class="spread__dek">예쁜 가전인지, 실제로 빨래를 줄이는지. 결론만 남깁니다.</p>
+          <div class="cta-row">
+            <a class="btn btn--solid" href="https://www.youtube.com/watch?v=pHeR-cBD8pc" target="_blank" rel="noopener">영상 보기</a>
+            <a class="btn btn--ghost" href="#reads">리뷰 읽기</a>
+          </div>
+        </div>
+      </div>
+      <aside class="spread__rail" aria-label="최근 리뷰">
+        <p class="rail__label">Latest reads</p>
+        <a class="story" href="article-muji-11.html">
+          <div>
+            <p class="story__meta">Review · Haul</p>
+            <h2 class="story__title">무지에서 남길 만한 11</h2>
+            <p class="story__dek">결정 장애 날 때 장바구니만 추린 목록.</p>
+          </div>
+        </a>
+        <a class="story" href="article-galaxy-s26u-setup.html">
+          <div>
+            <p class="story__meta">Setup · Phone</p>
+            <h2 class="story__title">갤럭시 S26 설정</h2>
+            <p class="story__dek">에어드롭 호환 포함, 사자마자 켤 것.</p>
+          </div>
+        </a>
+        <a class="story" href="article.html">
+          <div class="story__thumb">
+            <img src="assets/yt-3-AxKJ8vYFqys.jpg" alt="" width="480" height="480" />
+          </div>
+          <div>
+            <p class="story__meta">Review · Tablet</p>
+            <h2 class="story__title">레노버 아이디어 탭 11</h2>
+            <p class="story__dek">펜 포함 구성이 누구에게 맞는지, 아닌지만.</p>
+          </div>
+        </a>
+        <a class="story" href="article-ipad-homescreen.html">
+          <div>
+            <p class="story__meta">Setup · Tablet</p>
+            <h2 class="story__title">아이패드 홈 화면</h2>
+            <p class="story__dek">업무용·휴식용을 위치 자동화로 갈라 쓰기.</p>
+          </div>
+        </a>
+      </aside>
+    </section>
+
+    <section class="spread spread--magazine" id="reads" data-surface="magazine">
+      <div class="spread__anchor">
+        <img
+          class="media-fill"
+          src="assets/yt-3-AxKJ8vYFqys.jpg"
+          alt="레노버 아이디어 탭 11 실사용"
+          width="1280"
+          height="720"
+        />
+        <div class="spread__copy">
+          <p class="spread__eyebrow">Review</p>
+          <h2 class="spread__title">레노버 아이디어 탭 11, 누구에게 맞나</h2>
+          <p class="spread__dek">디자인과 구성은 설득력 있다. 아이패드를 대체하는지는 용도에 달렸다.</p>
+          <div class="cta-row">
+            <a class="btn btn--solid" href="article.html">아티클 열기</a>
+            <a class="btn btn--ghost" href="https://www.youtube.com/watch?v=AxKJ8vYFqys" target="_blank" rel="noopener">영상</a>
+          </div>
+        </div>
+      </div>
+      <aside class="spread__rail" aria-label="시리즈">
+        <p class="rail__label">From transcripts</p>
+        <a class="story" href="article-ainic-ifd01.html">
+          <div>
+            <p class="story__meta">Review · Home</p>
+            <h2 class="story__title">아이닉 음식물 처리기</h2>
+            <p class="story__dek">소량 잔반과 냄새, 1인 가구 주방 기준으로.</p>
+          </div>
+        </a>
+        <a class="story" href="article-shokz-openfit-pro.html">
+          <div>
+            <p class="story__meta">Review · Audio</p>
+            <h2 class="story__title">샥즈 오픈핏 프로</h2>
+            <p class="story__dek">오픈형으로 달리면서 리덕션이 버티는지.</p>
+          </div>
+        </a>
+        <a class="story" href="article-ipad-air-m4.html">
+          <div>
+            <p class="story__meta">Review · Tablet</p>
+            <h2 class="story__title">아이패드 에어 M4</h2>
+            <p class="story__dek">칩·메모리는 올랐고, 120Hz는 없다.</p>
+          </div>
+        </a>
+        <a class="story" href="reads.html">
+          <div>
+            <p class="story__meta">Index</p>
+            <h2 class="story__title">모든 아티클 보기</h2>
+            <p class="story__dek">자막 기반 초안 6편 + 샘플.</p>
+          </div>
+        </a>
+      </aside>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    <span>DDDIT · @DD-DIT</span>
+    <span>Discover. Design. Detail.</span>
+  </footer>
+  <p class="wire-note">Wire · live channel thumbs</p>
+
+  <script>
+    const panel = document.getElementById('panel');
+    const backdrop = document.getElementById('backdrop');
+    const mast = document.getElementById('mast');
+    const openBtn = document.getElementById('openPanel');
+    const closeBtn = document.getElementById('closePanel');
+
+    function setOpen(open) {
+      panel.classList.toggle('is-open', open);
+      backdrop.classList.toggle('is-open', open);
+      backdrop.hidden = !open;
+      panel.setAttribute('aria-hidden', String(!open));
+      openBtn.setAttribute('aria-expanded', String(open));
+      document.body.style.overflow = open ? 'hidden' : '';
+    }
+    openBtn.addEventListener('click', () => setOpen(true));
+    closeBtn.addEventListener('click', () => setOpen(false));
+    backdrop.addEventListener('click', () => setOpen(false));
+
+    const watch = document.getElementById('watch');
+    const io = new IntersectionObserver(([e]) => {
+      const onCinema = e.isIntersecting && e.intersectionRatio > 0.35;
+      mast.dataset.on = onCinema ? 'cinema' : 'magazine';
+      document.body.dataset.surface = onCinema ? 'cinema' : 'magazine';
+      const logo = mast.querySelector('img');
+      logo.src = onCinema
+        ? 'brand/logos/logo-purple-on-black.png'
+        : 'brand/logos/logo-purple-on-light.png';
+    }, { threshold: [0.35, 0.6] });
+    io.observe(watch);
+  </script>
+</body>
+</html>

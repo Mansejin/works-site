@@ -47,6 +47,13 @@
       status: "사용 가능",
       ready: true,
     },
+    {
+      name: "매거진 와이어",
+      path: "magazine/",
+      summary: "디디딧 매거진 초안 · Discover / Design / Detail · 자막 기반 아티클",
+      status: "초안",
+      ready: true,
+    },
   ];
 
   const SCHEDULE_TYPES = ["기획", "촬영", "편집", "업로드"];

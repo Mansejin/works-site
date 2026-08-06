@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>레노버 아이디어 탭 11 — 디디딧</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="brand/tokens.css" />
+  <link rel="stylesheet" href="wire.css" />
+</head>
+<body>
+  <header class="mast" data-on="cinema" id="mast">
+    <a class="mast__logo" href="index.html" aria-label="디디딧 홈">
+      <img src="brand/logos/logo-purple-on-black.png" alt="디디딧" id="logoImg" />
+    </a>
+    <div class="mast__actions">
+      <span class="mast__tag">Review</span>
+      <button class="burger" id="openPanel" aria-label="목차 열기" aria-expanded="false" aria-controls="panel">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="backdrop" id="backdrop" hidden></div>
+  <aside class="panel" id="panel" aria-hidden="true">
+    <div class="panel__top">
+      <p>Contents</p>
+      <button type="button" id="closePanel" aria-label="닫기">닫기</button>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="reads.html">All reads</a>
+      <a href="#lede">결론</a>
+      <a href="#body">본문</a>
+      <a href="https://www.youtube.com/watch?v=AxKJ8vYFqys" target="_blank" rel="noopener">Watch episode</a>
+    </nav>
+  </aside>
+
+  <article>
+    <header class="cover" id="cover">
+      <div class="cover__media">
+        <img
+          class="media-fill"
+          src="assets/yt-3-AxKJ8vYFqys.jpg"
+          alt="레노버 아이디어 탭 11을 키보드 케이스에 올려 사용하는 장면"
+          width="1280"
+          height="720"
+        />
+      </div>
+      <div class="cover__text">
+        <div class="cover__logo">
+          <img src="brand/logos/logo-purple-on-black.png" alt="" />
+        </div>
+        <p class="cover__meta">Review · Detail · Tablet</p>
+        <h1 class="cover__title">레노버 아이디어 탭 11, 펜 포함 구성이 맞는 사람</h1>
+        <p class="cover__dek">필기와 콘텐츠 소비가 중심인지, 앱 생태계까지 필요한지. 그 차이만 봅니다.</p>
+        <p class="cover__cta">
+          <a class="btn btn--solid" href="https://www.youtube.com/watch?v=AxKJ8vYFqys" target="_blank" rel="noopener">영상으로 보기</a>
+        </p>
+      </div>
+    </header>
+
+    <section class="lede" id="lede" data-surface="magazine">
+      <div class="lede__inner">
+        <h2>한 줄 결론</h2>
+        <p>필기와 콘텐츠 소비가 중심이면 충분히 후보다. 앱 생태계·영상 작업까지 기대하면 아직 아이패드를 대체하진 않는다.</p>
+      </div>
+    </section>
+
+    <section class="prose" id="body" data-surface="magazine">
+      <div class="prose__inner">
+        <p>
+          채널 에피소드와 같은 제품을 Discover. Design. Detail. 순으로만 정리한다.
+          과장 없는 팩트와 취향 기준. 이 페이지는 와이어 단계라 본문은 자리 표시용이다.
+        </p>
+
+        <h2>Discover</h2>
+        <p>
+          가방에 얇은 작업 화면을 넣고 싶은 사람, 펜 입문이 목적인 사람에게 먼저 열려 있다.
+        </p>
+
+        <figure class="figure">
+          <img src="assets/yt-5-V6yWwEgIveE.jpg" alt="같은 구도의 태블릿 실사용 참고 컷" width="1280" height="720" style="width:100%;height:auto;object-fit:cover;" />
+          <figcaption>관련 컷 자리 — 추후 본편 실사용 스틸로 교체</figcaption>
+        </figure>
+
+        <h2>Design</h2>
+        <p>
+          키보드 케이스와 펜이 기본에 가까운 구성이라, ‘뭘 더 사야 하지?’가 적다.
+          그 구성이 이 가격대에서 설득력의 절반이다.
+        </p>
+
+        <h2>Detail</h2>
+        <p>
+          디스플레이 완성도, 앱 호환, 장기 업데이트.
+          세 가지를 기준으로 싫고 좋음을 나눈다. 점수는 붙이지 않는다.
+        </p>
+
+        <p>
+          영상: <a href="https://www.youtube.com/watch?v=AxKJ8vYFqys" target="_blank" rel="noopener" style="color:var(--brand-ink);text-decoration:underline;">youtube.com/watch?v=AxKJ8vYFqys</a>
+        </p>
+      </div>
+    </section>
+  </article>
+
+  <footer class="site-foot">
+    <a href="index.html">← Home wire</a>
+    <span>DDDIT article wire · Idea Tab 11</span>
+  </footer>
+  <p class="wire-note">Wire · live channel thumbs</p>
+
+  <script>
+    const panel = document.getElementById('panel');
+    const backdrop = document.getElementById('backdrop');
+    const openBtn = document.getElementById('openPanel');
+    const closeBtn = document.getElementById('closePanel');
+    const mast = document.getElementById('mast');
+    const logoImg = document.getElementById('logoImg');
+    const cover = document.getElementById('cover');
+
+    function setOpen(open) {
+      panel.classList.toggle('is-open', open);
+      backdrop.classList.toggle('is-open', open);
+      backdrop.hidden = !open;
+      panel.setAttribute('aria-hidden', String(!open));
+      openBtn.setAttribute('aria-expanded', String(open));
+      document.body.style.overflow = open ? 'hidden' : '';
+    }
+    openBtn.addEventListener('click', () => setOpen(true));
+    closeBtn.addEventListener('click', () => setOpen(false));
+    backdrop.addEventListener('click', () => setOpen(false));
+
+    const io = new IntersectionObserver(([e]) => {
+      const onCover = e.isIntersecting && e.intersectionRatio > 0.25;
+      mast.dataset.on = onCover ? 'cinema' : 'magazine';
+      logoImg.src = onCover
+        ? 'brand/logos/logo-purple-on-black.png'
+        : 'brand/logos/logo-purple-on-light.png';
+    }, { threshold: [0.25, 0.5] });
+    io.observe(cover);
+  </script>
+</body>
+</html>

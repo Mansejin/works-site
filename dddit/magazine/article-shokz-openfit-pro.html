@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>샥즈 오픈핏 프로 — 디디딧</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="brand/tokens.css" />
+  <link rel="stylesheet" href="wire.css" />
+</head>
+<body>
+  <header class="mast" data-on="cinema" id="mast">
+    <a class="mast__logo" href="index.html" aria-label="디디딧 홈">
+      <img src="brand/logos/logo-purple-on-black.png" alt="디디딧" id="logoImg" />
+    </a>
+    <div class="mast__actions">
+      <span class="mast__tag">Review</span>
+      <button class="burger" id="openPanel" aria-label="목차 열기" aria-expanded="false" aria-controls="panel">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="backdrop" id="backdrop" hidden></div>
+  <aside class="panel" id="panel" aria-hidden="true">
+    <div class="panel__top">
+      <p>Contents</p>
+      <button type="button" id="closePanel" aria-label="닫기">닫기</button>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="reads.html">All reads</a>
+      <a href="#lede">결론</a>
+      <a href="#body">본문</a>
+    </nav>
+  </aside>
+
+  <article>
+    <header class="cover" id="cover">
+      <div class="cover__media">
+        <div class="ph ph--media" aria-hidden="true">Cover still<br/>TBA</div>
+      </div>
+      <div class="cover__text">
+        <div class="cover__logo">
+          <img src="brand/logos/logo-purple-on-black.png" alt="" />
+        </div>
+        <p class="cover__meta">Review · Audio</p>
+        <h1 class="cover__title">샥즈 오픈핏 프로</h1>
+        <p class="cover__dek">귀가 열린 채 달리면서도, 바람·차로 음악이 묻히지 않는지 본 기록.</p>
+      </div>
+    </header>
+
+    <section class="lede" id="lede" data-surface="magazine">
+      <div class="lede__inner">
+        <h2>한 줄 결론</h2>
+        <p>러닝·격한 땀에 커널형이 싫은 사람에게는 후보. 멀미·먹먹함에 예민하면 앱에서 리덕션을 낮추거나 패스. 36만 원대는 운동에 진심일 때 성립한다.</p>
+      </div>
+    </section>
+
+    <section class="prose" id="body" data-surface="magazine">
+      <div class="prose__inner">
+        <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
+        <h2>Discover</h2>
+        <p>커널형은 발소리가 울리고 땀이 차기 쉽다. 오픈핏 프로는 완전 오픈형인데 노이즈 리덕션을 넣어, 한강·도심 러닝에서 위험 신호(차·벨)는 남기고 저음역 지속 소음은 줄이는 쪽이다. 전력 질주에도 이어 후크가 빠지지 않았고, 안경·고글과도 간섭이 적었다. IP55, 유닛 약 11g, 울트라소프트 실리콘은 장거리 착용을 전제로 설계된 인상이다.</p>
+        <p>사무실·지하철에서도 쓸 수 있지만, 본편 초점은 야외 운동의 집중력이다.</p>
+        <h2>Design</h2>
+        <p>니켈-티타늄 이어 후크 + 귀 걸침 구조가 제품의 전부다. 전용 앱은 10밴드 EQ, 돌비 애트모스·헤드 트래킹, 리덕션 단계, 멀티포인트, 터치 커스텀, 저지연 모드까지 한곳에 모은다. 드라이버(11×20mm 듀얼)는 오픈형의 약한 저음을 채우는 쪽이고, 킥·베이스가 러닝 텐션에 맞춰진다. 배터리 공칭은 이어 단독 최대 12시간·케이스 포함 50시간. 리덕션을 켜면 대략 절반으로 준다는 점은 그대로 기억할 것.</p>
+        <h2>Detail</h2>
+        <p>통화는 유닛당 마이크 3개(총 6)로, 숨·바람 있는 야외에서도 ‘이어폰인지 몰랐다’는 반응이 나올 정도로 또렷했다는 한 달 체감이다. 노이즈 리덕션은 수음 후 반대 파형을 뿌리는 방식이라, 일부는 먹먹함·멀미를 느낀다. 그런 사람은 강도를 낮추거나 끄고 쓰는 게 맞다. 가격 369,000원은 저렴하지 않다. 안정 착용·방수·음질·통화·리덕션을 러닝용으로 한 번에 살 때 이야기가 된다.</p>
+      </div>
+    </section>
+  </article>
+
+  <footer class="site-foot">
+    <a href="reads.html">← All reads</a>
+    <span>DDDIT · SRT draft wire</span>
+  </footer>
+  <p class="wire-note">Wire · SRT draft</p>
+
+  <script>
+    const panel = document.getElementById('panel');
+    const backdrop = document.getElementById('backdrop');
+    const openBtn = document.getElementById('openPanel');
+    const closeBtn = document.getElementById('closePanel');
+    const mast = document.getElementById('mast');
+    const logoImg = document.getElementById('logoImg');
+    const cover = document.getElementById('cover');
+
+    function setOpen(open) {
+      panel.classList.toggle('is-open', open);
+      backdrop.classList.toggle('is-open', open);
+      backdrop.hidden = !open;
+      panel.setAttribute('aria-hidden', String(!open));
+      openBtn.setAttribute('aria-expanded', String(open));
+      document.body.style.overflow = open ? 'hidden' : '';
+    }
+    openBtn.addEventListener('click', () => setOpen(true));
+    closeBtn.addEventListener('click', () => setOpen(false));
+    backdrop.addEventListener('click', () => setOpen(false));
+
+    const io = new IntersectionObserver(([e]) => {
+      const onCover = e.isIntersecting && e.intersectionRatio > 0.25;
+      mast.dataset.on = onCover ? 'cinema' : 'magazine';
+      logoImg.src = onCover
+        ? 'brand/logos/logo-purple-on-black.png'
+        : 'brand/logos/logo-purple-on-light.png';
+    }, { threshold: [0.25, 0.5] });
+    io.observe(cover);
+  </script>
+
+</body>
+</html>
