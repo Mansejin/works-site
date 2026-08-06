@@ -21,7 +21,6 @@
       </button>
     </div>
   </header>
-
   <div class="backdrop" id="backdrop" hidden></div>
   <aside class="panel" id="panel" aria-hidden="true">
     <div class="panel__top">
@@ -35,7 +34,6 @@
       <a href="#body">본문</a>
     </nav>
   </aside>
-
   <article>
     <header class="cover" id="cover">
       <div class="cover__media">
@@ -50,17 +48,15 @@
         <p class="cover__dek">에어드롭 호환을 포함해, 개통 직후 손대면 좋은 여덟 가지.</p>
       </div>
     </header>
-
     <section class="lede" id="lede" data-surface="magazine">
       <div class="lede__inner">
         <h2>한 줄 결론</h2>
         <p>아이폰 친구와 사진 나눌 거면 ‘Apple 기기와 공유’를 먼저 켠다. 대용량 영상은 아직 느릴 수 있으니, 일상 공유와 원본 덤프를 기대한 사람을 나누어 보라.</p>
       </div>
     </section>
-
     <section class="prose" id="body" data-surface="magazine">
       <div class="prose__inner">
-        <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
+                <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
         <h2>Discover</h2>
         <p>S26 시리즈에서 말이 많았던 건 퀵쉐어의 애플 기기 공유다. 아이폰 사용자와 파일을 주고받을 때, 그리고 아이폰에서 넘어온 사람이 제스처·프라이버시 화면을 맞출 때 이 체크리스트가 맞다. ‘설정 팁’이지 카메라·배터리 풀리뷰가 아니다.</p>
         <h2>Design</h2>
@@ -71,7 +67,6 @@
       </div>
     </section>
   </article>
-
   <footer class="site-foot">
     <a href="reads.html">← All reads</a>
     <span>DDDIT · SRT draft wire</span>
@@ -86,7 +81,6 @@
     const mast = document.getElementById('mast');
     const logoImg = document.getElementById('logoImg');
     const cover = document.getElementById('cover');
-
     function setOpen(open) {
       panel.classList.toggle('is-open', open);
       backdrop.classList.toggle('is-open', open);
@@ -98,7 +92,6 @@
     openBtn.addEventListener('click', () => setOpen(true));
     closeBtn.addEventListener('click', () => setOpen(false));
     backdrop.addEventListener('click', () => setOpen(false));
-
     const io = new IntersectionObserver(([e]) => {
       const onCover = e.isIntersecting && e.intersectionRatio > 0.25;
       mast.dataset.on = onCover ? 'cinema' : 'magazine';

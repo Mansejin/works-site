@@ -21,7 +21,6 @@
       </button>
     </div>
   </header>
-
   <div class="backdrop" id="backdrop" hidden></div>
   <aside class="panel" id="panel" aria-hidden="true">
     <div class="panel__top">
@@ -35,7 +34,6 @@
       <a href="#body">본문</a>
     </nav>
   </aside>
-
   <article>
     <header class="cover" id="cover">
       <div class="cover__media">
@@ -50,17 +48,15 @@
         <p class="cover__dek">소량 잔반을 봉투에 넣기 애매한 1인 가구 주방을 기준으로 본 기록.</p>
       </div>
     </header>
-
     <section class="lede" id="lede" data-surface="magazine">
       <div class="lede__inner">
         <h2>한 줄 결론</h2>
         <p>잔반·뼈·국물까지 부피를 줄이고 냄새가 버틸 만하면 후보. 지자체 보조금·필터 유지비가 맞는지가 구매 조건이다, 극한 테스트(컵·전복 껍데기)는 성능 과시일 뿐 일상 기준으로 보지 않는다.</p>
       </div>
     </section>
-
     <section class="prose" id="body" data-surface="magazine">
       <div class="prose__inner">
-        <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
+                <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
         <h2>Discover</h2>
         <p>여름철 1인 가구에서 음식물은 양이 적어 버리기도, 방치하면 냄새가 난다. iFD01은 그 애매한 구간을 집 안에서 말리고 갈아버리는 쪽에 맞춰져 있다. 본체 폭이 한 뼘(약 21cm)이라 원룸 싱크 옆에도 올리기 쉬운 편이고, 야간 소음이 크지 않다고 채널에서 체감했다. 3L 내솥은 1인이 보관 모드로 모았다가 한 번에 돌리기에도, 소규모 다인 가구의 하루 치에도 쓸 수 있는 용량이다.</p>
         <p>맞지 않는 사람: 잔반을 거의 안 남기거나, 보조금 없이 30만 원대 초반이 부담이거나, ‘극한 분쇄’를 일상 스펙으로 기대하는 경우.</p>
@@ -71,7 +67,6 @@
       </div>
     </section>
   </article>
-
   <footer class="site-foot">
     <a href="reads.html">← All reads</a>
     <span>DDDIT · SRT draft wire</span>
@@ -86,7 +81,6 @@
     const mast = document.getElementById('mast');
     const logoImg = document.getElementById('logoImg');
     const cover = document.getElementById('cover');
-
     function setOpen(open) {
       panel.classList.toggle('is-open', open);
       backdrop.classList.toggle('is-open', open);
@@ -98,7 +92,6 @@
     openBtn.addEventListener('click', () => setOpen(true));
     closeBtn.addEventListener('click', () => setOpen(false));
     backdrop.addEventListener('click', () => setOpen(false));
-
     const io = new IntersectionObserver(([e]) => {
       const onCover = e.isIntersecting && e.intersectionRatio > 0.25;
       mast.dataset.on = onCover ? 'cinema' : 'magazine';

@@ -21,7 +21,6 @@
       </button>
     </div>
   </header>
-
   <div class="backdrop" id="backdrop" hidden></div>
   <aside class="panel" id="panel" aria-hidden="true">
     <div class="panel__top">
@@ -35,11 +34,10 @@
       <a href="#body">본문</a>
     </nav>
   </aside>
-
   <article>
     <header class="cover" id="cover">
       <div class="cover__media">
-        <div class="ph ph--media" aria-hidden="true">Cover still<br/>TBA</div>
+        <img class="media-fill" src="assets/covers/muji-11.jpg" alt="무인양품에서 남길 만한 11" width="1400" height="788" />
       </div>
       <div class="cover__text">
         <div class="cover__logo">
@@ -50,17 +48,15 @@
         <p class="cover__dek">매장에서 결정 장애가 올 때, ‘이건 장바구니’만 추린 목록.</p>
       </div>
     </header>
-
     <section class="lede" id="lede" data-surface="magazine">
       <div class="lede__inner">
         <h2>한 줄 결론</h2>
         <p>휴대·정리·보냉처럼 손 가는 횟수가 많은 물건 위주다. 스피커·손거울처럼 기대치를 낮춰야 하는 것과, 클리너·케이블 박스처럼 바로 체감되는 것을 구분해서 고르면 실패가 적다.</p>
       </div>
     </section>
-
     <section class="prose" id="body" data-surface="magazine">
       <div class="prose__inner">
-        <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
+                <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
         <h2>Discover</h2>
         <p>무인양품은 종류가 많아 고르기보다 걸러내기가 어렵다. 이 목록은 1인 가구·출근·가벼운 외출 동선에서 ‘다시 사게 되는’ 쪽에 가깝다. 리필·보증(전자는 품질보증서 사진)까지 함께 보는 편이 낫다.</p>
         <h2>Design</h2>
@@ -71,7 +67,6 @@
       </div>
     </section>
   </article>
-
   <footer class="site-foot">
     <a href="reads.html">← All reads</a>
     <span>DDDIT · SRT draft wire</span>
@@ -86,7 +81,6 @@
     const mast = document.getElementById('mast');
     const logoImg = document.getElementById('logoImg');
     const cover = document.getElementById('cover');
-
     function setOpen(open) {
       panel.classList.toggle('is-open', open);
       backdrop.classList.toggle('is-open', open);
@@ -98,7 +92,6 @@
     openBtn.addEventListener('click', () => setOpen(true));
     closeBtn.addEventListener('click', () => setOpen(false));
     backdrop.addEventListener('click', () => setOpen(false));
-
     const io = new IntersectionObserver(([e]) => {
       const onCover = e.isIntersecting && e.intersectionRatio > 0.25;
       mast.dataset.on = onCover ? 'cinema' : 'magazine';

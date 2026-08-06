@@ -21,7 +21,6 @@
       </button>
     </div>
   </header>
-
   <div class="backdrop" id="backdrop" hidden></div>
   <aside class="panel" id="panel" aria-hidden="true">
     <div class="panel__top">
@@ -35,7 +34,6 @@
       <a href="#body">본문</a>
     </nav>
   </aside>
-
   <article>
     <header class="cover" id="cover">
       <div class="cover__media">
@@ -50,17 +48,15 @@
         <p class="cover__dek">칩과 메모리는 올랐고 값은 그대로인데, 화면 주사율은 여전히 60Hz다.</p>
       </div>
     </header>
-
     <section class="lede" id="lede" data-surface="magazine">
       <div class="lede__inner">
         <h2>한 줄 결론</h2>
         <p>학습·필기·가벼운 영상 편집에 오래 쓸 고성능이 필요하면 합리적. 120Hz를 이미 쓴 사람이나 프로 급 디스플레이가 목표면 에어가 아니라 프로 쪽을 본다.</p>
       </div>
     </section>
-
     <section class="prose" id="body" data-surface="magazine">
       <div class="prose__inner">
-        <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
+                <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
         <h2>Discover</h2>
         <p>M4 + 기본 12GB 통합 메모리에 가격 동결(11&quot; Wi-Fi 128GB 기준 949,000원대, 교육가 더 낮음)이라 ‘혜자’로 보이기 쉽다. 외형·디스플레이(SDR 500니트)·배터리 공칭 10시간·펜슬 프로 지원은 전작과 같다. 프로모션 120Hz는 이번에도 없다. M2/M3 에어 액세서리를 그대로 쓰는 사람, 신학기 학습용으로 성능을 올리는 사람에게 열리고, 프로의 부드러움을 역체감할 사람에게는 닫힌다.</p>
         <h2>Design</h2>
@@ -70,7 +66,6 @@
       </div>
     </section>
   </article>
-
   <footer class="site-foot">
     <a href="reads.html">← All reads</a>
     <span>DDDIT · SRT draft wire</span>
@@ -85,7 +80,6 @@
     const mast = document.getElementById('mast');
     const logoImg = document.getElementById('logoImg');
     const cover = document.getElementById('cover');
-
     function setOpen(open) {
       panel.classList.toggle('is-open', open);
       backdrop.classList.toggle('is-open', open);
@@ -97,7 +91,6 @@
     openBtn.addEventListener('click', () => setOpen(true));
     closeBtn.addEventListener('click', () => setOpen(false));
     backdrop.addEventListener('click', () => setOpen(false));
-
     const io = new IntersectionObserver(([e]) => {
       const onCover = e.isIntersecting && e.intersectionRatio > 0.25;
       mast.dataset.on = onCover ? 'cinema' : 'magazine';

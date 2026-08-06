@@ -21,7 +21,6 @@
       </button>
     </div>
   </header>
-
   <div class="backdrop" id="backdrop" hidden></div>
   <aside class="panel" id="panel" aria-hidden="true">
     <div class="panel__top">
@@ -35,11 +34,10 @@
       <a href="#body">본문</a>
     </nav>
   </aside>
-
   <article>
     <header class="cover" id="cover">
       <div class="cover__media">
-        <div class="ph ph--media" aria-hidden="true">Cover still<br/>TBA</div>
+        <img class="media-fill" src="assets/covers/shokz-openfit-pro.jpg" alt="샥즈 오픈핏 프로" width="1400" height="788" />
       </div>
       <div class="cover__text">
         <div class="cover__logo">
@@ -50,17 +48,15 @@
         <p class="cover__dek">귀가 열린 채 달리면서도, 바람·차로 음악이 묻히지 않는지 본 기록.</p>
       </div>
     </header>
-
     <section class="lede" id="lede" data-surface="magazine">
       <div class="lede__inner">
         <h2>한 줄 결론</h2>
         <p>러닝·격한 땀에 커널형이 싫은 사람에게는 후보. 멀미·먹먹함에 예민하면 앱에서 리덕션을 낮추거나 패스. 36만 원대는 운동에 진심일 때 성립한다.</p>
       </div>
     </section>
-
     <section class="prose" id="body" data-surface="magazine">
       <div class="prose__inner">
-        <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
+                <p>채널 에피소드를 Discover. Design. Detail. 순으로 정리한 와이어 본문입니다. 자막 기반 초안.</p>
         <h2>Discover</h2>
         <p>커널형은 발소리가 울리고 땀이 차기 쉽다. 오픈핏 프로는 완전 오픈형인데 노이즈 리덕션을 넣어, 한강·도심 러닝에서 위험 신호(차·벨)는 남기고 저음역 지속 소음은 줄이는 쪽이다. 전력 질주에도 이어 후크가 빠지지 않았고, 안경·고글과도 간섭이 적었다. IP55, 유닛 약 11g, 울트라소프트 실리콘은 장거리 착용을 전제로 설계된 인상이다.</p>
         <p>사무실·지하철에서도 쓸 수 있지만, 본편 초점은 야외 운동의 집중력이다.</p>
@@ -71,7 +67,6 @@
       </div>
     </section>
   </article>
-
   <footer class="site-foot">
     <a href="reads.html">← All reads</a>
     <span>DDDIT · SRT draft wire</span>
@@ -86,7 +81,6 @@
     const mast = document.getElementById('mast');
     const logoImg = document.getElementById('logoImg');
     const cover = document.getElementById('cover');
-
     function setOpen(open) {
       panel.classList.toggle('is-open', open);
       backdrop.classList.toggle('is-open', open);
@@ -98,7 +92,6 @@
     openBtn.addEventListener('click', () => setOpen(true));
     closeBtn.addEventListener('click', () => setOpen(false));
     backdrop.addEventListener('click', () => setOpen(false));
-
     const io = new IntersectionObserver(([e]) => {
       const onCover = e.isIntersecting && e.intersectionRatio > 0.25;
       mast.dataset.on = onCover ? 'cinema' : 'magazine';
