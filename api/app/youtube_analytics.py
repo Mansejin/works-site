@@ -542,21 +542,46 @@ def is_shorts_video_record(
     return False
 
 
+_AD_VIEW_TRAFFIC_SOURCES = frozenset({"ADVERTISING"})
+
+
+def aggregate_video_advertising_views(rows: list[dict[str, Any]]) -> dict[str, int]:
+    """Sum ADVERTISING views per video from video+insightTrafficSourceType rows."""
+    result: dict[str, int] = {}
+    for row in rows:
+        source = str(row.get("insightTrafficSourceType") or "").strip()
+        if source not in _AD_VIEW_TRAFFIC_SOURCES:
+            continue
+        vid = str(row.get("video") or "").strip()
+        if not vid:
+            continue
+        result[vid] = result.get(vid, 0) + _safe_int(row.get("views"))
+    return result
+
+
 async def fetch_videos_advertising_views(
     video_ids: list[str], refresh: bool = False
 ) -> dict[str, int]:
-    """Per-video ad traffic (ADVERTISING source) for recent-videos bar chart."""
+    """Per-video ad traffic (ADVERTISING) for recent-videos bar chart.
+
+    YouTube Analytics rejects `dimensions=video` combined with
+    `filters=insightTrafficSourceType==ADVERTISING` (HTTP 400). Query
+    `video,insightTrafficSourceType` filtered by video ids, then sum
+    ADVERTISING rows client-side.
+    """
     ids = [str(v).strip() for v in video_ids if str(v).strip()]
     if not ids or not _configured():
         return {}
 
-    cache_key = f"video-ad-views:{','.join(sorted(ids[:25]))}"
+    # Longer window so older longform ads are not truncated vs lifetime views.
+    window_days = 365
+    cache_key = f"video-ad-views:v2:{window_days}:{','.join(sorted(ids[:25]))}"
     if not refresh:
         cached = _cache_get(cache_key)
         if cached is not None:
             return cached
 
-    start_date, end_date = _date_range(28)
+    start_date, end_date = _date_range(window_days)
     result: dict[str, int] = {}
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -569,15 +594,12 @@ async def fetch_videos_advertising_views(
                 start_date=start_date,
                 end_date=end_date,
                 metrics="views",
-                dimensions="video",
-                filters=f"insightTrafficSourceType==ADVERTISING;video=={id_filter}",
+                dimensions="video,insightTrafficSourceType",
+                filters=f"video=={id_filter}",
                 sort="-views",
-                max_results=25,
+                max_results=200,
             )
-            for row in _parse_rows(body):
-                vid = str(row.get("video") or "").strip()
-                if vid:
-                    result[vid] = _safe_int(row.get("views"))
+            result = aggregate_video_advertising_views(_parse_rows(body))
         _cache_set(cache_key, result)
     except Exception:
         return result
