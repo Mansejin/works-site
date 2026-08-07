@@ -692,9 +692,10 @@ def _build_subscriber_trend(
         except ValueError:
             continue
 
+    analytics_ok = bool(analytics_weeks and analytics_weeks.get("ok") and (analytics_weeks.get("weeks") or []))
     aligned_analytics = (
-        _align_analytics_weeks((analytics_weeks or {}).get("weeks") or [], week_ends)
-        if analytics_weeks and analytics_weeks.get("ok")
+        _align_analytics_weeks(analytics_weeks.get("weeks") or [], week_ends)
+        if analytics_ok
         else [None] * len(snapshots)
     )
 
@@ -705,8 +706,22 @@ def _build_subscriber_trend(
         and all(item is not None for item in aligned_analytics)
     )
 
+    # Prefer end-of-day curve from Analytics daily nets (Studio Advanced Mode style).
+    daily_totals = _daily_totals_from_analytics_days(
+        analytics_weeks.get("days") if analytics_weeks else None,
+        live_subscribers,
+    )
+
     totals: list[int]
-    if can_rebuild_totals:
+    if daily_totals:
+        totals = [
+            _pick_daily_total(daily_totals, week_ends[index], fallback=_parse_int(snapshots[index].get("total")))
+            for index in range(len(snapshots))
+        ]
+        if live_subscribers and live_subscribers > 0:
+            totals[-1] = live_subscribers
+        can_rebuild_totals = True
+    elif can_rebuild_totals:
         totals = [0] * len(snapshots)
         totals[-1] = live_subscribers
         for index in range(len(snapshots) - 2, -1, -1):
@@ -728,12 +743,16 @@ def _build_subscriber_trend(
         stored_organic_raw = snap.get("organic")
         has_stored_organic = stored_organic_raw is not None and str(stored_organic_raw).strip() != ""
         stored_organic = _parse_int(stored_organic_raw) if has_stored_organic else None
+        # Ignore stale snapshot organic when Analytics rebuilt the absolute totals
+        # (old disks had organic≈400 while totals were thousands).
+        snap_matches = abs(total - snap_total) <= max(80, int(total * 0.04))
+        trust_stored_organic = has_stored_organic and snap_matches and not can_rebuild_totals
         live_bumped = (
             index == last_index
             and live_subscribers is not None
             and live_subscribers > 0
             and total > snap_total
-            and has_stored_organic
+            and trust_stored_organic
         )
 
         aw = aligned_analytics[index]
@@ -748,17 +767,12 @@ def _build_subscriber_trend(
             total_delta=total_delta,
         )
 
-        # Prefer snapshot organic; grow by residual (total_delta - ad_delta).
-        # Do not invent organic share when ads claim the tip — that inverted ad vs organic.
-        if has_stored_organic and not live_bumped:
+        if trust_stored_organic and not live_bumped:
             organic_stock = max(0, min(stored_organic or 0, total))
         elif live_bumped:
             base = max(0, min(stored_organic or 0, snap_total))
             bump = total - snap_total
             measured_ad = ad_delta or 0
-            # Ongoing Studio promos often miss Analytics ADVERTISING + post-capture
-            # promo timeline. If measured ad is far below the channel's historical
-            # ad share of growth, blend toward that history so tip isn't flipped to organic.
             if bump > 0 and measured_ad < bump * 0.5:
                 first = snapshots[0]
                 first_total = _parse_int(first.get("total"))
@@ -780,11 +794,11 @@ def _build_subscriber_trend(
             residual = max(0, bump - measured_ad)
             organic_stock = max(0, min(total, base + residual))
         elif index == 0:
-            # Do not subtract cumulative promo from the first point — capture-day dumps
-            # (even when spread) would zero the baseline. Weekly deltas handle ad share.
+            # Baseline follows absolute Analytics total (Studio-like). Weekly
+            # promo/ads peel subsequent growth, not the baseline stock.
             organic_stock = total
         elif total_delta is not None:
-            organic_stock += max(0, total_delta - ad_delta)
+            organic_stock += max(0, total_delta - (ad_delta or 0))
 
         organic_stock = max(0, min(organic_stock, total))
         organic = organic_stock
@@ -794,7 +808,6 @@ def _build_subscriber_trend(
         ad_delta_out = ad_delta
         if index > 0:
             organic_delta = organic - points[index - 1]["organic"]
-            # Keep weekly tip math consistent: organic + ad ≈ total delta.
             ad_delta_out = max(0, (total_delta or 0) - (organic_delta or 0))
 
         points.append(
@@ -810,12 +823,22 @@ def _build_subscriber_trend(
             }
         )
 
-    has_analytics = bool(analytics_weeks and analytics_weeks.get("ok"))
-    if has_analytics:
+    if daily_totals:
+        note = (
+            "총 구독자는 Analytics 일별 순증으로 Studio 고급모드처럼 역산합니다. "
+            "자연 증가는 주간 총 증가분에서 광고 기여(프로모션)를 뺀 잔여분입니다."
+        )
+        method = "analytics-daily+promo"
+    elif can_rebuild_totals:
         note = (
             "총 구독자는 Analytics 주간 순증으로 역산합니다. "
-            "자연 증가는 주간 총 증가분에서 광고 기여를 뺀 잔여분입니다. "
-            "스냅샷 organic이 있으면 이를 기준으로 이어갑니다."
+            "자연 증가는 주간 총 증가분에서 광고 기여를 뺀 잔여분입니다."
+        )
+        method = "analytics+promo"
+    elif analytics_ok:
+        note = (
+            "Analytics 주간 데이터가 일부만 맞아 스냅샷 총구독자를 보완합니다. "
+            "자연 증가는 주간 총 증가분에서 광고 기여를 뺀 잔여분입니다."
         )
         method = "analytics+promo"
     else:
@@ -833,29 +856,77 @@ def _build_subscriber_trend(
     }
 
 
+def _daily_totals_from_analytics_days(
+    days: list[dict[str, Any]] | None,
+    live_subscribers: int | None,
+) -> dict[str, int] | None:
+    """Map YYYY-MM-DD → absolute subscribers at end of that day (reverse from live)."""
+    if not days or not live_subscribers or live_subscribers <= 0:
+        return None
+    ordered = sorted(days, key=lambda item: str(item.get("day") or ""))
+    if not ordered:
+        return None
+    total = int(live_subscribers)
+    by_day: dict[str, int] = {}
+    for item in reversed(ordered):
+        day = str(item.get("day") or "").strip()
+        if not day:
+            continue
+        by_day[day] = max(0, total)
+        total -= _parse_int(item.get("net"))
+    return by_day or None
+
+
+def _pick_daily_total(
+    daily_totals: dict[str, int],
+    target: date,
+    *,
+    fallback: int,
+) -> int:
+    key = target.isoformat()
+    if key in daily_totals:
+        return int(daily_totals[key])
+    # Prefer the latest Analytics day on or before the slot date.
+    best: str | None = None
+    for day in daily_totals:
+        if day <= key and (best is None or day > best):
+            best = day
+    if best is not None:
+        return int(daily_totals[best])
+    # Otherwise earliest available day after the slot.
+    later = sorted(d for d in daily_totals if d >= key)
+    if later:
+        return int(daily_totals[later[0]])
+    return fallback
+
+
 
 def _persist_trend_snapshots(
     snapshots_data: dict[str, Any],
     live_subscribers: int | None,
     trend: dict[str, Any],
 ) -> dict[str, Any]:
-    """Write back latest total/organic so the natural-growth line keeps updating on disk."""
+    """Write back rebuilt totals/organic so disk matches Analytics reverse-walk."""
     points = trend.get("points") or []
     snaps = list(snapshots_data.get("snapshots") or [])
     if not points or not snaps:
         return trend
-    last_point = points[-1]
-    last = dict(snaps[-1])
-    last["total"] = int(last_point.get("total") or last.get("total") or 0)
-    last["organic"] = int(last_point.get("organic") or last.get("organic") or 0)
-    if last_point.get("date"):
-        last["date"] = last_point["date"]
-    if live_subscribers and live_subscribers > 0:
-        last["total"] = int(live_subscribers)
-        last["organic"] = min(int(last["organic"]), int(last["total"]))
-    snaps[-1] = last
+    # Keep slot count; rewrite each corresponding point onto disk.
+    updated: list[dict[str, Any]] = []
+    for index, snap in enumerate(snaps):
+        row = dict(snap)
+        if index < len(points):
+            point = points[index]
+            row["total"] = int(point.get("total") or row.get("total") or 0)
+            row["organic"] = int(point.get("organic") or 0)
+            if point.get("date"):
+                row["date"] = point["date"]
+        updated.append(row)
+    if live_subscribers and live_subscribers > 0 and updated:
+        updated[-1]["total"] = int(live_subscribers)
+        updated[-1]["organic"] = min(int(updated[-1].get("organic") or 0), int(live_subscribers))
     payload = {
-        "snapshots": snaps,
+        "snapshots": updated,
         "viewsTrend7d": snapshots_data.get("viewsTrend7d") or [],
     }
     try:

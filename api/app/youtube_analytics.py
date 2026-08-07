@@ -212,19 +212,25 @@ async def _get_token_and_channel(client: httpx.AsyncClient) -> tuple[str, str]:
 
 
 async def fetch_subscriber_weekly_trend(refresh: bool = False) -> dict[str, Any]:
-    """Weekly subscribers gained/lost and advertising-sourced gains (channel level)."""
-    cache_key = "subscriber_weekly"
+    """Weekly subscriber net/gains rebuilt from Analytics *daily* rows.
+
+    YouTube Analytics rejects ``dimensions=week`` for this channel/metrics
+    combo (HTTP 400). Build ISO weeks from ``dimensions=day`` so the report
+    can reverse-walk absolute totals like Studio Advanced Mode.
+    """
+    cache_key = "subscriber_weekly:v2-day"
     if not refresh:
         cached = _cache_get(cache_key)
         if cached:
             return cached
 
     if not _configured():
-        return {"ok": False, "configured": False, "weeks": [], "message": "Analytics OAuth 미설정"}
+        return {"ok": False, "configured": False, "weeks": [], "days": [], "message": "Analytics OAuth 미설정"}
 
-    start_date, end_date = _date_range(49)
+    # Match Studio Advanced Mode "지난 90일" window.
+    start_date, end_date = _date_range(90)
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=45.0) as client:
             token, channel_id = await _get_token_and_channel(client)
             net_body = await _analytics_get_safe(
                 client,
@@ -233,58 +239,84 @@ async def fetch_subscriber_weekly_trend(refresh: bool = False) -> dict[str, Any]
                 start_date=start_date,
                 end_date=end_date,
                 metrics="subscribersGained,subscribersLost",
-                dimensions="week",
-                sort="week",
-                max_results=12,
+                dimensions="day",
+                sort="day",
+                max_results=200,
             )
-            ad_body = await _analytics_get_safe(
+            # day + ADVERTISING filter is rejected (400). Period-level traffic
+            # sources still work for an overall ad share hint; weekly ad uses promo.
+            traffic_body = await _analytics_get_safe(
                 client,
                 token,
                 channel_id,
                 start_date=start_date,
                 end_date=end_date,
                 metrics="subscribersGained",
-                dimensions="week",
-                filters="insightTrafficSourceType==ADVERTISING",
-                sort="week",
-                max_results=12,
+                dimensions="insightTrafficSourceType",
+                sort="-subscribersGained",
+                max_results=50,
             )
 
-        ad_by_week = {
-            row.get("week"): _safe_int(row.get("subscribersGained"))
-            for row in _parse_rows(ad_body)
-            if row.get("week") is not None
-        }
-
-        weeks: list[dict[str, Any]] = []
+        days: list[dict[str, Any]] = []
         for row in _parse_rows(net_body):
-            week = row.get("week")
-            if week is None:
+            day = str(row.get("day") or "").strip()
+            if not day:
                 continue
             gained = _safe_int(row.get("subscribersGained"))
             lost = _safe_int(row.get("subscribersLost"))
-            ad_gained = ad_by_week.get(week, 0)
-            week_end = _week_index_to_end_date(week)
-            net = gained - lost
-            weeks.append(
+            days.append(
                 {
-                    "week": week,
-                    "weekEnd": week_end.isoformat() if week_end else None,
+                    "day": day,
                     "gained": gained,
                     "lost": lost,
-                    "net": net,
-                    "adGained": min(ad_gained, max(0, net)),
-                    "organicGained": max(0, net - min(ad_gained, max(0, net))),
+                    "net": gained - lost,
                 }
             )
+        days.sort(key=lambda item: str(item.get("day") or ""))
 
-        weeks.sort(key=lambda item: _safe_int(item.get("week")))
+        ad_total = 0
+        for row in _parse_rows(traffic_body):
+            source = str(row.get("insightTrafficSourceType") or "").strip()
+            if source == "ADVERTISING":
+                ad_total += _safe_int(row.get("subscribersGained"))
+
+        # Roll daily nets into ISO weeks (Sunday weekEnd) for chart slots.
+        week_buckets: dict[str, dict[str, Any]] = {}
+        for item in days:
+            day = date.fromisoformat(str(item["day"]))
+            iso_year, iso_week, _ = day.isocalendar()
+            week_key = f"{iso_year}{iso_week:02d}"
+            bucket = week_buckets.get(week_key)
+            if bucket is None:
+                week_end = date.fromisocalendar(iso_year, iso_week, 7)
+                bucket = {
+                    "week": week_key,
+                    "weekEnd": week_end.isoformat(),
+                    "gained": 0,
+                    "lost": 0,
+                    "net": 0,
+                    "adGained": 0,
+                    "organicGained": 0,
+                }
+                week_buckets[week_key] = bucket
+            bucket["gained"] += _safe_int(item.get("gained"))
+            bucket["lost"] += _safe_int(item.get("lost"))
+            bucket["net"] += _safe_int(item.get("net"))
+
+        weeks = sorted(week_buckets.values(), key=lambda item: str(item.get("weekEnd") or ""))
+        # Leave adGained at 0 here — weekly ad is attributed via Studio promos
+        # (and optional period share) inside _build_subscriber_trend.
+        for bucket in weeks:
+            bucket["organicGained"] = max(0, _safe_int(bucket.get("net")))
+
         payload = {
-            "ok": True,
+            "ok": bool(days),
             "configured": True,
             "period": {"startDate": start_date, "endDate": end_date},
-            "weeks": weeks[-7:],
-            "message": None,
+            "days": days,
+            "weeks": weeks,
+            "advertisingSubscribersGained": ad_total,
+            "message": None if days else "일별 구독자 Analytics 행이 비었습니다",
         }
         _cache_set(cache_key, payload)
         return payload
@@ -293,6 +325,7 @@ async def fetch_subscriber_weekly_trend(refresh: bool = False) -> dict[str, Any]
             "ok": False,
             "configured": True,
             "weeks": [],
+            "days": [],
             "message": f"주간 구독자 Analytics 조회 실패: {exc}",
         }
 
