@@ -1,23 +1,26 @@
-# 구독자 자연 증가 (추정) — 보류
+# 구독자 자연 증가 (추정) — 보류 (확정)
 
-차트에는 **총 구독자만** 표시한다. 자연/광고 분리 선은 UI에서 제거했고, 타당성 확정 전까지 재도입하지 않는다.
+차트에는 **총 구독자만** 표시한다. 자연/광고 분리 선은 UI에서 쓰지 않는다.
 
-## 추정 초안 (미확정)
+## 2026-08-07 타당성 점검 결과
 
-주간 슬롯마다:
+| 신호 | 결과 |
+|------|------|
+| Analytics 일별 gained/lost → 주간 total | **신뢰 가능** (예: 2026-07-25~31 net 784 = 차트 Δ) |
+| Analytics `subscribersGained` × `insightTrafficSourceType` | **행 0건** (90일·주간 모두). 주간 광고 구독 API 신호 **없음** |
+| Studio 구독 프로모션 lifetime 분배 | 주간 Δ를 거의 전부 덮어 **organicΔ ≈ 0**이 됨 |
+
+**결정:** Analytics로 광고/자연 구독을 나눌 수 없으므로 초안식은 도입하지 않고 **총량만 유지(C)**.
+
+나중에 Studio 고급모드에서 주간 광고 구독을 캡처·수동 입력할 수 있으면 그때 **방안 B**만 재검토.
+
+## 폐기된 초안 (참고)
 
 ```text
-organic_delta ≈ total_delta − max(Analytics adGained, Studio 구독 프로모션 캠페인분)
+organic_delta ≈ total_delta − max(Analytics adGained, Studio 구독 프로모션 분배분)
 ```
 
-- `total_delta`: Analytics 일별 순증을 ISO 주 슬롯에 역산한 총구독자 차분 (현재 차트에 쓰는 값)
-- `adGained`: Analytics 주간 `ADVERTISING` 구독 유입 (있으면)
-- Studio 프로모션: 목표=시청자층 성장 캠페인의 `subscribers`를 캠페인 기간(또는 기본 3주)에 분배
+- `adGained` API가 비어 max가 항상 promo → 자연이 평평해지는 편향
+- 프로모션 `subscribers`는 캠페인 lifetime이라 주간 순증과 스케일이 다름
 
-## 보류 이유
-
-1. Analytics 주간 `adGained`가 비거나 과소계상되는 경우가 있음 → 프로모션 플로어가 한 주에 쏠리면 자연이 깨짐
-2. 스냅샷에 남은 `organic`이 오래된 수동 값이면 Analytics 역산 총구독자와 불일치
-3. Studio 고급모드와 주간 자연분을 맞춰 본 뒤에야 선을 다시 켤 수 있음
-
-API는 `organicEstimateEnabled: false`와 `organicEstimateDraft` 문구를 내려 두었고, point의 `organic`/`adDriven` 필드는 나중에 켤 때 쓰기 위해 계산만 유지할 수 있다(UI 미표시).
+API는 `organicEstimateEnabled: false`를 유지한다.
