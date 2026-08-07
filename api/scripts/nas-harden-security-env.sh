@@ -1,5 +1,6 @@
 #!/bin/sh
-# Synology NAS: ensure security-related env keys exist in api/.env, then recreate containers.
+# Synology NAS: ensure security-related env keys exist in api/.env.
+# Recreate containers only when a key was newly generated.
 #
 # Usage (on NAS):
 #   sh /volume1/docker/works-site/api/scripts/nas-harden-security-env.sh
@@ -9,8 +10,12 @@
 set -e
 
 REPO_DIR="${NAS_REPO_PATH:-/volume1/docker/works-site}"
+if [ -z "$REPO_DIR" ]; then
+  REPO_DIR="/volume1/docker/works-site"
+fi
 COMPOSE_DIR="$REPO_DIR/api"
 ENV_FILE="$COMPOSE_DIR/.env"
+CHANGED=0
 
 export PATH="/usr/local/bin:/var/packages/ContainerManager/target/usr/bin:/var/packages/Docker/target/usr/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
@@ -37,7 +42,6 @@ resolve_docker() {
 }
 
 rand_hex() {
-  # 32 bytes → 64 hex chars
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 32
     return
@@ -73,7 +77,6 @@ env_set() {
     return
   fi
   if grep -qE "^${key}=" "$ENV_FILE" 2>/dev/null; then
-    # replace in place without printing value
     awk -v k="$key" -v v="$value" '
       BEGIN { FS=OFS="=" }
       index($0, k "=") == 1 { print k "=" v; next }
@@ -94,6 +97,7 @@ ensure_key() {
   fi
   gen=$(rand_hex | tr -d '\n')
   env_set "$key" "$gen"
+  CHANGED=1
   log "SET $key generated (len=${#gen})"
   return 0
 }
@@ -110,18 +114,20 @@ fi
 
 log "==> harden security env in $ENV_FILE"
 
-# Signing secret separate from passcode
 ensure_key "DDDIT_TEAM_GATE_SECRET"
-
-# Studio bookmarklet shared secret (Origin alone is not auth)
 ensure_key "DDDIT_STUDIO_IMPORT_SECRET"
 
-# Conti WS must share the same team secrets (compose env_file)
 pass=$(env_get "DDDIT_TEAM_GATE_PASSCODE")
 if [ -z "$pass" ]; then
   log "WARN DDDIT_TEAM_GATE_PASSCODE empty — team gate / conti-ws auth disabled until set"
 else
   log "OK  DDDIT_TEAM_GATE_PASSCODE present (len=${#pass})"
+fi
+
+if [ "$CHANGED" != "1" ]; then
+  log "==> no new secrets — skip container recreate"
+  log "==> done (secrets not printed)"
+  exit 0
 fi
 
 DOCKER=$(resolve_docker)
@@ -132,14 +138,17 @@ fi
 
 SUDO=""
 if [ "${WORKS_DOCKER_SUDO:-1}" = "1" ] && command -v sudo >/dev/null 2>&1; then
-  SUDO="sudo"
+  if sudo -n true >/dev/null 2>&1; then
+    SUDO="sudo -n"
+  else
+    SUDO="sudo"
+  fi
 fi
 
-log "==> recreate works-api + conti-collab to load env"
+log "==> new secrets written — recreate works-api + conti-collab to load env"
 cd "$COMPOSE_DIR"
 $SUDO $DOCKER compose up -d --force-recreate --no-deps works-api conti-collab
 
-# health
 ok=0
 for i in 1 2 3 4 5 6 7 8 9 10; do
   if curl -fsS "http://127.0.0.1:8788/health" >/dev/null 2>&1; then

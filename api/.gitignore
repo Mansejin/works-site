@@ -9,6 +9,8 @@ data/youtube/studio-promo-sync.json
 .env
 .env.*
 !.env.example
+# Synology Container Manager naming (container_name / image) — keep local
+docker-compose.override.yml
 __pycache__/
 *.pyc
 conti-collab/node_modules/

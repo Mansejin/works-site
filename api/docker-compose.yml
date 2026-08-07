@@ -9,6 +9,9 @@ services:
       - .env
     volumes:
       - ./data:/app/data
+      # Bind-mount app code so git sync + restart is enough (Dockerfile/requirements still need --build)
+      - ./app:/app/app
+      - ./server.py:/app/server.py
     environment:
       WORKS_HOST: "0.0.0.0"
       WORKS_PORT: "8788"
