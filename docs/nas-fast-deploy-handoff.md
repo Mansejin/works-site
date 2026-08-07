@@ -59,7 +59,7 @@ SSH:
 | 레노버 아이디어탭 | ~8,949 |
 | 음쓰/아이닉 | 0 (광고 소스 없음; Studio 조회수 캠페인만 별도) |
 
-프로모션 JSON: `api/data/youtube/promotions.json` (`./data` 볼륨 마운트 → **파일 sync만으로도 디스크상 갱신 가능**, 다만 overview in-memory cache TTL 900s라 즉시 반영엔 **restart**가 안전).
+프로모션 JSON: `api/data/youtube/promotions.json` — **NAS 로컬 런타임 파일**(git 추적 안 함). 배포 시 `.deploy-preserve`로 백업/복구. 시드(신규 설치): `promotions.seed.json`. overview in-memory cache TTL 900s라 즉시 반영엔 **restart**가 안전.
 
 ---
 

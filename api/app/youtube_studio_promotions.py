@@ -878,6 +878,9 @@ def merge_studio_into_promotions(studio_promos: list[dict[str, Any]]) -> dict[st
                     "startDate": match.get("startDate") or manual.get("startDate"),
                     "capturedAt": manual.get("capturedAt") or match.get("capturedAt") or date.today().isoformat(),
                     "endDate": manual.get("endDate") or match.get("endDate"),
+                    "budget": manual.get("budget")
+                    if manual.get("budget") not in (None, "")
+                    else match.get("budget"),
                     "source": "merged-studio",
                     "studioCampaignId": match.get("studioCampaignId") or manual.get("studioCampaignId"),
                     "syncedAt": match.get("syncedAt"),

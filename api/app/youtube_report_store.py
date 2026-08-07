@@ -10,6 +10,7 @@ from app.config import google_ads_sync_enabled
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "youtube"
 PROMOTIONS_FILE = DATA_DIR / "promotions.json"
+PROMOTIONS_SEED_FILE = DATA_DIR / "promotions.seed.json"
 SNAPSHOTS_FILE = DATA_DIR / "subscriber-snapshots.json"
 ADS_SYNC_FILE = DATA_DIR / "ads-sync.json"
 REPORTING_SYNC_FILE = DATA_DIR / "reporting-sync.json"
@@ -94,7 +95,22 @@ def normalize_promotions(data: dict[str, Any]) -> dict[str, Any]:
     return {**data, "promotions": promos}
 
 
+def _ensure_promotions_file() -> None:
+    """Fresh clones: copy seed when runtime promotions.json is missing."""
+    if PROMOTIONS_FILE.exists() or not PROMOTIONS_SEED_FILE.exists():
+        return
+    try:
+        PROMOTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PROMOTIONS_FILE.write_text(
+            PROMOTIONS_SEED_FILE.read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
 def read_promotions() -> dict[str, Any]:
+    _ensure_promotions_file()
     data = _read_json(PROMOTIONS_FILE, {"promotions": [], "memo": "", "issues": []})
     if not str(data.get("memo") or "").strip():
         issues = data.get("issues") or []

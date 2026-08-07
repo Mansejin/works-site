@@ -19,7 +19,20 @@
       "notes": [
         "Studio 캡처 2026-08-07",
         "활성 · 동영상 조회수"
-      ]
+      ],
+      "metrics": {
+        "cpv": 37.3,
+        "cps": null,
+        "cpm": 2930.6,
+        "cpc": null,
+        "ctr": 7.85,
+        "goalGroup": "views",
+        "efficiencyText": "조회 1회당 약 37원 · 효율 보통",
+        "efficiencyRating": "효율 보통",
+        "budgetDefault": 90000,
+        "budget": 500000
+      },
+      "budget": 500000
     },
     {
       "id": "daiso-summer-subs",
@@ -38,7 +51,20 @@
       "notes": [
         "Studio 캡처 2026-08-07",
         "활성 · 시청자층 성장"
-      ]
+      ],
+      "metrics": {
+        "cpv": null,
+        "cps": 253,
+        "cpm": 2743.9,
+        "cpc": 14064.1,
+        "ctr": 2.14,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 253원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 422000
+      },
+      "budget": 422000
     },
     {
       "id": "daiso-summer-views",
@@ -58,7 +84,20 @@
       "notes": [
         "Studio 캡처 2026-08-07",
         "종료됨 · 동영상 조회수 · 종료일 2026-07-31"
-      ]
+      ],
+      "metrics": {
+        "cpv": 21.2,
+        "cps": 229533,
+        "cpm": 1941.3,
+        "cpc": null,
+        "ctr": 9.17,
+        "goalGroup": "views",
+        "efficiencyText": "조회 1회당 약 21원 · 효율 좋음",
+        "efficiencyRating": "효율 좋음",
+        "budgetDefault": 90000,
+        "budget": 230000
+      },
+      "budget": 230000
     },
     {
       "id": "justairbeam-views",
@@ -77,7 +116,20 @@
       "notes": [
         "Studio 캡처 2026-08-07",
         "활성 · 동영상 조회수"
-      ]
+      ],
+      "metrics": {
+        "cpv": 47.2,
+        "cps": null,
+        "cpm": 7452.9,
+        "cpc": null,
+        "ctr": 15.79,
+        "goalGroup": "views",
+        "efficiencyText": "조회 1회당 약 47원 · 효율 보통",
+        "efficiencyRating": "효율 보통",
+        "budgetDefault": 90000,
+        "budget": 400000
+      },
+      "budget": 400000
     },
     {
       "id": "lumena-objet-subs",
@@ -98,7 +150,19 @@
         "Studio 캡처 2026-08-07",
         "종료됨 · 시청자층 성장 · 종료일 2026-08-03"
       ],
-      "endDate": "2026-08-03"
+      "endDate": "2026-08-03",
+      "metrics": {
+        "cpv": null,
+        "cps": 260,
+        "cpm": 2523.5,
+        "cpc": 13070.2,
+        "ctr": 1.84,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 260원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "lumena-objet-views",
@@ -119,7 +183,19 @@
         "Studio 캡처 2026-08-07",
         "종료됨 · 동영상 조회수 · 종료일 2026-08-03"
       ],
-      "endDate": "2026-08-03"
+      "endDate": "2026-08-03",
+      "metrics": {
+        "cpv": 24,
+        "cps": null,
+        "cpm": 2343.9,
+        "cpc": null,
+        "ctr": 9.76,
+        "goalGroup": "views",
+        "efficiencyText": "조회 1회당 약 24원 · 효율 좋음",
+        "efficiencyRating": "효율 좋음",
+        "budgetDefault": 90000,
+        "budget": 90000
+      }
     },
     {
       "id": "dreame-mf10-subs",
@@ -140,7 +216,19 @@
       ],
       "budget": 170000,
       "capturedAt": "2026-08-07",
-      "endDate": "2026-07-20"
+      "endDate": "2026-07-20",
+      "metrics": {
+        "cpv": null,
+        "cps": 287,
+        "cpm": 2149.2,
+        "cpc": 12136.1,
+        "ctr": 1.8,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 287원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "redmi-pad2-subs",
@@ -160,7 +248,19 @@
         "활성"
       ],
       "budget": 170000,
-      "capturedAt": "2026-07-16"
+      "capturedAt": "2026-07-16",
+      "metrics": {
+        "cpv": null,
+        "cps": 266,
+        "cpm": 1815.2,
+        "cpc": 79380,
+        "ctr": 1.49,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 266원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "lenovo-ideatab11-subs",
@@ -181,7 +281,19 @@
       ],
       "budget": 170000,
       "capturedAt": "2026-08-07",
-      "endDate": "2026-07-24"
+      "endDate": "2026-07-24",
+      "metrics": {
+        "cpv": null,
+        "cps": 292,
+        "cpm": 1433.5,
+        "cpc": 13064,
+        "ctr": 1.09,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 292원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "lenovo-ideatab11-views",
@@ -202,7 +314,19 @@
       ],
       "budget": 90000,
       "capturedAt": "2026-08-07",
-      "endDate": "2026-07-30"
+      "endDate": "2026-07-30",
+      "metrics": {
+        "cpv": 21.8,
+        "cps": null,
+        "cpm": 3821.7,
+        "cpc": null,
+        "ctr": 17.5,
+        "goalGroup": "views",
+        "efficiencyText": "조회 1회당 약 22원 · 효율 좋음",
+        "efficiencyRating": "효율 좋음",
+        "budgetDefault": 90000,
+        "budget": 90000
+      }
     },
     {
       "id": "dreame-mf10-views",
@@ -221,9 +345,21 @@
         "Studio 캡처 2026-08-07",
         "종료됨 · 동영상 조회수 · 종료일 2026-07-20"
       ],
-      "budget": 90000,
+      "budget": 80000,
       "capturedAt": "2026-08-07",
-      "endDate": "2026-07-20"
+      "endDate": "2026-07-20",
+      "metrics": {
+        "cpv": 22.6,
+        "cps": null,
+        "cpm": 1889.8,
+        "cpc": null,
+        "ctr": 8.36,
+        "goalGroup": "views",
+        "efficiencyText": "조회 1회당 약 23원 · 효율 좋음",
+        "efficiencyRating": "효율 좋음",
+        "budgetDefault": 90000,
+        "budget": 80000
+      }
     },
     {
       "id": "logitech-mobifold-subs",
@@ -244,7 +380,19 @@
       ],
       "budget": 170000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": null,
+        "cps": 282,
+        "cpm": 1554.4,
+        "cpc": 7718.1,
+        "ctr": 1.37,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 282원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "lyfen-p3-t1-pro-subs",
@@ -265,7 +413,19 @@
       ],
       "budget": 170000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": null,
+        "cps": 299,
+        "cpm": 2406.4,
+        "cpc": 15442.5,
+        "ctr": 1.87,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 299원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "ikko-mindone-pro-subs",
@@ -286,7 +446,19 @@
       ],
       "budget": 170000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": null,
+        "cps": 268,
+        "cpm": 2829,
+        "cpc": 24253.6,
+        "ctr": 2.12,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 268원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "shokz-openfit-subs",
@@ -307,7 +479,19 @@
       ],
       "budget": 170000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": null,
+        "cps": 289,
+        "cpm": 1936.7,
+        "cpc": 24268.6,
+        "ctr": 1.42,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 289원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "muji-best11-subs",
@@ -328,7 +512,19 @@
       ],
       "budget": 170000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": null,
+        "cps": 279,
+        "cpm": 2386.9,
+        "cpc": 14161.9,
+        "ctr": 1.73,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 279원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "abko-af108pro-subs",
@@ -349,7 +545,19 @@
       ],
       "budget": 170000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": null,
+        "cps": 303,
+        "cpm": 979.1,
+        "cpc": 9439.9,
+        "ctr": 0.76,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 303원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "daiso-fan-subs",
@@ -370,7 +578,19 @@
       ],
       "budget": 170000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": null,
+        "cps": 294,
+        "cpm": 1202,
+        "cpc": 8944.2,
+        "ctr": 0.95,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 294원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "garmin-165-subs",
@@ -391,7 +611,19 @@
       ],
       "budget": 170000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": null,
+        "cps": 345,
+        "cpm": 1346.2,
+        "cpc": 8944.7,
+        "ctr": 0.92,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 345원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "air-purifier-subs",
@@ -412,7 +644,19 @@
       ],
       "budget": 170000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": null,
+        "cps": 362,
+        "cpm": 4700.7,
+        "cpc": 7081.8,
+        "ctr": 1.81,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 362원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 170000
+      }
     },
     {
       "id": "daiso-deskterior-subs",
@@ -431,9 +675,21 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 170000,
+      "budget": 55000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": null,
+        "cps": 388,
+        "cpm": 4510.8,
+        "cpc": 11017.2,
+        "ctr": 1.64,
+        "goalGroup": "subscribe",
+        "efficiencyText": "구독자 1명당 약 388원 · 효율 매우 좋음",
+        "efficiencyRating": "효율 매우 좋음",
+        "budgetDefault": 170000,
+        "budget": 55000
+      }
     },
     {
       "id": "shokz-openfit-views",
@@ -454,7 +710,19 @@
       ],
       "budget": 90000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": 24.8,
+        "cps": null,
+        "cpm": 2833.4,
+        "cpc": null,
+        "ctr": 11.45,
+        "goalGroup": "views",
+        "efficiencyText": "조회 1회당 약 25원 · 효율 좋음",
+        "efficiencyRating": "효율 좋음",
+        "budgetDefault": 90000,
+        "budget": 90000
+      }
     },
     {
       "id": "abko-af108pro-views",
@@ -473,9 +741,21 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 90000,
+      "budget": 170000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": 29.3,
+        "cps": 169999,
+        "cpm": 2297.7,
+        "cpc": null,
+        "ctr": 7.84,
+        "goalGroup": "views",
+        "efficiencyText": "조회 1회당 약 29원 · 효율 좋음",
+        "efficiencyRating": "효율 좋음",
+        "budgetDefault": 90000,
+        "budget": 170000
+      }
     },
     {
       "id": "ipad-homescreen-views",
@@ -494,9 +774,21 @@
         "Studio 캡처 2026-07-16",
         "종료"
       ],
-      "budget": 90000,
+      "budget": 170000,
       "capturedAt": "2026-07-16",
-      "endDate": "2026-07-16"
+      "endDate": "2026-07-16",
+      "metrics": {
+        "cpv": 20.4,
+        "cps": 42500,
+        "cpm": 1669.1,
+        "cpc": null,
+        "ctr": 8.17,
+        "goalGroup": "views",
+        "efficiencyText": "조회 1회당 약 20원 · 효율 좋음",
+        "efficiencyRating": "효율 좋음",
+        "budgetDefault": 90000,
+        "budget": 170000
+      }
     }
   ]
 }
