@@ -76,7 +76,7 @@
     "recent-videos":
       "최근 업로드 롱폼 4개의 조회 구성입니다(쇼츠 제외). 빨강은 YouTube Analytics 광고 유입(또는 프로모션 수치), 회색은 자연 조회입니다.",
     subscribers:
-      "주간 스냅샷 기준 총 구독자(빨강)와 자연 증가 추정치(회색)입니다. 프로모션 구독 기여는 스냅샷·프로모션 데이터로 분리됩니다.",
+      "주간 슬롯의 총 구독자입니다. Analytics 일별 순증으로 Studio 고급모드처럼 역산합니다. 자연/광고 분리 추정은 보류 중입니다.",
   };
 
   const TRAFFIC_LABELS = {
@@ -575,16 +575,6 @@
             pointBorderWidth: 2,
             tension: 0.25,
           },
-          {
-            label: "자연 증가 (추정)",
-            data: trend.points.map((p) => p.organic),
-            borderColor: "#94a3b8",
-            backgroundColor: "#94a3b8",
-            pointBackgroundColor: "#fff",
-            pointBorderColor: "#94a3b8",
-            pointBorderWidth: 2,
-            tension: 0.15,
-          },
         ],
       },
       options: {
@@ -602,12 +592,8 @@
                 const idx = items[0]?.dataIndex;
                 const p = trend.points[idx];
                 if (!p) return "";
-                const lines = [
-                  `광고 누적 (추정): ${formatNum(p.adDriven)}명`,
-                ];
+                const lines = [];
                 if (p.totalDelta != null) lines.push(`이번 주 순증: ${formatSigned(p.totalDelta)}`);
-                if (p.adDelta != null) lines.push(`이번 주 광고: ${formatSigned(p.adDelta)}`);
-                if (p.organicDelta != null) lines.push(`이번 주 자연: ${formatSigned(p.organicDelta)}`);
                 return lines.join("\n");
               },
             },
@@ -2368,7 +2354,9 @@
       const overview = await apiGet(`/api/dddit/youtube/report/overview${refresh ? "?refresh=1" : ""}`);
       if (seq !== loadSeq) return;
       onStep("영상 목록 (YouTube Data API)");
-      const videosData = await apiGet("/api/dddit/youtube/report/videos");
+      const videosData = await apiGet(
+        `/api/dddit/youtube/report/videos${refresh ? "?refresh=1" : ""}`
+      );
       if (seq !== loadSeq) return;
       const { traffic, retention, demographics } = await loadAnalyticsExtras(refresh, onStep);
       if (seq !== loadSeq) return;

@@ -70,7 +70,8 @@ def test_build_subscriber_trend_uses_promo_dates() -> None:
     assert len(points) == 3
     assert points[-1]["adDriven"] <= 700
     assert points[-1]["organic"] == 1500 - points[-1]["adDriven"]
-    assert trend["method"] == "promo-dated"
+    assert trend["method"] == "snapshot"
+    assert trend.get("organicEstimateEnabled") is False
 
 
 def test_build_subscriber_trend_from_daily_analytics() -> None:
@@ -98,8 +99,8 @@ def test_build_subscriber_trend_from_daily_analytics() -> None:
     assert abs(points[-2]["total"] - 1601) <= 1
     # Slot date 7/17 precedes first Analytics day (7/18) → use earliest day total.
     assert points[0]["total"] == points[-2]["total"] - (13 * 36)
-    assert trend["method"] == "analytics-daily+promo"
-    assert points[-1]["organic"] > 100
+    assert trend["method"] == "analytics-daily"
+    assert trend.get("organicEstimateEnabled") is False
 
 
 def test_build_subscriber_trend_rebuilds_totals_from_analytics() -> None:
@@ -132,7 +133,8 @@ def test_build_subscriber_trend_rebuilds_totals_from_analytics() -> None:
     assert totals[-1] == 1600
     assert totals[1] == 1300
     assert totals[0] == 1100
-    assert trend["method"] == "analytics+promo"
+    assert trend["method"] == "analytics-weekly"
+    assert trend.get("organicEstimateEnabled") is False
 
 
 def test_organic_does_not_drop_when_promo_batch_exceeds_total() -> None:
