@@ -383,12 +383,12 @@
 
   async function loadAnalyticsExtras(refresh, onStep) {
     const q = refresh ? "?refresh=1" : "";
-    onStep?.("유입 경로 (Analytics API)");
-    const traffic = await apiGet(`/api/dddit/youtube/report/traffic-sources${q}`).catch(() => null);
-    onStep?.("시청 유지 (Analytics API)");
-    const retention = await apiGet(`/api/dddit/youtube/report/retention${q}`).catch(() => null);
-    onStep?.("연령·성별 (Analytics API)");
-    const demographics = await apiGet(`/api/dddit/youtube/report/demographics${q}`).catch(() => null);
+    onStep?.("유입·유지·인구통계 (Analytics API)");
+    const [traffic, retention, demographics] = await Promise.all([
+      apiGet(`/api/dddit/youtube/report/traffic-sources${q}`).catch(() => null),
+      apiGet(`/api/dddit/youtube/report/retention${q}`).catch(() => null),
+      apiGet(`/api/dddit/youtube/report/demographics${q}`).catch(() => null),
+    ]);
     return { traffic, retention, demographics };
   }
 
@@ -2311,12 +2311,8 @@
     });
   }
 
-  async function loadEditors() {
-    const promo = await apiGet("/api/dddit/youtube/report/promotions");
-    const memo =
-      promo.memo ||
-      (Array.isArray(promo.issues) ? promo.issues.join("\n") : "") ||
-      "";
+  async function loadEditors(memoText) {
+    const memo = memoText || "";
     if (els.memoEditor) els.memoEditor.value = memo;
     if (els.issuesEditor) els.issuesEditor.value = memo;
   }
@@ -2330,6 +2326,53 @@
     els.saveStatus.className = "status-pill ok";
   }
 
+  function paintOverviewShell(overview, videos) {
+    const ch = overview.channel || {};
+    els.title.textContent = `${ch.title || "디디딧"} · 채널 현황 분석`;
+    els.subtitle.textContent = `생성: ${new Date(overview.generatedAt).toLocaleString("ko-KR")} · ${ch.source || "api"}`;
+    if (els.channelLink && ch.channelUrl) {
+      els.channelLink.href = ch.channelUrl;
+    }
+
+    apiConnections = overview.apiConnections || [];
+    renderKpis(overview.kpis || {}, overview.channel?.subscriberCount);
+    renderAnalyticsOverview(overview.analytics);
+    renderInsights(overview.insights || []);
+    promoPage = 0;
+    videoPage = 0;
+    renderPromotions(overview.promotions || []);
+    renderVideos(videos || []);
+    void loadEditors(overview.memo || "");
+  }
+
+  function paintCharts(overview, videos, traffic, retention, demographics) {
+    destroyCharts();
+    applyChartTheme();
+    chartSnapshot = {
+      traffic,
+      retention,
+      demographics,
+      recentVideosBar: overview.recentVideosBar || [],
+      viewsTrend7d: overview.viewsTrend7d || [],
+      viewsTrend7dDays: overview.viewsTrend7dDays || [],
+      viewsTrendNote: overview.viewsTrendNote,
+      subscriberTrend: overview.subscriberTrend,
+      videos: videos || [],
+    };
+    renderTrafficChart(traffic);
+    bindRetentionTabs(retention, videos || []);
+    renderRetentionChart(retention, videos || [], activeRetentionFormat);
+    renderDemographicsCharts(demographics);
+    renderRecentVideosChart(overview.recentVideosBar || []);
+    renderViews7dChart(
+      overview.viewsTrend7d || [],
+      overview.viewsTrendNote,
+      overview.viewsTrend7dDays || []
+    );
+    renderSubscriberChart(overview.subscriberTrend);
+    requestAnimationFrame(resizeCharts);
+  }
+
   async function loadReport(refresh, options = {}) {
     const quiet = Boolean(options.quiet);
     const seq = ++loadSeq;
@@ -2337,7 +2380,7 @@
       els.loading?.classList.add("hidden");
       els.root.classList.add("hidden");
       els.error?.classList.add("hidden");
-      setPageLoading(true, refresh ? "데이터를 갱신하는 중…" : "보고 데이터를 불러오는 중…", "YouTube · Analytics · 프로모션");
+      setPageLoading(true, refresh ? "데이터를 갱신하는 중…" : "보고 데이터를 불러오는 중…", "채널 개요");
       setStatus(refresh ? "API 요청 중…" : "불러오는 중…");
       stopSubscriberLivePoll();
       destroyCharts();
@@ -2347,70 +2390,35 @@
 
     try {
       const onStep = (step) => {
+        if (quiet) return;
         setPageLoading(true, refresh ? "데이터를 갱신하는 중…" : "보고 데이터를 불러오는 중…", step);
         setStatus(step);
       };
+      const q = refresh ? "?refresh=1" : "";
       onStep("채널 개요 (YouTube Data API)");
-      const overview = await apiGet(`/api/dddit/youtube/report/overview${refresh ? "?refresh=1" : ""}`);
-      if (seq !== loadSeq) return;
-      onStep("영상 목록 (YouTube Data API)");
-      const videosData = await apiGet(
-        `/api/dddit/youtube/report/videos${refresh ? "?refresh=1" : ""}`
-      );
-      if (seq !== loadSeq) return;
-      const { traffic, retention, demographics } = await loadAnalyticsExtras(refresh, onStep);
+      // Overview + Analytics extras in parallel (extras tolerate failure).
+      const extrasPromise = loadAnalyticsExtras(refresh, onStep);
+      const overview = await apiGet(`/api/dddit/youtube/report/overview${q}`);
       if (seq !== loadSeq) return;
 
-      const ch = overview.channel || {};
-      els.title.textContent = `${ch.title || "디디딧"} · 채널 현황 분석`;
-      els.subtitle.textContent = `생성: ${new Date(overview.generatedAt).toLocaleString("ko-KR")} · ${ch.source || "api"}`;
-      if (els.channelLink && ch.channelUrl) {
-        els.channelLink.href = ch.channelUrl;
+      onStep("영상 목록");
+      const videosPromise = apiGet(`/api/dddit/youtube/report/videos${q}`);
+      // First paint as soon as overview is ready — don't wait for Analytics extras.
+      paintOverviewShell(overview, []);
+      if (!quiet) {
+        els.loading?.classList.add("hidden");
+        els.root.classList.remove("hidden");
+        setPageLoading(false);
+        hideError();
+        setStatus(refresh ? "차트 불러오는 중…" : `차트 불러오는 중… · ${cacheStatusText()}`, "");
       }
 
-      apiConnections = overview.apiConnections || [];
-      renderKpis(overview.kpis || {}, overview.channel?.subscriberCount);
-      renderAnalyticsOverview(overview.analytics);
-      renderInsights(overview.insights || []);
-      promoPage = 0;
-      videoPage = 0;
-      renderPromotions(overview.promotions || []);
-      renderVideos(videosData.videos || []);
-
-      await loadEditors();
+      const [videosData, extras] = await Promise.all([videosPromise, extrasPromise]);
       if (seq !== loadSeq) return;
-
-      // Chart.js needs visible parent to measure canvas size.
-      els.loading?.classList.add("hidden");
-      els.root.classList.remove("hidden");
-      setPageLoading(false);
-      hideError();
-
-      destroyCharts();
-      applyChartTheme();
-      chartSnapshot = {
-        traffic,
-        retention,
-        demographics,
-        recentVideosBar: overview.recentVideosBar || [],
-        viewsTrend7d: overview.viewsTrend7d || [],
-        viewsTrend7dDays: overview.viewsTrend7dDays || [],
-        viewsTrendNote: overview.viewsTrendNote,
-        subscriberTrend: overview.subscriberTrend,
-        videos: videosData.videos || [],
-      };
-      renderTrafficChart(traffic);
-      bindRetentionTabs(retention, videosData.videos || []);
-      renderRetentionChart(retention, videosData.videos || [], activeRetentionFormat);
-      renderDemographicsCharts(demographics);
-      renderRecentVideosChart(overview.recentVideosBar || []);
-      renderViews7dChart(
-        overview.viewsTrend7d || [],
-        overview.viewsTrendNote,
-        overview.viewsTrend7dDays || []
-      );
-      renderSubscriberChart(overview.subscriberTrend);
-      requestAnimationFrame(resizeCharts);
+      const videos = videosData.videos || [];
+      renderVideos(videos);
+      const { traffic, retention, demographics } = extras;
+      paintCharts(overview, videos, traffic, retention, demographics);
 
       if (refresh) {
         markApiRefreshed();
@@ -2443,8 +2451,12 @@
       !els.root.classList.contains("hidden") &&
       (!els.error || els.error.classList.contains("hidden"));
     if (shouldAutoRefresh()) {
-      // Soft paint succeeded → refresh quietly. Soft failed → full refresh UI.
-      await loadReport(true, { quiet: softOk });
+      if (softOk) {
+        // Don't block the open experience on a second full YouTube pull.
+        void loadReport(true, { quiet: true });
+      } else {
+        await loadReport(true);
+      }
     } else if (!softOk) {
       await loadReport(true);
     }
