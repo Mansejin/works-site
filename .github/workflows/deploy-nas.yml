@@ -86,9 +86,9 @@ jobs:
             export WORKS_BRANCH
             export WORKS_DOCKER_SUDO="${WORKS_DOCKER_SUDO:-1}"
             export NAS_REPO_PATH="$REPO"
+            mkdir -p "$(dirname "$REPO")"
             curl -fsSL "https://raw.githubusercontent.com/Mansejin/works-site/${WORKS_BRANCH}/api/scripts/nas-docker-update.sh" -o /tmp/works-api-deploy.sh
             sed -i 's/\r$//' /tmp/works-api-deploy.sh 2>/dev/null || true
-            cd "$REPO"
             sh /tmp/works-api-deploy.sh --full-build
             # Ensure TEAM_GATE_SECRET + STUDIO_IMPORT_SECRET exist, recreate containers
             curl -fsSL "https://raw.githubusercontent.com/Mansejin/works-site/${WORKS_BRANCH}/api/scripts/nas-harden-security-env.sh" -o /tmp/works-api-harden-env.sh

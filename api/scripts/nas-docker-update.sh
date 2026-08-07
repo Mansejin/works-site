@@ -11,9 +11,10 @@
 
 set -e
 
-REPO_DIR="/volume1/docker/works-site"
+REPO_DIR="${NAS_REPO_PATH:-/volume1/docker/works-site}"
 COMPOSE_DIR="$REPO_DIR/api"
 GIT_IMAGE="alpine/git:latest"
+GIT_REMOTE_URL="${WORKS_GIT_REMOTE:-https://github.com/Mansejin/works-site.git}"
 PULL_ONLY=0
 FORCE_BUILD=0
 
@@ -89,6 +90,59 @@ resolve_git() {
     return
   fi
   echo ""
+}
+
+git_bootstrap_clone() {
+  parent=$(dirname "$REPO_DIR")
+  name=$(basename "$REPO_DIR")
+  stamp=$(date '+%Y%m%d%H%M%S')
+  backup=""
+  env_backup=""
+  logs_backup=""
+
+  mkdir -p "$parent"
+  if [ -d "$REPO_DIR" ]; then
+    if [ -f "$REPO_DIR/api/.env" ]; then
+      env_backup="/tmp/works-api-env-$stamp"
+      cp "$REPO_DIR/api/.env" "$env_backup"
+      log "==> preserved api/.env -> $env_backup"
+    fi
+    if [ -d "$REPO_DIR/api/logs" ]; then
+      logs_backup="/tmp/works-api-logs-$stamp"
+      cp -a "$REPO_DIR/api/logs" "$logs_backup"
+      log "==> preserved api/logs -> $logs_backup"
+    fi
+    backup="${REPO_DIR}.bak-$stamp"
+    mv "$REPO_DIR" "$backup"
+    log "==> moved broken tree to $backup"
+  fi
+
+  GIT=$(resolve_git)
+  if [ -n "$GIT" ]; then
+    log "==> bootstrap clone via $GIT ($BRANCH)"
+    "$GIT" -C "$parent" clone --branch "$BRANCH" --single-branch "$GIT_REMOTE_URL" "$name"
+  else
+    log "==> bootstrap clone via docker ($BRANCH)"
+    ensure_docker_access
+    $DOCKER run --rm \
+      --entrypoint sh \
+      -v "$parent:/git" \
+      -w /git \
+      "$GIT_IMAGE" \
+      -ec "git clone --branch '$BRANCH' --single-branch '$GIT_REMOTE_URL' '$name'"
+  fi
+
+  if [ -n "$env_backup" ] && [ -f "$env_backup" ]; then
+    mkdir -p "$REPO_DIR/api"
+    cp "$env_backup" "$REPO_DIR/api/.env"
+    log "==> restored api/.env"
+  fi
+  if [ -n "$logs_backup" ] && [ -d "$logs_backup" ]; then
+    mkdir -p "$REPO_DIR/api"
+    rm -rf "$REPO_DIR/api/logs"
+    mv "$logs_backup" "$REPO_DIR/api/logs"
+    log "==> restored api/logs"
+  fi
 }
 
 git_sync_deploy() {
@@ -209,10 +263,16 @@ fi
 mkdir -p "$LOG_DIR"
 log "==> works-api deploy start (branch=$BRANCH)"
 
+mkdir -p "$(dirname "$REPO_DIR")"
+if [ ! -d "$REPO_DIR/.git" ]; then
+  log "==> no .git in $REPO_DIR — bootstrapping clone"
+  git_bootstrap_clone
+fi
+
 cd "$REPO_DIR" || exit 1
 
 if [ ! -d .git ]; then
-  log "ERROR: no .git in $REPO_DIR — clone Mansejin/works-site first"
+  log "ERROR: bootstrap failed — still no .git in $REPO_DIR"
   exit 1
 fi
 
