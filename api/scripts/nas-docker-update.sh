@@ -174,8 +174,35 @@ git_bootstrap_clone() {
 }
 
 git_preserve_excludes() {
-  # Flags for git clean -e (do not delete local secrets / Synology overrides)
-  echo "-e api/.env -e api/logs -e api/docker-compose.override.yml"
+  # Flags for git clean -e (do not delete local secrets / Synology overrides / runtime data)
+  echo "-e api/.env -e api/logs -e api/docker-compose.override.yml -e .deploy-preserve -e api/data/youtube/promotions.json -e api/data/youtube/ad-subscriber-events.json"
+}
+
+PRESERVE_RUNTIME_FILES="api/data/youtube/promotions.json"
+
+deploy_preserve_runtime_backup() {
+  dest="$REPO_DIR/.deploy-preserve"
+  mkdir -p "$dest"
+  for rel in $PRESERVE_RUNTIME_FILES; do
+    src="$REPO_DIR/$rel"
+    if [ -f "$src" ]; then
+      mkdir -p "$dest/$(dirname "$rel")"
+      cp -a "$src" "$dest/$rel"
+      log "==> preserved $rel"
+    fi
+  done
+}
+
+deploy_preserve_runtime_restore() {
+  dest="$REPO_DIR/.deploy-preserve"
+  for rel in $PRESERVE_RUNTIME_FILES; do
+    bak="$dest/$rel"
+    if [ -f "$bak" ]; then
+      mkdir -p "$REPO_DIR/$(dirname "$rel")"
+      cp -a "$bak" "$REPO_DIR/$rel"
+      log "==> restored $rel (NAS local)"
+    fi
+  done
 }
 
 git_sync_deploy() {
@@ -200,7 +227,7 @@ git_sync_deploy() {
     -ec "
       git config --global --add safe.directory /git
       git fetch origin '$BRANCH'
-      git clean -fd -e api/.env -e api/logs -e api/docker-compose.override.yml
+      git clean -fd -e api/.env -e api/logs -e api/docker-compose.override.yml -e .deploy-preserve -e api/data/youtube/promotions.json -e api/data/youtube/ad-subscriber-events.json
       git reset --hard 'origin/$BRANCH'
       git rev-parse --short HEAD
     ")
@@ -365,7 +392,9 @@ if [ -z "$WORKS_PRE_SYNC_REV" ]; then
   WORKS_PRE_SYNC_REV=$(git_current_rev)
 fi
 OLD_REV="$WORKS_PRE_SYNC_REV"
+deploy_preserve_runtime_backup
 git_sync_deploy
+deploy_preserve_runtime_restore
 SYNCED_REV=$(git_current_rev)
 
 REPO_SCRIPT="$REPO_DIR/api/scripts/nas-docker-update.sh"

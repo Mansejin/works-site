@@ -10,3 +10,9 @@
 credentials*.json
 token.json
 **/service-account*.json
+
+# NAS-local runtime data (deploy must not overwrite edits / budgets)
+api/data/youtube/promotions.json
+api/data/youtube/ad-subscriber-events.json
+api/data/youtube/promo-budgets.json
+.deploy-preserve/
