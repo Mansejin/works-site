@@ -1,17 +1,27 @@
 #!/bin/sh
-# Synology NAS: works-site git pull + works-api docker rebuild
+# Synology NAS: works-site git pull + works-api docker update (fast by default)
 #
 # Usage:
 #   cd /volume1/docker/works-site && sh api/scripts/nas-docker-update.sh
 #   cd /volume1/docker/works-site && sh api/scripts/nas-docker-update.sh --pull-only
+#   cd /volume1/docker/works-site && sh api/scripts/nas-docker-update.sh --full-build
 #
-# Branch: WORKS_BRANCH=main sh api/scripts/nas-docker-update.sh
-#        (or WORKS_DEPLOY_BRANCH in api/.env)
+# Branch: WORKS_BRANCH=main  (or WORKS_DEPLOY_BRANCH in api/.env)
+# Path:   NAS_REPO_PATH=/volume1/docker/works-site
 # Sudo:   WORKS_DOCKER_SUDO=1
+#
+# Change classes after git sync:
+#   data-only  -> restart works-api (no build)
+#   code       -> restart (bind-mounted app/ + server.py) unless image recipe changed
+#   image      -> docker compose up -d --build
+#   --full-build always forces image rebuild
 
 set -e
 
 REPO_DIR="${NAS_REPO_PATH:-/volume1/docker/works-site}"
+if [ -z "$REPO_DIR" ]; then
+  REPO_DIR="/volume1/docker/works-site"
+fi
 COMPOSE_DIR="$REPO_DIR/api"
 GIT_IMAGE="alpine/git:latest"
 GIT_REMOTE_URL="${WORKS_GIT_REMOTE:-https://github.com/Mansejin/works-site.git}"
@@ -25,7 +35,7 @@ for arg in "$@"; do
   esac
 done
 
-export PATH="/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+export PATH="/usr/local/bin:/var/packages/ContainerManager/target/usr/bin:/var/packages/Docker/target/usr/bin:/var/packages/Git/target/usr/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 log() {
   echo "$@"
@@ -96,21 +106,33 @@ git_bootstrap_clone() {
   parent=$(dirname "$REPO_DIR")
   name=$(basename "$REPO_DIR")
   stamp=$(date '+%Y%m%d%H%M%S')
-  backup=""
   env_backup=""
   logs_backup=""
+  override_backup=""
 
   mkdir -p "$parent"
-  if [ -d "$REPO_DIR" ]; then
-    if [ -f "$REPO_DIR/api/.env" ]; then
+  if [ -d "$REPO_DIR" ] || [ -L "$REPO_DIR" ]; then
+    # Follow symlink target for preserving secrets/logs from real tree
+    real_repo="$REPO_DIR"
+    if [ -L "$REPO_DIR" ]; then
+      log "==> $REPO_DIR is symlink — bootstrap should target real tree, not replace the link"
+      log "ERROR: clone into symlink path is unsafe. Fix NAS_REPO_PATH to the real directory"
+      exit 1
+    fi
+    if [ -f "$real_repo/api/.env" ]; then
       env_backup="/tmp/works-api-env-$stamp"
-      cp "$REPO_DIR/api/.env" "$env_backup"
+      cp "$real_repo/api/.env" "$env_backup"
       log "==> preserved api/.env -> $env_backup"
     fi
-    if [ -d "$REPO_DIR/api/logs" ]; then
+    if [ -d "$real_repo/api/logs" ]; then
       logs_backup="/tmp/works-api-logs-$stamp"
-      cp -a "$REPO_DIR/api/logs" "$logs_backup"
+      cp -a "$real_repo/api/logs" "$logs_backup"
       log "==> preserved api/logs -> $logs_backup"
+    fi
+    if [ -f "$real_repo/api/docker-compose.override.yml" ]; then
+      override_backup="/tmp/works-api-compose-override-$stamp.yml"
+      cp "$real_repo/api/docker-compose.override.yml" "$override_backup"
+      log "==> preserved api/docker-compose.override.yml"
     fi
     backup="${REPO_DIR}.bak-$stamp"
     mv "$REPO_DIR" "$backup"
@@ -143,6 +165,16 @@ git_bootstrap_clone() {
     mv "$logs_backup" "$REPO_DIR/api/logs"
     log "==> restored api/logs"
   fi
+  if [ -n "$override_backup" ] && [ -f "$override_backup" ]; then
+    mkdir -p "$REPO_DIR/api"
+    cp "$override_backup" "$REPO_DIR/api/docker-compose.override.yml"
+    log "==> restored api/docker-compose.override.yml"
+  fi
+}
+
+git_preserve_excludes() {
+  # Flags for git clean -e (do not delete local secrets / Synology overrides)
+  echo "-e api/.env -e api/logs -e api/docker-compose.override.yml"
 }
 
 git_sync_deploy() {
@@ -150,7 +182,8 @@ git_sync_deploy() {
   if [ -n "$GIT" ]; then
     log "==> git sync ($BRANCH) via $GIT"
     "$GIT" -C "$REPO_DIR" fetch origin "$BRANCH" || "$GIT" -C "$REPO_DIR" fetch origin
-    "$GIT" -C "$REPO_DIR" clean -fd -e api/.env -e api/logs
+    # shellcheck disable=SC2046
+    "$GIT" -C "$REPO_DIR" clean -fd $(git_preserve_excludes)
     "$GIT" -C "$REPO_DIR" reset --hard "origin/$BRANCH"
     log "==> git at $("$GIT" -C "$REPO_DIR" rev-parse --short HEAD)"
     return
@@ -166,7 +199,7 @@ git_sync_deploy() {
     -ec "
       git config --global --add safe.directory /git
       git fetch origin '$BRANCH'
-      git clean -fd -e api/.env -e api/logs
+      git clean -fd -e api/.env -e api/logs -e api/docker-compose.override.yml
       git reset --hard 'origin/$BRANCH'
       git rev-parse --short HEAD
     ")
@@ -179,37 +212,69 @@ git_current_rev() {
     "$GIT" -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || true
     return
   fi
+  ensure_docker_access
   $DOCKER run --rm \
-    --entrypoint git \
+    --entrypoint sh \
     -v "$REPO_DIR:/git" \
     -w /git \
     "$GIT_IMAGE" \
-    -C /git rev-parse HEAD 2>/dev/null || true
+    -ec "git config --global --add safe.directory /git; git rev-parse HEAD" 2>/dev/null || true
 }
 
-api_changed() {
+git_diff_names() {
+  old_rev="$1"
+  new_rev="$2"
+  GIT=$(resolve_git)
+  if [ -n "$GIT" ]; then
+    "$GIT" -C "$REPO_DIR" diff --name-only "$old_rev" "$new_rev" 2>/dev/null || true
+    return
+  fi
+  ensure_docker_access
+  $DOCKER run --rm \
+    --entrypoint sh \
+    -v "$REPO_DIR:/git" \
+    -w /git \
+    "$GIT_IMAGE" \
+    -ec "git config --global --add safe.directory /git; git diff --name-only '$old_rev' '$new_rev'" 2>/dev/null || true
+}
+
+# Classify api/ delta: none | data | code | image
+classify_api_changes() {
   old_rev="$1"
   new_rev="$2"
   if [ -z "$old_rev" ] || [ "$old_rev" = "$new_rev" ]; then
-    return 1
+    echo "none"
+    return
   fi
-  GIT=$(resolve_git)
-  if [ -z "$GIT" ]; then
-    ensure_docker_access
-    if $DOCKER run --rm \
-      --entrypoint sh \
-      -v "$REPO_DIR:/git" \
-      -w /git \
-      "$GIT_IMAGE" \
-      -ec "git diff --name-only '$old_rev' '$new_rev' 2>/dev/null | grep -q '^api/'"; then
-      return 0
+
+  names=$(git_diff_names "$old_rev" "$new_rev")
+  api_names=$(printf '%s\n' "$names" | grep '^api/' || true)
+  if [ -z "$api_names" ]; then
+    echo "none"
+    return
+  fi
+
+  # Image recipe / collab service — need rebuild
+  if printf '%s\n' "$api_names" | grep -qE '^api/(Dockerfile|requirements\.txt|conti-collab/|docker-compose\.yml)'; then
+    echo "image"
+    return
+  fi
+
+  # Anything under api/ outside data/ (and not purely docs/scripts of host) → code
+  non_data=$(printf '%s\n' "$api_names" | grep -vE '^api/data/' || true)
+  if [ -n "$non_data" ]; then
+    # scripts/docs only → no container action needed for serving
+    codeish=$(printf '%s\n' "$non_data" | grep -E '^api/(app/|server\.py|conti-collab/)' || true)
+    if [ -n "$codeish" ]; then
+      echo "code"
+      return
     fi
-    return 1
+    # api/scripts, api/docs, tests alone — skip runtime
+    echo "none"
+    return
   fi
-  if "$GIT" -C "$REPO_DIR" diff --name-only "$old_rev" "$new_rev" 2>/dev/null | grep -q '^api/'; then
-    return 0
-  fi
-  return 1
+
+  echo "data"
 }
 
 docker_can_run() {
@@ -228,8 +293,27 @@ ensure_docker_access() {
       return
     fi
   done
-  log "ERROR: cannot access docker daemon. DSM Task Scheduler as root, or WORKS_DOCKER_SUDO=1"
+  log "ERROR: cannot access docker daemon. DSM Task Scheduler as root, or WORKS_DOCKER_SUDO=1 (NOPASSWD docker)"
   exit 126
+}
+
+compose_restart_api() {
+  ensure_docker_access
+  cd "$COMPOSE_DIR" || exit 1
+  log "==> docker compose restart works-api (no build)"
+  if $DOCKER compose restart works-api; then
+    return
+  fi
+  # Fallback if service name differs on older Synology projects
+  log "==> restart via compose up -d --no-build works-api"
+  $DOCKER compose up -d --no-build --no-deps works-api
+}
+
+compose_build_all() {
+  ensure_docker_access
+  cd "$COMPOSE_DIR" || exit 1
+  log "==> docker compose up -d --build (api/)"
+  $DOCKER compose up -d --build --remove-orphans
 }
 
 read_env_flag() {
@@ -261,7 +345,7 @@ if [ -z "$DOCKER" ]; then
 fi
 
 mkdir -p "$LOG_DIR"
-log "==> works-api deploy start (branch=$BRANCH)"
+log "==> works-api deploy start (branch=$BRANCH path=$REPO_DIR)"
 
 mkdir -p "$(dirname "$REPO_DIR")"
 if [ ! -d "$REPO_DIR/.git" ]; then
@@ -284,19 +368,16 @@ git_sync_deploy
 SYNCED_REV=$(git_current_rev)
 
 REPO_SCRIPT="$REPO_DIR/api/scripts/nas-docker-update.sh"
-case "$0" in
-  "$REPO_SCRIPT"|*/api/scripts/nas-docker-update.sh) ;;
-  *)
-    if [ -f "$REPO_SCRIPT" ]; then
-      if [ "$OLD_REV" != "$SYNCED_REV" ]; then
-        log "==> re-exec deploy script from repo (post git sync, rebuild)"
-        exec sh "$REPO_SCRIPT" --full-build "$@"
-      fi
-      log "==> re-exec deploy script from repo (post git sync)"
-      exec sh "$REPO_SCRIPT" "$@"
-    fi
-    ;;
-esac
+# After sync, re-exec once so DSM/curl callers pick up the updated script.
+# Keep caller flags — never inject --full-build.
+if [ -z "$WORKS_DEPLOY_REEXEC" ] && [ -f "$REPO_SCRIPT" ]; then
+  if [ "$OLD_REV" != "$SYNCED_REV" ] || [ "$(readlink -f "$0" 2>/dev/null || echo "$0")" != "$(readlink -f "$REPO_SCRIPT" 2>/dev/null || echo "$REPO_SCRIPT")" ]; then
+    export WORKS_DEPLOY_REEXEC=1
+    export WORKS_PRE_SYNC_REV="$OLD_REV"
+    log "==> re-exec deploy script from repo (post git sync)"
+    exec sh "$REPO_SCRIPT" "$@"
+  fi
+fi
 
 NEW_REV="$SYNCED_REV"
 
@@ -306,14 +387,28 @@ if [ "$PULL_ONLY" = "1" ]; then
   exit 0
 fi
 
-if [ "$FORCE_BUILD" = "1" ] || api_changed "$OLD_REV" "$NEW_REV"; then
-  ensure_docker_access
-  log "==> docker compose up -d --build (api/)"
-  cd "$COMPOSE_DIR" || exit 1
-  $DOCKER compose up -d --build --remove-orphans
+if [ "$FORCE_BUILD" = "1" ]; then
+  kind="image"
 else
-  log "==> api/ unchanged — skip docker build"
+  kind=$(classify_api_changes "$OLD_REV" "$NEW_REV")
 fi
+log "==> change class: $kind (old=${OLD_REV:-none} new=${NEW_REV:-none})"
+
+case "$kind" in
+  image)
+    compose_build_all
+    ;;
+  code|data)
+    compose_restart_api
+    ;;
+  none)
+    log "==> api runtime unchanged — skip docker"
+    ;;
+  *)
+    log "WARN: unknown class '$kind' — restart works-api"
+    compose_restart_api
+    ;;
+esac
 
 if command -v curl >/dev/null 2>&1; then
   port=8788
@@ -336,7 +431,7 @@ if command -v curl >/dev/null 2>&1; then
   if [ "$health_ok" = "1" ]; then
     log "==> health OK (:${port})"
   else
-    log "WARN: health check failed after 60s — docker logs works-api --tail 50"
+    log "WARN: health check failed after 60s — check docker logs for works-api / p8e1b72d-w1"
   fi
 fi
 

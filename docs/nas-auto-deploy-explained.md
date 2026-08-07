@@ -1,7 +1,8 @@
 # NAS 자동 배포 시스템 이해하기 (works-site)
 
 다른 사람에게 **「git push만 하면 NAS에 API가 반영되는 이유」**를 설명할 때 쓰는 요약 문서입니다.  
-셋업 절차만 필요하면 → [`api/docs/deploy-nas-auto.md`](../api/docs/deploy-nas-auto.md)
+셋업 절차만 필요하면 → [`api/docs/deploy-nas-auto.md`](../api/docs/deploy-nas-auto.md)  
+로컬에서 빠른 배포로 고칠 때 → [`docs/nas-fast-deploy-handoff.md`](./nas-fast-deploy-handoff.md)
 
 ---
 
