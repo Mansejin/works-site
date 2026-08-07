@@ -614,16 +614,16 @@ async def fetch_videos_traffic_source_views(
         return {}
 
     earliest = _earliest_published_date(published_ats)
-    end = date.today() - timedelta(days=1)
+    # Studio Advanced Mode "게시일 ~ 현재" includes the current day; Analytics
+    # still accepts endDate=today (partial day counts as available).
+    end = date.today()
     if earliest is not None:
         start = earliest
-        # Analytics rejects start > end for brand-new uploads.
         if start > end:
             start = end
     else:
-        start_s, end_s = _date_range(365)
+        start_s, _ = _date_range(365)
         start = date.fromisoformat(start_s)
-        end = date.fromisoformat(end_s)
 
     start_date, end_date = start.isoformat(), end.isoformat()
     cache_key = (
