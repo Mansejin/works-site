@@ -72,7 +72,7 @@ for _brand in PUBLIC_BRANDS:
 
 DEFAULT_OWNER_EMAILS = (
     "adoholabusiness@gmail.com",
-    "Sae3648@gmail.com",
+    "sae3648@gmail.com",
 )
 DEFAULT_COMPANY_EXTRA = (
     "peppe841107@gmail.com",
@@ -129,13 +129,12 @@ def parse_emails(*raw_lists: str) -> list[str]:
     seen: set[str] = set()
     for raw in raw_lists:
         for part in (raw or "").split(","):
-            email = part.strip()
+            email = part.strip().lower()
             if not email:
                 continue
-            key = email.lower()
-            if key in seen:
+            if email in seen:
                 continue
-            seen.add(key)
+            seen.add(email)
             out.append(email)
     return out
 
@@ -202,7 +201,7 @@ def main() -> None:
 
     owner_emails = parse_emails(os.environ.get("WORKS_ACCESS_OWNER_EMAILS", ""))
     if not owner_emails:
-        owner_emails = list(DEFAULT_OWNER_EMAILS)
+        owner_emails = parse_emails(",".join(DEFAULT_OWNER_EMAILS))
 
     company_emails = parse_emails(
         os.environ.get("WORKS_ACCESS_COMPANY_EMAILS", ""),
