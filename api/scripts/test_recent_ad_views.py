@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for recent longform ad-view attribution."""
+"""Unit tests for recent longform traffic-source / ad-view attribution."""
 
 from __future__ import annotations
 
@@ -10,7 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.routes.youtube_report import _build_recent_videos_bar
-from app.youtube_analytics import aggregate_video_advertising_views
+from app.youtube_analytics import (
+    aggregate_video_advertising_views,
+    aggregate_video_traffic_source_views,
+)
 
 
 def test_aggregate_sums_advertising_only() -> None:
@@ -22,6 +25,47 @@ def test_aggregate_sums_advertising_only() -> None:
         {"video": "c", "insightTrafficSourceType": "SUBSCRIBER", "views": 99},
     ]
     assert aggregate_video_advertising_views(rows) == {"a": 100, "b": 25}
+
+
+def test_aggregate_traffic_source_totals() -> None:
+    rows = [
+        {"video": "daiso", "insightTrafficSourceType": "ADVERTISING", "views": 20387},
+        {"video": "daiso", "insightTrafficSourceType": "YT_SEARCH", "views": 77},
+        {"video": "daiso", "insightTrafficSourceType": "BROWSE_FEATURES", "views": 71},
+        {"video": "daiso", "insightTrafficSourceType": "CHANNEL_PAGE", "views": 47},
+        {"video": "daiso", "insightTrafficSourceType": "DIRECT_OR_UNKNOWN", "views": 9},
+        {"video": "daiso", "insightTrafficSourceType": "EXT_URL", "views": 5},
+        {"video": "daiso", "insightTrafficSourceType": "END_SCREEN", "views": 4},
+        {"video": "daiso", "insightTrafficSourceType": "NOTIFICATION", "views": 3},
+        {"video": "daiso", "insightTrafficSourceType": "RELATED_VIDEO", "views": 1},
+        {"video": "daiso", "insightTrafficSourceType": "OTHER", "views": 1},
+        {"video": "daiso", "insightTrafficSourceType": "PLAYLIST", "views": 1},
+    ]
+    totals = aggregate_video_traffic_source_views(rows)
+    assert totals["daiso"]["views"] == 20606
+    assert totals["daiso"]["adViews"] == 20387
+
+
+def test_chart_uses_traffic_sum_for_views() -> None:
+    videos = [
+        {
+            "id": "vid-daiso",
+            "title": "다이소 여름 꿀템 BEST 20",
+            "views": 20585,  # Data API (slightly off vs Studio Advanced Mode)
+            "durationSec": 586,
+        }
+    ]
+    rows = _build_recent_videos_bar(
+        videos,
+        promotions=[],
+        traffic_views_map={"vid-daiso": {"views": 20606, "adViews": 20387}},
+    )
+    assert rows[0]["views"] == 20606
+    assert rows[0]["dataApiViews"] == 20585
+    assert rows[0]["adViews"] == 20387
+    assert rows[0]["organicViews"] == 20606 - 20387
+    assert rows[0]["viewsSource"] == "traffic"
+    assert rows[0]["adViewsSource"] == "analytics"
 
 
 def test_chart_prefers_analytics_over_small_promo() -> None:
@@ -45,7 +89,7 @@ def test_chart_prefers_analytics_over_small_promo() -> None:
     rows = _build_recent_videos_bar(
         videos,
         promotions,
-        ad_views_map={"vid-lumena": 5660},
+        traffic_views_map={"vid-lumena": {"views": 5974, "adViews": 5660}},
     )
     assert len(rows) == 1
     assert rows[0]["adViews"] == 5660
@@ -78,7 +122,9 @@ def test_chart_uses_promo_when_analytics_missing() -> None:
             "views": 67,
         },
     ]
-    rows = _build_recent_videos_bar(videos, promotions, ad_views_map={})
+    rows = _build_recent_videos_bar(videos, promotions, traffic_views_map={})
+    assert rows[0]["views"] == 10808
+    assert rows[0]["viewsSource"] == "dataApi"
     assert rows[0]["adViews"] == 365
     assert rows[0]["adViewsSource"] == "promo"
 
@@ -95,7 +141,7 @@ def test_chart_picks_up_ads_without_studio_promo() -> None:
     rows = _build_recent_videos_bar(
         videos,
         promotions=[],
-        ad_views_map={"vid-daiso": 19880},
+        traffic_views_map={"vid-daiso": {"views": 20585, "adViews": 19880}},
     )
     assert rows[0]["adViews"] == 19880
     assert rows[0]["organicViews"] == 20585 - 19880
@@ -104,6 +150,8 @@ def test_chart_picks_up_ads_without_studio_promo() -> None:
 
 if __name__ == "__main__":
     test_aggregate_sums_advertising_only()
+    test_aggregate_traffic_source_totals()
+    test_chart_uses_traffic_sum_for_views()
     test_chart_prefers_analytics_over_small_promo()
     test_chart_uses_promo_when_analytics_missing()
     test_chart_picks_up_ads_without_studio_promo()

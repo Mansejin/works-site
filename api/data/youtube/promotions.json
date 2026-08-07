@@ -125,21 +125,22 @@
       "id": "dreame-mf10-subs",
       "title": "드리미 MF10 (구독)",
       "videoTitle": "다이슨이 긴장해야 할까? 드리미 MF10 직접 써봤습니다 #드리미 #MF10 #선풍기 #블레이드리스선풍기",
-      "videoId": "",
-      "status": "진행중",
+      "videoId": "pHeR-cBD8pc",
+      "status": "완료",
       "goal": "시청자층 성장",
-      "cost": 114495,
-      "impressions": 51921,
-      "views": 941,
-      "subscribers": 368,
-      "followOnViews": 8,
+      "cost": 169905,
+      "impressions": 79055,
+      "views": 1422,
+      "subscribers": 593,
+      "followOnViews": 14,
       "source": "manual",
       "notes": [
-        "Studio 캡처 2026-07-16",
-        "활성"
+        "Studio 캡처 2026-08-07",
+        "종료됨 · 시청자층 성장 · 종료일 2026-07-20"
       ],
       "budget": 170000,
-      "capturedAt": "2026-07-16"
+      "capturedAt": "2026-08-07",
+      "endDate": "2026-07-20"
     },
     {
       "id": "redmi-pad2-subs",
@@ -207,21 +208,22 @@
       "id": "dreame-mf10-views",
       "title": "드리미 MF10 (조회수)",
       "videoTitle": "다이슨이 긴장해야 할까? 드리미 MF10 직접 써봤습니다 #드리미 #MF10 #선풍기 #블레이드리스선풍기",
-      "videoId": "",
-      "status": "진행중",
+      "videoId": "pHeR-cBD8pc",
+      "status": "완료",
       "goal": "동영상 조회수",
-      "cost": 54411,
-      "impressions": 28547,
-      "views": 2278,
+      "cost": 80000,
+      "impressions": 42333,
+      "views": 3540,
       "subscribers": 0,
       "followOnViews": 0,
       "source": "manual",
       "notes": [
-        "Studio 캡처 2026-07-16",
-        "활성"
+        "Studio 캡처 2026-08-07",
+        "종료됨 · 동영상 조회수 · 종료일 2026-07-20"
       ],
       "budget": 90000,
-      "capturedAt": "2026-07-16"
+      "capturedAt": "2026-08-07",
+      "endDate": "2026-07-20"
     },
     {
       "id": "logitech-mobifold-subs",
