@@ -153,6 +153,7 @@ async def _fetch_video_meta(
             meta[video_id] = {
                 "duration": _iso_duration_seconds(duration),
                 "title": title,
+                "publishedAt": str((item.get("snippet") or {}).get("publishedAt") or ""),
             }
     return meta
 
@@ -338,6 +339,86 @@ def _week_index_to_end_date(week_index: Any) -> date | None:
         return date.fromisocalendar(int(text[:4]), int(text[4:]), 7)
     except ValueError:
         return None
+
+
+async def fetch_channel_daily_views(
+    days: int = 7,
+    *,
+    lookback: int = 14,
+    refresh: bool = False,
+) -> dict[str, Any]:
+    """Channel views by day for the recent-views chart (Studio 일별과 동일 계열).
+
+    Analytics lags a day or two; we take the last ``days`` calendar days ending
+    at the newest day Analytics returned (not wall-clock today).
+    """
+    cache_key = f"channel-daily-views:v1:{days}:{lookback}"
+    if not refresh:
+        cached = _cache_get(cache_key)
+        if cached:
+            return cached
+
+    if not _configured():
+        return {**_not_configured_payload("channel-daily-views"), "points": [], "values": []}
+
+    end = date.today() - timedelta(days=1)
+    start = end - timedelta(days=max(lookback, days) - 1)
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            token, channel_id = await _get_token_and_channel(client)
+            body = await _analytics_get(
+                client,
+                token,
+                channel_id,
+                start_date=start.isoformat(),
+                end_date=end.isoformat(),
+                metrics="views",
+                dimensions="day",
+                sort="day",
+                max_results=max(lookback, days) + 5,
+            )
+        by_day = {
+            str(row.get("day") or ""): _safe_int(row.get("views"))
+            for row in _parse_rows(body)
+            if row.get("day")
+        }
+        if not by_day:
+            payload = {
+                "ok": False,
+                "configured": True,
+                "points": [],
+                "values": [],
+                "message": "일별 조회 Analytics 행이 비었습니다",
+            }
+            _cache_set(cache_key, payload)
+            return payload
+
+        last_day = max(by_day)
+        last = date.fromisoformat(last_day)
+        points: list[dict[str, Any]] = []
+        for offset in range(days - 1, -1, -1):
+            day = last - timedelta(days=offset)
+            key = day.isoformat()
+            points.append({"day": key, "views": by_day.get(key, 0)})
+
+        payload = {
+            "ok": True,
+            "configured": True,
+            "period": {"startDate": points[0]["day"], "endDate": points[-1]["day"]},
+            "points": points,
+            "values": [p["views"] for p in points],
+            "message": None,
+        }
+        _cache_set(cache_key, payload)
+        return payload
+    except Exception as exc:
+        return {
+            "ok": False,
+            "configured": True,
+            "points": [],
+            "values": [],
+            "message": f"일별 조회 Analytics 실패: {exc}",
+        }
 
 
 async def fetch_analytics_overview(refresh: bool = False) -> dict[str, Any]:

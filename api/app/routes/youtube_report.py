@@ -20,6 +20,7 @@ from app.youtube_studio_promotions import (
 from app.routes.youtube import _fetch_via_api, _fetch_via_scrape, _format_count
 from app.youtube_analytics import (
     fetch_analytics_overview,
+    fetch_channel_daily_views,
     fetch_demographics,
     fetch_retention,
     fetch_subscriber_weekly_trend,
@@ -481,6 +482,15 @@ def _build_recent_videos_bar(
             views = data_api_views
             views_source = "dataApi"
 
+        published = str(video.get("publishedAt") or "")[:10]
+        traffic_pending = False
+        if views_source == "dataApi" and published:
+            try:
+                pub_day = date.fromisoformat(published)
+                traffic_pending = (date.today() - pub_day).days <= 3
+            except ValueError:
+                traffic_pending = False
+
         # Analytics ADVERTISING is primary; Studio promo views are a floor.
         candidate = max(analytics_ad, promo_ad)
         ad_views = min(views, candidate) if views > 0 else candidate
@@ -501,6 +511,7 @@ def _build_recent_videos_bar(
                 "organicViews": max(0, views - ad_views),
                 "adViewsSource": ad_source,
                 "viewsSource": views_source,
+                "trafficPending": traffic_pending,
                 "isShorts": False,
             }
         )
@@ -1069,19 +1080,33 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             refresh=refresh,
             published_ats=[str(v.get("publishedAt") or "") for v in recent_longform],
         )
+        daily_views = await fetch_channel_daily_views(7, refresh=refresh)
+        if daily_views.get("ok") and daily_views.get("values"):
+            views_trend_7d = list(daily_views.get("values") or [])
+            views_trend_days = [p.get("day") for p in (daily_views.get("points") or [])]
+            views_trend_note = (
+                "채널 일별 조회(YouTube Analytics). "
+                f"기간 {daily_views.get('period', {}).get('startDate')} ~ "
+                f"{daily_views.get('period', {}).get('endDate')} "
+                "(Analytics 반영분만 · 최신 1~2일은 비어 있을 수 있음)."
+            )
+        else:
+            views_trend_7d = list(snapshots_data.get("viewsTrend7d") or [])
+            views_trend_days = []
+            if analytics_overview.get("ok"):
+                views_trend_note = (
+                    "7일 조회 추이 Analytics 조회 실패 — snapshots JSON 수동 값을 표시합니다. "
+                    f"{daily_views.get('message') or ''}".strip()
+                )
+            else:
+                views_trend_note = (
+                    "7일 조회 추이는 subscriber-snapshots.json의 viewsTrend7d 또는 "
+                    "YouTube Analytics OAuth 필요"
+                )
 
         if analytics_overview.get("ok"):
             for video in videos:
                 video["retentionNote"] = ""
-            views_trend_note = (
-                "7일 조회 추이는 snapshots JSON 수동 입력. "
-                "유입·시청 지표는 상단 Analytics(OAuth 연동됨) 참고."
-            )
-        else:
-            views_trend_note = (
-                "7일 조회 추이는 subscriber-snapshots.json의 viewsTrend7d 또는 "
-                "YouTube Analytics OAuth 필요"
-            )
 
         payload = {
             "ok": True,
@@ -1103,7 +1128,8 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
                 traffic_views_map=traffic_views_map,
                 content_types=content_types,
             ),
-            "viewsTrend7d": snapshots_data.get("viewsTrend7d") or [],
+            "viewsTrend7d": views_trend_7d,
+            "viewsTrend7dDays": views_trend_days,
             "viewsTrendNote": views_trend_note,
             "subscriberTrend": _persist_trend_snapshots(
                 snapshots_data,

@@ -167,6 +167,7 @@
       demographics,
       recentVideosBar,
       viewsTrend7d,
+      viewsTrend7dDays,
       viewsTrendNote,
       subscriberTrend,
       videos,
@@ -176,7 +177,7 @@
     renderRetentionChart(retention, videos || [], activeRetentionFormat);
     renderDemographicsCharts(demographics);
     renderRecentVideosChart(recentVideosBar || []);
-    renderViews7dChart(viewsTrend7d || [], viewsTrendNote);
+    renderViews7dChart(viewsTrend7d || [], viewsTrendNote, viewsTrend7dDays);
     renderSubscriberChart(subscriberTrend);
     requestAnimationFrame(resizeCharts);
   }
@@ -488,7 +489,12 @@
               },
               footer(items) {
                 const row = longformRows[items[0]?.dataIndex];
-                return row ? `합계 ${formatNum(row.views)}` : "";
+                if (!row) return "";
+                const lines = [`합계 ${formatNum(row.views)}`];
+                if (row.viewsSource === "traffic") lines.push("기준: Analytics 트래픽소스 합");
+                else if (row.trafficPending) lines.push("신규 영상 · Analytics 트래픽소스 대기 → Data API");
+                else if (row.viewsSource === "dataApi") lines.push("기준: Data API viewCount");
+                return lines.join("\n");
               },
             },
           },
@@ -508,16 +514,23 @@
     });
   }
 
-  function renderViews7dChart(values, note) {
+  function renderViews7dChart(values, note, dayLabels) {
     const ctx = document.getElementById("chart-views-7d");
     if (!ctx) return;
     destroyCanvasChart(ctx);
     charts.views7d = null;
-    const labels = ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "오늘"];
+    const fallback = ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "오늘"];
+    const labels = (dayLabels && dayLabels.length
+      ? dayLabels.map((d) => {
+          const m = String(d || "").match(/(\d{4})-(\d{2})-(\d{2})/);
+          return m ? `${Number(m[2])}/${Number(m[3])}` : d;
+        })
+      : fallback
+    ).slice(-values.length);
     charts.views7d = new Chart(ctx, {
       type: "line",
       data: {
-        labels: labels.slice(-values.length),
+        labels,
         datasets: [
           {
             label: "일 조회",
@@ -2393,6 +2406,7 @@
         demographics,
         recentVideosBar: overview.recentVideosBar || [],
         viewsTrend7d: overview.viewsTrend7d || [],
+        viewsTrend7dDays: overview.viewsTrend7dDays || [],
         viewsTrendNote: overview.viewsTrendNote,
         subscriberTrend: overview.subscriberTrend,
         videos: videosData.videos || [],
@@ -2402,7 +2416,11 @@
       renderRetentionChart(retention, videosData.videos || [], activeRetentionFormat);
       renderDemographicsCharts(demographics);
       renderRecentVideosChart(overview.recentVideosBar || []);
-      renderViews7dChart(overview.viewsTrend7d || [], overview.viewsTrendNote);
+      renderViews7dChart(
+        overview.viewsTrend7d || [],
+        overview.viewsTrendNote,
+        overview.viewsTrend7dDays || []
+      );
       renderSubscriberChart(overview.subscriberTrend);
       requestAnimationFrame(resizeCharts);
 
