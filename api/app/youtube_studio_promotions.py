@@ -1266,6 +1266,13 @@ async def sync_studio_promotions(
 
         merged = merge_studio_into_promotions(promos)
         write_promotions(merged)
+        from app.ad_subscriber_events import ingest_promo_subscriber_snapshots
+
+        ad_delta = ingest_promo_subscriber_snapshots(
+            merged.get("promotions") or [],
+            as_of=datetime.now(timezone.utc).date().isoformat(),
+            source="studio",
+        )
         result = {
             "ok": True,
             "source": source,
@@ -1274,7 +1281,15 @@ async def sync_studio_promotions(
             "promotionCount": len(promos),
             "mergedCount": len(merged.get("promotions") or []),
             "promotions": promos,
-            "message": f"Studio 프로모션 {len(promos)}개 동기화 완료",
+            "adSubscriberDelta": ad_delta.get("deltaAdded") or 0,
+            "message": (
+                f"Studio 프로모션 {len(promos)}개 동기화 완료"
+                + (
+                    f" · 구독 Δ +{ad_delta.get('deltaAdded')}"
+                    if ad_delta.get("deltaAdded")
+                    else ""
+                )
+            ),
         }
         write_sync_meta(
             {

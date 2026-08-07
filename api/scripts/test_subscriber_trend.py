@@ -12,33 +12,23 @@ from app.routes.youtube_report import (  # noqa: E402
     _align_analytics_weeks,
     _build_subscriber_trend,
     _cumulative_promo_subscribers,
-    _promo_ad_subscribers_by_date,
 )
 
 
 def test_promo_timeline_is_date_ordered() -> None:
-    promos = [
-        {
-            "goal": "시청자층 성장",
-            "subscribers": 100,
-            "capturedAt": "2026-07-01",
-            "endDate": "2026-07-10",
-        },
-        {
-            "goal": "시청자층 성장",
-            "subscribers": 200,
-            "capturedAt": "2026-07-16",
-            "endDate": "2026-07-16",
-        },
+    """Legacy helper still sums an event-style timeline."""
+    timeline = [
+        (date(2026, 7, 1), 100),
+        (date(2026, 7, 10), 100),
+        (date(2026, 7, 16), 100),
     ]
-    timeline = _promo_ad_subscribers_by_date(promos)
-    # Default: spread each campaign over 3 weeks ending on credit date
     assert sum(s for _, s in timeline) == 300
     assert _cumulative_promo_subscribers(timeline, date(2026, 7, 20)) == 300
-    assert _cumulative_promo_subscribers(timeline, date(2026, 7, 10)) >= 100
+    assert _cumulative_promo_subscribers(timeline, date(2026, 7, 10)) == 200
 
 
 def test_build_subscriber_trend_uses_promo_dates() -> None:
+    """Without delta events, promo lifetime totals do not invent weekly ad."""
     snapshots = {
         "snapshots": [
             {"label": "2주전", "total": 1000},
@@ -53,23 +43,12 @@ def test_build_subscriber_trend_uses_promo_dates() -> None:
             "capturedAt": "2026-07-01",
             "endDate": "2026-07-01",
         },
-        {
-            "goal": "시청자층 성장",
-            "subscribers": 300,
-            "capturedAt": "2026-07-16",
-            "endDate": "2026-07-16",
-        },
-        {
-            "goal": "동영상 조회수",
-            "subscribers": 99,
-            "notes": ["Studio 캡처 2026-07-16"],
-        },
     ]
     trend = _build_subscriber_trend(snapshots, 1500, promotions=promos)
     points = trend["points"]
     assert len(points) == 3
-    assert points[-1]["adDriven"] <= 700
-    assert points[-1]["organic"] == 1500 - points[-1]["adDriven"]
+    assert points[-1]["adDriven"] == 0
+    assert points[-1]["organic"] == 1500
     assert trend["method"] == "snapshot"
     assert trend.get("organicEstimateEnabled") is False
 
@@ -196,8 +175,18 @@ def test_organic_updates_when_analytics_reports_zero_organic() -> None:
     assert points[2]["adDelta"] > points[2]["organicDelta"]
 
 
-def test_promo_beats_undercounted_analytics_ad() -> None:
-    """Studio promo subs should win when Analytics ADVERTISING undercounts."""
+def test_promo_beats_undercounted_analytics_ad(tmp_path: Path | None = None) -> None:
+    """Sync-delta events should supply ad when weekly Analytics ad is tiny."""
+    import app.ad_subscriber_events as events
+
+    base = tmp_path or (Path(__file__).resolve().parent / "_tmp_promo_beats")
+    base.mkdir(parents=True, exist_ok=True)
+    events.EVENTS_FILE = base / "ad-subscriber-events.json"
+    events.replace_google_ads_subscribe_events(
+        [{"date": "2026-07-16", "promoId": "ads-1", "delta": 400}],
+        wipe_start="2026-07-01",
+        wipe_end="2026-07-31",
+    )
     snapshots = {
         "snapshots": [
             {"label": "2주전", "total": 1000, "organic": 400, "date": "2026-07-05"},
@@ -205,14 +194,6 @@ def test_promo_beats_undercounted_analytics_ad() -> None:
             {"label": "최신", "total": 1500, "organic": 440, "date": "2026-07-19"},
         ]
     }
-    promos = [
-        {
-            "goal": "시청자층 성장",
-            "subscribers": 4000,
-            "capturedAt": "2026-07-16",
-            "endDate": "2026-07-16",
-        }
-    ]
     analytics_weeks = {
         "ok": True,
         "weeks": [
@@ -224,17 +205,26 @@ def test_promo_beats_undercounted_analytics_ad() -> None:
     trend = _build_subscriber_trend(
         snapshots,
         2000,
-        promotions=promos,
+        promotions=[],
         analytics_weeks=analytics_weeks,
     )
     points = trend["points"]
     assert points[-1]["total"] == 2000
-    # Tip growth should be mostly ad (promo), not organic
     assert points[-1]["adDelta"] >= points[-1]["organicDelta"]
     assert points[-1]["adDelta"] > 0
 
 
-def test_organic_updates_despite_same_day_promo_dump() -> None:
+def test_organic_updates_despite_same_day_promo_dump(tmp_path: Path | None = None) -> None:
+    import app.ad_subscriber_events as events
+
+    base = tmp_path or (Path(__file__).resolve().parent / "_tmp_promo_dump")
+    base.mkdir(parents=True, exist_ok=True)
+    events.EVENTS_FILE = base / "ad-subscriber-events.json"
+    events.replace_google_ads_subscribe_events(
+        [{"date": "2026-07-16", "promoId": "ads-1", "delta": 500}],
+        wipe_start="2026-07-01",
+        wipe_end="2026-07-31",
+    )
     snapshots = {
         "snapshots": [
             {"label": "2주전", "total": 1000, "organic": 400, "date": "2026-07-05"},
@@ -242,19 +232,12 @@ def test_organic_updates_despite_same_day_promo_dump() -> None:
             {"label": "최신", "total": 1500, "organic": 440, "date": "2026-07-19"},
         ]
     }
-    promos = [
-        {
-            "goal": "시청자층 성장",
-            "subscribers": 4000,
-            "capturedAt": "2026-07-16",
-            "endDate": "2026-07-16",
-        }
-    ]
-    trend = _build_subscriber_trend(snapshots, 2000, promotions=promos)
+    trend = _build_subscriber_trend(snapshots, 2000, promotions=[])
     points = trend["points"]
     assert points[-1]["total"] == 2000
+    # Live tip 2000 vs prior week 1300 → Δ700; 500 event peels majority to ad.
     assert points[-1]["adDelta"] >= points[-1]["organicDelta"]
-    assert points[-1]["adDelta"] > 0
+    assert points[-1]["adDelta"] == 500
 
 def test_live_tip_uses_historical_ad_share_when_signals_undercount() -> None:
     """When Analytics/promo miss the tip, use snapshot ad-share so organic isn't inflated."""
