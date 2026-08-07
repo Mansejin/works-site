@@ -38,7 +38,8 @@ done
 export PATH="/usr/local/bin:/var/packages/ContainerManager/target/usr/bin:/var/packages/Docker/target/usr/bin:/var/packages/Git/target/usr/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 log() {
-  echo "$@"
+  # stderr so command substitutions ($(git_*), kind=$(classify_*)) stay clean
+  echo "$@" >&2
   if [ -n "$LOG_FILE" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG_FILE"
   fi
