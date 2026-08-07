@@ -837,33 +837,40 @@ def _build_subscriber_trend(
     if daily_totals:
         note = (
             "총 구독자는 Analytics 일별 순증으로 Studio 고급모드처럼 역산합니다. "
-            "자연 증가는 주간 총 증가분에서 광고 기여(프로모션)를 뺀 잔여분입니다."
+            "자연/광고 구독 분리는 보류(타당성 확정 후 재도입)."
         )
-        method = "analytics-daily+promo"
+        method = "analytics-daily"
     elif can_rebuild_totals:
         note = (
             "총 구독자는 Analytics 주간 순증으로 역산합니다. "
-            "자연 증가는 주간 총 증가분에서 광고 기여를 뺀 잔여분입니다."
+            "자연/광고 구독 분리는 보류(타당성 확정 후 재도입)."
         )
-        method = "analytics+promo"
+        method = "analytics-weekly"
     elif analytics_ok:
         note = (
             "Analytics 주간 데이터가 일부만 맞아 스냅샷 총구독자를 보완합니다. "
-            "자연 증가는 주간 총 증가분에서 광고 기여를 뺀 잔여분입니다."
+            "자연/광고 구독 분리는 보류."
         )
-        method = "analytics+promo"
+        method = "analytics-partial"
     else:
         note = (
-            "자연 증가는 주간 총 증가분에서 광고 기여(캠페인·분산 귀속)를 뺀 잔여분입니다. "
-            "캠페인 구독은 종료일 하루에 몰지 않고 집행 기간(없으면 3주)에 나눠 반영합니다."
+            "Analytics를 쓸 수 없어 스냅샷 총구독자만 표시합니다. "
+            "자연/광고 구독 분리는 보류."
         )
-        method = "promo-dated"
+        method = "snapshot"
 
     return {
         "points": points,
         "adSubsTotal": ad_subs_total,
         "note": note,
         "method": method,
+        # Organic/ad split kept in points for later revival, but not shown in UI.
+        "organicEstimateEnabled": False,
+        "organicEstimateDraft": (
+            "Draft: weekly total_delta − max(Analytics adGained, Studio promo "
+            "subscribe campaigns spread over campaign window). Rejected for now "
+            "until share validity is confirmed with Studio Advanced Mode."
+        ),
     }
 
 
@@ -916,29 +923,40 @@ def _persist_trend_snapshots(
     snapshots_data: dict[str, Any],
     live_subscribers: int | None,
     trend: dict[str, Any],
+    *,
+    views_trend_7d: list[int] | None = None,
 ) -> dict[str, Any]:
-    """Write back rebuilt totals/organic so disk matches Analytics reverse-walk."""
+    """Persist Analytics-rebuilt totals (+ optional 7d views). Skip organic estimates."""
     points = trend.get("points") or []
     snaps = list(snapshots_data.get("snapshots") or [])
     if not points or not snaps:
         return trend
-    # Keep slot count; rewrite each corresponding point onto disk.
+
+    method = str(trend.get("method") or "")
+    # Avoid writing corrupt snapshot fallbacks when Analytics reverse-walk failed.
+    if not method.startswith("analytics"):
+        return trend
+
     updated: list[dict[str, Any]] = []
     for index, snap in enumerate(snaps):
         row = dict(snap)
         if index < len(points):
             point = points[index]
             row["total"] = int(point.get("total") or row.get("total") or 0)
-            row["organic"] = int(point.get("organic") or 0)
+            row.pop("organic", None)
             if point.get("date"):
                 row["date"] = point["date"]
         updated.append(row)
     if live_subscribers and live_subscribers > 0 and updated:
         updated[-1]["total"] = int(live_subscribers)
-        updated[-1]["organic"] = min(int(updated[-1].get("organic") or 0), int(live_subscribers))
+
     payload = {
         "snapshots": updated,
-        "viewsTrend7d": snapshots_data.get("viewsTrend7d") or [],
+        "viewsTrend7d": (
+            list(views_trend_7d)
+            if views_trend_7d is not None
+            else list(snapshots_data.get("viewsTrend7d") or [])
+        ),
     }
     try:
         write_snapshots(payload)
@@ -1017,11 +1035,6 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
                 channel = scraped
                 channel["source"] = "scrape"
 
-        recent_six = videos[:6]
-        recent_avg = (
-            sum(v.get("views", 0) for v in recent_six) / len(recent_six) if recent_six else 0
-        )
-
         analytics_overview = await fetch_analytics_overview(refresh=refresh)
         subscriber_weekly = await fetch_subscriber_weekly_trend(refresh=refresh)
         ads_status = await get_ads_status()
@@ -1069,7 +1082,13 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             video["isShorts"] = is_shorts_video_record(video, content_types)
         longform_videos = _longform_videos(videos, content_types)
         top_views = max((v.get("views") or 0 for v in longform_videos), default=0)
-        recent_longform = _longform_videos(videos, content_types)[:4]
+        recent_longform_avg = longform_videos[:6]
+        recent_avg = (
+            sum(v.get("views", 0) for v in recent_longform_avg) / len(recent_longform_avg)
+            if recent_longform_avg
+            else 0
+        )
+        recent_longform = longform_videos[:4]
         recent_video_ids = [
             str(v.get("id") or "")
             for v in recent_longform
@@ -1140,6 +1159,7 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
                     promotions=promotions,
                     analytics_weeks=subscriber_weekly,
                 ),
+                views_trend_7d=views_trend_7d if daily_views.get("ok") else None,
             ),
             "promotions": enriched_promos,
             "memo": _overview_memo(promotions_data),
