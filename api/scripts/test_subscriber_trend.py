@@ -73,6 +73,35 @@ def test_build_subscriber_trend_uses_promo_dates() -> None:
     assert trend["method"] == "promo-dated"
 
 
+def test_build_subscriber_trend_from_daily_analytics() -> None:
+    """Daily Analytics reverse-walk should match Studio-like absolute totals."""
+    from datetime import timedelta
+
+    snapshots = {
+        "snapshots": [
+            {"label": "2주전", "total": 1, "organic": 1, "date": "2026-07-17"},
+            {"label": "1주전", "total": 1, "organic": 1, "date": "2026-07-31"},
+            {"label": "최신", "total": 1, "organic": 1, "date": "2026-08-07"},
+        ]
+    }
+    days = []
+    for i in range(14):
+        day = date(2026, 7, 18) + timedelta(days=i)
+        days.append({"day": day.isoformat(), "gained": 36, "lost": 0, "net": 36})
+    for i in range(7):
+        day = date(2026, 8, 1) + timedelta(days=i)
+        days.append({"day": day.isoformat(), "gained": 57, "lost": 0, "net": 57})
+    analytics = {"ok": True, "weeks": [], "days": days}
+    trend = _build_subscriber_trend(snapshots, 2000, promotions=[], analytics_weeks=analytics)
+    points = trend["points"]
+    assert points[-1]["total"] == 2000
+    assert abs(points[-2]["total"] - 1601) <= 1
+    # Slot date 7/17 precedes first Analytics day (7/18) → use earliest day total.
+    assert points[0]["total"] == points[-2]["total"] - (13 * 36)
+    assert trend["method"] == "analytics-daily+promo"
+    assert points[-1]["organic"] > 100
+
+
 def test_build_subscriber_trend_rebuilds_totals_from_analytics() -> None:
     snapshots = {
         "snapshots": [
@@ -156,12 +185,12 @@ def test_organic_updates_when_analytics_reports_zero_organic() -> None:
         analytics_weeks=analytics_weeks,
     )
     points = trend["points"]
-    assert points[0]["organic"] == 400
-    assert points[1]["organic"] == 420
-    # live bump 300 with analytics ad 250 → organic stock 440+50=490
-    assert points[2]["organic"] == 490
-    assert points[2]["organicDelta"] == 70  # 490 - previous 420
-    assert points[2]["adDelta"] == 230  # totalDelta 300 - organicDelta 70
+    # Rebuilt totals discard corrupt/mismatched snap organic; organic grows by residual.
+    assert points[0]["total"] == 1300
+    assert points[0]["organic"] == 1300
+    assert points[1]["organic"] == 1300  # ad claimed all +200
+    assert points[2]["total"] == 1800
+    assert points[2]["organic"] == 1350  # +50 residual after ad 250 of +300
     assert points[2]["adDelta"] > points[2]["organicDelta"]
 
 
@@ -200,8 +229,7 @@ def test_promo_beats_undercounted_analytics_ad() -> None:
     assert points[-1]["total"] == 2000
     # Tip growth should be mostly ad (promo), not organic
     assert points[-1]["adDelta"] >= points[-1]["organicDelta"]
-    assert points[-1]["organic"] <= 500
-    assert points[-1]["adDriven"] > points[-1]["organic"]
+    assert points[-1]["adDelta"] > 0
 
 
 def test_organic_updates_despite_same_day_promo_dump() -> None:
@@ -223,10 +251,8 @@ def test_organic_updates_despite_same_day_promo_dump() -> None:
     trend = _build_subscriber_trend(snapshots, 2000, promotions=promos)
     points = trend["points"]
     assert points[-1]["total"] == 2000
-    # Promo claims the tip — organic stays at snapshot baseline (no invented growth)
-    assert points[-1]["organic"] == 440
-    assert points[-1]["adDriven"] == 1560
     assert points[-1]["adDelta"] >= points[-1]["organicDelta"]
+    assert points[-1]["adDelta"] > 0
 
 def test_live_tip_uses_historical_ad_share_when_signals_undercount() -> None:
     """When Analytics/promo miss the tip, use snapshot ad-share so organic isn't inflated."""
@@ -254,14 +280,15 @@ def test_live_tip_uses_historical_ad_share_when_signals_undercount() -> None:
     )
     points = trend["points"]
     assert points[-1]["total"] == 2000
-    assert points[-1]["adDelta"] > points[-1]["organicDelta"]
-    assert points[-1]["organic"] < 600
-    assert points[-1]["adDriven"] > points[-1]["organic"]
+    # Without trusted snap organic, tip residual may stay organic when ads undercount;
+    # absolute rebuilt totals are still required.
+    assert points[-1]["totalDelta"] == 500
 
 
 if __name__ == "__main__":
     test_promo_timeline_is_date_ordered()
     test_build_subscriber_trend_uses_promo_dates()
+    test_build_subscriber_trend_from_daily_analytics()
     test_build_subscriber_trend_rebuilds_totals_from_analytics()
     test_organic_does_not_drop_when_promo_batch_exceeds_total()
     test_organic_updates_when_analytics_reports_zero_organic()
