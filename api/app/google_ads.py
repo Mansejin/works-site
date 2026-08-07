@@ -103,10 +103,15 @@ def _status_label(status_raw: str) -> str:
     return value or "진행중"
 
 
-def _aggregate_campaign_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _aggregate_campaign_rows(
+    rows: list[dict[str, Any]],
+    *,
+    subscribe_conversions: dict[str, float] | None = None,
+) -> list[dict[str, Any]]:
     """segments.date 일별 행을 campaign.id 기준으로 합산."""
     buckets: dict[str, dict[str, Any]] = {}
     synced_at = datetime.now(timezone.utc).isoformat()
+    subscribe_conversions = subscribe_conversions or {}
 
     for row in rows:
         campaign = row.get("campaign") or {}
@@ -148,6 +153,7 @@ def _aggregate_campaign_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
     for bucket in buckets.values():
         campaign_id = bucket["campaign_id"]
         name = bucket["name"]
+        subs = int(round(float(subscribe_conversions.get(campaign_id) or 0)))
         campaigns.append(
             {
                 "id": f"ads-{campaign_id}" if campaign_id else _slugify(name),
@@ -159,7 +165,7 @@ def _aggregate_campaign_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
                 "impressions": bucket["impressions"],
                 "views": bucket["views"],
                 "clicks": bucket["clicks"],
-                "subscribers": 0,
+                "subscribers": max(0, subs),
                 "source": "google-ads",
                 "syncedAt": synced_at,
             }
@@ -167,6 +173,99 @@ def _aggregate_campaign_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
 
     campaigns.sort(key=lambda c: (-int(c.get("cost") or 0), str(c.get("title") or "")))
     return campaigns
+
+
+async def _fetch_subscribe_conversion_actions(
+    client: httpx.AsyncClient,
+    access_token: str,
+    cfg: dict[str, str],
+) -> list[dict[str, str]]:
+    """Return conversion actions that look like channel-subscribe tracking."""
+    from app.ad_subscriber_events import is_subscribe_conversion_name
+
+    query = """
+        SELECT
+          conversion_action.id,
+          conversion_action.name,
+          conversion_action.category,
+          conversion_action.status
+        FROM conversion_action
+        WHERE conversion_action.status != 'REMOVED'
+    """.strip()
+    rows = await _search_ads(client, access_token, cfg, query)
+    matched: list[dict[str, str]] = []
+    for row in rows:
+        action = row.get("conversionAction") or {}
+        name = str(action.get("name") or "")
+        category = str(action.get("category") or "")
+        if not is_subscribe_conversion_name(name) and "SUBSCRIBE" not in category.upper():
+            continue
+        action_id = str(action.get("id") or "").strip()
+        if not action_id:
+            continue
+        matched.append({"id": action_id, "name": name, "category": category})
+    return matched
+
+
+async def _fetch_subscribe_conversion_days(
+    client: httpx.AsyncClient,
+    access_token: str,
+    cfg: dict[str, str],
+    actions: list[dict[str, str]],
+) -> tuple[list[dict[str, Any]], dict[str, float], str | None, str | None]:
+    """Daily subscribe conversions by campaign + totals per campaign id."""
+    from app.ad_subscriber_events import is_subscribe_conversion_name
+
+    if not actions:
+        return [], {}, None, None
+
+    action_ids = {a["id"] for a in actions}
+    action_names = {a["name"] for a in actions if a.get("name")}
+    query = """
+        SELECT
+          campaign.id,
+          segments.date,
+          segments.conversion_action,
+          segments.conversion_action_name,
+          metrics.conversions
+        FROM campaign
+        WHERE campaign.status != 'REMOVED'
+          AND segments.date DURING LAST_30_DAYS
+          AND metrics.conversions > 0
+    """.strip()
+    rows = await _search_ads(client, access_token, cfg, query)
+    daily: list[dict[str, Any]] = []
+    by_campaign: dict[str, float] = {}
+    dates: list[str] = []
+    for row in rows:
+        campaign = row.get("campaign") or {}
+        segments = row.get("segments") or {}
+        metrics = row.get("metrics") or {}
+        campaign_id = str(campaign.get("id") or "").strip()
+        day = str(segments.get("date") or "")[:10]
+        name = str(segments.get("conversionActionName") or "")
+        resource = str(segments.get("conversionAction") or "")
+        # Resource looks like customers/123/conversionActions/456
+        resource_id = resource.rsplit("/", 1)[-1] if resource else ""
+        if resource_id not in action_ids and name not in action_names:
+            if not is_subscribe_conversion_name(name):
+                continue
+        conversions = float(metrics.get("conversions") or 0)
+        if conversions <= 0 or not campaign_id or not day:
+            continue
+        daily.append(
+            {
+                "date": day,
+                "promoId": f"ads-{campaign_id}",
+                "delta": int(round(conversions)),
+                "conversionAction": name or resource_id,
+            }
+        )
+        by_campaign[campaign_id] = by_campaign.get(campaign_id, 0.0) + conversions
+        dates.append(day)
+    wipe_start = min(dates) if dates else None
+    wipe_end = max(dates) if dates else None
+    return daily, by_campaign, wipe_start, wipe_end
 
 
 async def sync_campaigns(force: bool = False) -> dict[str, Any]:
@@ -209,7 +308,32 @@ async def sync_campaigns(force: bool = False) -> dict[str, Any]:
                 cache_key="google-ads",
             )
             rows = await _search_ads(client, token, cfg, query)
-            campaigns = _aggregate_campaign_rows(rows)
+            subscribe_note = ""
+            subscribe_by_campaign: dict[str, float] = {}
+            try:
+                actions = await _fetch_subscribe_conversion_actions(client, token, cfg)
+                daily, subscribe_by_campaign, wipe_start, wipe_end = (
+                    await _fetch_subscribe_conversion_days(client, token, cfg, actions)
+                )
+                from app.ad_subscriber_events import replace_google_ads_subscribe_events
+
+                if daily:
+                    replace_google_ads_subscribe_events(
+                        daily, wipe_start=wipe_start, wipe_end=wipe_end
+                    )
+                if actions:
+                    subscribe_note = (
+                        f" · 구독전환 {len(actions)}개 / "
+                        f"일별 {sum(r['delta'] for r in daily)}건"
+                    )
+                else:
+                    subscribe_note = " · 구독 전환 액션 없음(이름에 구독/subscribe 필요)"
+            except Exception as conv_exc:  # noqa: BLE001
+                subscribe_note = f" · 구독전환 조회 실패: {conv_exc}"
+
+            campaigns = _aggregate_campaign_rows(
+                rows, subscribe_conversions=subscribe_by_campaign
+            )
 
         sync_payload = {
             "syncedAt": datetime.now(timezone.utc).isoformat(),
@@ -219,6 +343,14 @@ async def sync_campaigns(force: bool = False) -> dict[str, Any]:
         write_ads_sync(sync_payload)
         merged = merge_ads_into_promotions(campaigns)
         write_promotions(merged)
+        from app.ad_subscriber_events import ingest_promo_subscriber_snapshots
+
+        # Watermark Studio/manual subscribe promos too (Ads already upserted daily events).
+        ingest_promo_subscriber_snapshots(
+            merged.get("promotions") or [],
+            as_of=datetime.now(timezone.utc).date().isoformat(),
+            source="ads-sync",
+        )
 
         active = sum(1 for c in campaigns if c.get("status") == "진행중")
         result = {
@@ -233,6 +365,7 @@ async def sync_campaigns(force: bool = False) -> dict[str, Any]:
             "message": (
                 f"{len(campaigns)}개 캠페인 동기화 완료"
                 + (f" (진행중 {active})" if active else "")
+                + subscribe_note
             ),
         }
         _SYNC_CACHE["last"] = {"at": time.time(), "data": result}

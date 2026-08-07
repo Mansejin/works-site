@@ -518,88 +518,16 @@ def _build_recent_videos_bar(
     return rows
 
 
-_PROMO_DATE_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
-
-
-def _promo_subscriber_credit_date(promo: dict[str, Any]) -> date | None:
-    """Date when promo subscriber count applies to the weekly trend."""
-    for key in ("endDate", "capturedAt", "startDate", "completedAt", "updatedAt"):
-        parsed = _parse_promo_iso_date(promo.get(key))
-        if parsed:
-            return date.fromisoformat(parsed)
-    notes_date = _promo_date_from_notes(promo.get("notes"))
-    if notes_date:
-        return date.fromisoformat(notes_date)
-    return None
-
-
-def _parse_promo_iso_date(value: Any) -> str | None:
-    if value is None or value == "":
-        return None
-    try:
-        return date.fromisoformat(str(value)[:10]).isoformat()
-    except ValueError:
-        return None
-
-
-def _promo_date_from_notes(notes: Any) -> str | None:
-    if not isinstance(notes, list):
-        return None
-    for note in notes:
-        match = _PROMO_DATE_RE.search(str(note))
-        if not match:
-            continue
-        try:
-            return date(
-                int(match.group(1)),
-                int(match.group(2)),
-                int(match.group(3)),
-            ).isoformat()
-        except ValueError:
-            continue
-    return None
-
-
-_DEFAULT_PROMO_SPREAD_WEEKS = 3
-
-
-def _promo_spread_weeks(promo: dict[str, Any], credit_end: date) -> int:
-    """How many weeks to spread promo subs over (avoids Studio capture-day dumps)."""
-    start_raw = _parse_promo_iso_date(promo.get("startDate"))
-    if start_raw:
-        start = date.fromisoformat(start_raw)
-        if start < credit_end:
-            days = (credit_end - start).days
-            return max(1, min(8, (days + 6) // 7))
-    return _DEFAULT_PROMO_SPREAD_WEEKS
-
-
 def _promo_ad_subscribers_by_date(promotions: list[dict[str, Any]]) -> list[tuple[date, int]]:
-    """Timeline of promo-attributed subs.
+    """Timeline of advertising subscriber *increments* from sync deltas.
 
-    Studio sync often stamps many campaigns with the same endDate/capturedAt, which
-    previously dumped thousands of ad subs into a single week and froze organic growth.
-    Spread each campaign's subscribers across its run (or 3 weeks by default).
+    Lifetime campaign totals are not spread into weeks (that overcounted).
+    ``promotions`` kept for call-site compatibility; events are the source of truth.
     """
-    rows: list[tuple[date, int]] = []
-    for promo in promotions:
-        if not _is_subscribe_promotion(promo):
-            continue
-        subs = _parse_int(promo.get("subscribers"))
-        if subs <= 0:
-            continue
-        credit_date = _promo_subscriber_credit_date(promo)
-        if not credit_date:
-            continue
-        weeks = _promo_spread_weeks(promo, credit_date)
-        base, rem = divmod(subs, weeks)
-        for offset in range(weeks):
-            portion = base + (rem if offset == weeks - 1 else 0)
-            if portion <= 0:
-                continue
-            rows.append((credit_date - timedelta(weeks=(weeks - 1 - offset)), portion))
-    rows.sort(key=lambda item: item[0])
-    return rows
+    from app.ad_subscriber_events import event_timeline
+
+    _ = promotions
+    return event_timeline()
 
 
 def _snapshot_week_end_dates(snapshot_count: int) -> list[date]:
@@ -986,7 +914,12 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
     promotions_data = read_merged_promotions()
     snapshots_data = read_snapshots()
     promotions = promotions_data.get("promotions") or []
+    from app.ad_subscriber_events import ingest_promo_subscriber_snapshots
+
+    # Seed / advance Studio promo watermarks (no lifetime dump on first sight).
+    ingest_promo_subscriber_snapshots(promotions, source="overview")
     enriched_promos = [{**p, "metrics": _promotion_metrics(p)} for p in promotions]
+
 
     try:
         async with httpx.AsyncClient(timeout=25.0) as client:
