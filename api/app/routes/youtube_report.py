@@ -465,13 +465,17 @@ def _build_recent_videos_bar(
         video_id = str(video.get("id") or "")
         views = _parse_int(video.get("views"))
         promo_ad = _ad_views_for_video(title, video_id, promotions)
-        analytics_ad = (ad_views_map or {}).get(video_id)
-        if analytics_ad is not None and analytics_ad > 0:
-            ad_views = min(views, analytics_ad)
+        analytics_ad = _parse_int((ad_views_map or {}).get(video_id)) if video_id else 0
+        # Analytics ADVERTISING is the primary signal; Studio promo views are a
+        # floor when Analytics is empty/undercounted (same idea as subscriber tip).
+        candidate = max(analytics_ad, promo_ad)
+        ad_views = min(views, candidate)
+        if analytics_ad > 0 and analytics_ad >= promo_ad:
             ad_source = "analytics"
+        elif promo_ad > 0:
+            ad_source = "promo"
         else:
-            ad_views = min(views, promo_ad)
-            ad_source = "promo" if promo_ad > 0 else "none"
+            ad_source = "none"
         rows.append(
             {
                 "videoId": video_id,
