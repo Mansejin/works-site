@@ -26,7 +26,7 @@ from app.youtube_analytics import (
     fetch_traffic_sources,
     fetch_video_content_types,
     fetch_video_detail_analytics,
-    fetch_videos_advertising_views,
+    fetch_videos_traffic_source_views,
     is_shorts_video_record,
 )
 from app.youtube_report_store import (
@@ -456,20 +456,34 @@ def _build_recent_videos_bar(
     promotions: list[dict[str, Any]],
     *,
     limit: int = 4,
-    ad_views_map: dict[str, int] | None = None,
+    traffic_views_map: dict[str, dict[str, int]] | None = None,
     content_types: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
+    """Build stacked bar rows for recent longform videos.
+
+    Prefer Studio Advanced Mode traffic-source sums for ``views`` / ad split
+    when Analytics returned rows; fall back to Data API viewCount + promo.
+    """
     rows: list[dict[str, Any]] = []
     for video in _longform_videos(videos, content_types)[:limit]:
         title = str(video.get("title") or "")
         video_id = str(video.get("id") or "")
-        views = _parse_int(video.get("views"))
+        data_api_views = _parse_int(video.get("views"))
+        traffic = (traffic_views_map or {}).get(video_id) or {}
+        traffic_views = _parse_int(traffic.get("views"))
+        analytics_ad = _parse_int(traffic.get("adViews"))
         promo_ad = _ad_views_for_video(title, video_id, promotions)
-        analytics_ad = _parse_int((ad_views_map or {}).get(video_id)) if video_id else 0
-        # Analytics ADVERTISING is the primary signal; Studio promo views are a
-        # floor when Analytics is empty/undercounted (same idea as subscriber tip).
+
+        if traffic_views > 0:
+            views = traffic_views
+            views_source = "traffic"
+        else:
+            views = data_api_views
+            views_source = "dataApi"
+
+        # Analytics ADVERTISING is primary; Studio promo views are a floor.
         candidate = max(analytics_ad, promo_ad)
-        ad_views = min(views, candidate)
+        ad_views = min(views, candidate) if views > 0 else candidate
         if analytics_ad > 0 and analytics_ad >= promo_ad:
             ad_source = "analytics"
         elif promo_ad > 0:
@@ -482,9 +496,11 @@ def _build_recent_videos_bar(
                 "title": title,
                 "shortLabel": _short_video_label(title, video_id, promotions),
                 "views": views,
+                "dataApiViews": data_api_views,
                 "adViews": ad_views,
                 "organicViews": max(0, views - ad_views),
                 "adViewsSource": ad_source,
+                "viewsSource": views_source,
                 "isShorts": False,
             }
         )
@@ -971,12 +987,17 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
             video["isShorts"] = is_shorts_video_record(video, content_types)
         longform_videos = _longform_videos(videos, content_types)
         top_views = max((v.get("views") or 0 for v in longform_videos), default=0)
+        recent_longform = _longform_videos(videos, content_types)[:4]
         recent_video_ids = [
             str(v.get("id") or "")
-            for v in _longform_videos(videos, content_types)[:4]
+            for v in recent_longform
             if v.get("id")
         ]
-        ad_views_map = await fetch_videos_advertising_views(recent_video_ids, refresh=refresh)
+        traffic_views_map = await fetch_videos_traffic_source_views(
+            recent_video_ids,
+            refresh=refresh,
+            published_ats=[str(v.get("publishedAt") or "") for v in recent_longform],
+        )
 
         if analytics_overview.get("ok"):
             for video in videos:
@@ -1006,7 +1027,10 @@ async def _build_report_overview(refresh: bool = False) -> dict[str, Any]:
                 "recentAvgViewsRaw": int(recent_avg),
             },
             "recentVideosBar": _build_recent_videos_bar(
-                videos, promotions, ad_views_map=ad_views_map, content_types=content_types
+                videos,
+                promotions,
+                traffic_views_map=traffic_views_map,
+                content_types=content_types,
             ),
             "viewsTrend7d": snapshots_data.get("viewsTrend7d") or [],
             "viewsTrendNote": views_trend_note,

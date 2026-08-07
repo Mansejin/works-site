@@ -559,32 +559,84 @@ def aggregate_video_advertising_views(rows: list[dict[str, Any]]) -> dict[str, i
     return result
 
 
-async def fetch_videos_advertising_views(
-    video_ids: list[str], refresh: bool = False
-) -> dict[str, int]:
-    """Per-video ad traffic (ADVERTISING) for recent-videos bar chart.
+def aggregate_video_traffic_source_views(
+    rows: list[dict[str, Any]],
+) -> dict[str, dict[str, int]]:
+    """Per-video totals matching Studio Advanced Mode → Traffic source.
 
-    YouTube Analytics rejects `dimensions=video` combined with
-    `filters=insightTrafficSourceType==ADVERTISING` (HTTP 400). Query
-    `video,insightTrafficSourceType` filtered by video ids, then sum
-    ADVERTISING rows client-side.
+    Returns ``{videoId: {"views": sum(all sources), "adViews": ADVERTISING}}``.
+    """
+    result: dict[str, dict[str, int]] = {}
+    for row in rows:
+        vid = str(row.get("video") or "").strip()
+        if not vid:
+            continue
+        views = _safe_int(row.get("views"))
+        if views <= 0:
+            continue
+        bucket = result.setdefault(vid, {"views": 0, "adViews": 0})
+        bucket["views"] += views
+        source = str(row.get("insightTrafficSourceType") or "").strip()
+        if source in _AD_VIEW_TRAFFIC_SOURCES:
+            bucket["adViews"] += views
+    return result
+
+
+def _earliest_published_date(published_ats: list[str] | None) -> date | None:
+    earliest: date | None = None
+    for raw in published_ats or []:
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        try:
+            day = date.fromisoformat(text[:10])
+        except ValueError:
+            continue
+        if earliest is None or day < earliest:
+            earliest = day
+    return earliest
+
+
+async def fetch_videos_traffic_source_views(
+    video_ids: list[str],
+    refresh: bool = False,
+    *,
+    published_ats: list[str] | None = None,
+) -> dict[str, dict[str, int]]:
+    """Per-video traffic-source breakdown (Studio 고급 모드 → 트래픽 소스).
+
+    Uses the same Analytics query as ad attribution
+    (`video,insightTrafficSourceType`), then sums all sources for ``views``
+    and ADVERTISING for ``adViews`` — matching the Advanced Mode table total.
     """
     ids = [str(v).strip() for v in video_ids if str(v).strip()]
     if not ids or not _configured():
         return {}
 
-    # Longer window so older longform ads are not truncated vs lifetime views.
-    window_days = 365
-    cache_key = f"video-ad-views:v2:{window_days}:{','.join(sorted(ids[:25]))}"
+    earliest = _earliest_published_date(published_ats)
+    end = date.today() - timedelta(days=1)
+    if earliest is not None:
+        start = earliest
+        # Analytics rejects start > end for brand-new uploads.
+        if start > end:
+            start = end
+    else:
+        start_s, end_s = _date_range(365)
+        start = date.fromisoformat(start_s)
+        end = date.fromisoformat(end_s)
+
+    start_date, end_date = start.isoformat(), end.isoformat()
+    cache_key = (
+        f"video-traffic-views:v1:{start_date}:{end_date}:{','.join(sorted(ids[:25]))}"
+    )
     if not refresh:
         cached = _cache_get(cache_key)
         if cached is not None:
             return cached
 
-    start_date, end_date = _date_range(window_days)
-    result: dict[str, int] = {}
+    result: dict[str, dict[str, int]] = {}
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=45.0) as client:
             token, channel_id = await _get_token_and_channel(client)
             id_filter = ",".join(ids[:25])
             body = await _analytics_get(
@@ -597,13 +649,21 @@ async def fetch_videos_advertising_views(
                 dimensions="video,insightTrafficSourceType",
                 filters=f"video=={id_filter}",
                 sort="-views",
-                max_results=200,
+                max_results=400,
             )
-            result = aggregate_video_advertising_views(_parse_rows(body))
+            result = aggregate_video_traffic_source_views(_parse_rows(body))
         _cache_set(cache_key, result)
     except Exception:
         return result
     return result
+
+
+async def fetch_videos_advertising_views(
+    video_ids: list[str], refresh: bool = False
+) -> dict[str, int]:
+    """Per-video ADVERTISING views (subset of traffic-source fetch)."""
+    traffic = await fetch_videos_traffic_source_views(video_ids, refresh=refresh)
+    return {vid: int(payload.get("adViews") or 0) for vid, payload in traffic.items()}
 
 
 async def fetch_traffic_sources(refresh: bool = False) -> dict[str, Any]:
